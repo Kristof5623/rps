@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kő Papír Olló</title>
+    <link rel="stylesheet" href="rps.css">
+</head>
+<body>
+    <main class="app">
+        <header class="header">
+            <h1>Kő • Papír • Olló</h1>
+            <p class="subtitle">Játssz a gép ellen — győzz minél többször!</p>
+        </header>
+
+        <section class="board card">
+            <div class="scoreboard">
+                <div class="score">
+                    <div class="label">Player</div>
+                    <div id="win" class="value">0</div>
+                </div>
+                <div class="score">
+                    <div class="label">Ties</div>
+                    <div id="tie" class="value">0</div>
+                </div>
+                <div class="score">
+                    <div class="label">Computer</div>
+                    <div id="lose" class="value">0</div>
+                </div>
+            </div>
+
+            <div id="result" class="result">Válassz egyet</div>
+
+            <div class="choices" id="container">
+                <button class="choice" data-choice="rock" aria-label="rock">🪨<span class="choice-label">Kő</span></button>
+                <button class="choice" data-choice="paper" aria-label="paper">📄<span class="choice-label">Papír</span></button>
+                <button class="choice" data-choice="sisors" aria-label="sisors">✂️<span class="choice-label">Olló</span></button>
+            </div>
+
+            <div class="picked card">
+                <div class="picked-item">
+                    <div class="picked-title">Player</div>
+                    <div id="playerChoice" class="picked-value">—</div>
+                </div>
+                <div class="picked-item">
+                    <div class="picked-title">Computer</div>
+                    <div id="computerChoice" class="picked-value">—</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="resetGame" class="btn reset">Reset</button>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <small>Egyszerű játék — jó szórakozást!</small>
+        </footer>
+    </main>
+
+    <script src="rps.js"></script>
+</body>
+</html>
