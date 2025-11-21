@@ -9,7 +9,7 @@ const win = document.getElementById("win");
 const lose = document.getElementById("lose");
 const tieDisp = document.getElementById("tie");
 const resetBtn = document.getElementById("resetGame");
-const targetURL = "../nyiltnapdisplay/nydisplay.html"; 
+const targetURL = "index.html"; 
 
 function navigateTo(url){
   if (!url) return;
@@ -36,17 +36,17 @@ function playthis(playerChoice){
     let result = "";
 
     if (playerChoice === computerChoice){
-        result = "Döntetlen!";
+        result = "It's a tie!";
     } else {
         switch (playerChoice){
             case "rock":
-                result = (computerChoice === "sisors") ? "Nyertél!" : "Vesztettél!";
+                result = (computerChoice === "sisors") ? "You win!" : "You lose!";
                 break;
             case "paper":
-                result = (computerChoice === "rock") ? "Nyertél!" : "Vesztettél!";
+                result = (computerChoice === "rock") ? "You win!" : "You lose!";
                 break;
             case "sisors":
-                result = (computerChoice === "paper") ? "Nyertél!" : "Vesztettél!";
+                result = (computerChoice === "paper") ? "You win!" : "You lose!";
                 break;
             default:
                 result = "Invalid";
@@ -60,15 +60,15 @@ function playthis(playerChoice){
 
     // result classes for color
     resultDisp.classList.remove("win","lose","tie");
-    if (result === "Nyertél!") resultDisp.classList.add("win");
-    else if (result === "Vesztettál!") resultDisp.classList.add("lose");
-    else resultDisp.classList.add("Döntetlen");
+    if (result === "You win!") resultDisp.classList.add("win");
+    else if (result === "You lose!") resultDisp.classList.add("lose");
+    else resultDisp.classList.add("tie");
 
-    if (result === "Nyertél!"){
+    if (result === "You win!"){
         playerScore++;
-    } else if (result === "Vesztettél!"){
+    } else if (result === "You lose!"){
         computerScore++;
-    } else if (result === "Döntetlen!"){
+    } else if (result === "It's a tie!"){
         tie++;
     }
 
@@ -107,4 +107,8 @@ choices.forEach(btn => {
 resetBtn.addEventListener("click", resetGame);
 
 // initialise UI
+
 resetGame();
+
+
+
