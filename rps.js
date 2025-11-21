@@ -68,7 +68,7 @@ function playthis(playerChoice){
         playerScore++;
     } else if (result === "Vesztettél!"){
         computerScore++;
-    } else if (result === "Döntettlen!"){
+    } else if (result === "Döntetlen!"){
         tie++;
     }
 
