@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor Pro</title>
+    <title>Verseny Kalkulátor Pro v6</title>
     <style>
         :root {
             --bg: #000000;
@@ -66,7 +66,6 @@
             margin-top: 5px;
         }
 
-        /* Megakadályozza az iOS nagyítást fókuszkor */
         input:focus { outline: 2px solid var(--primary); font-size: 1.1rem; }
 
         .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
@@ -150,9 +149,9 @@
 
         <label>Verseny rajtja (ÓÓ : PP : MM):</label>
         <div class="time-group">
-            <input type="number" id="vhR" pattern="\d*" placeholder="00" onkeyup="jump(this, 'vmR')"> <span>:</span>
-            <input type="number" id="vmR" pattern="\d*" placeholder="00" onkeyup="jump(this, 'vsR')"> <span>:</span>
-            <input type="number" id="vsR" pattern="\d*" placeholder="00">
+            <input type="number" id="vhR" pattern="\d*" placeholder="00" oninput="jump(this, 'vmR')"> <span>:</span>
+            <input type="number" id="vmR" pattern="\d*" placeholder="00" oninput="jump(this, 'vsR')" onkeydown="jumpBack(event, this, 'vhR')"> <span>:</span>
+            <input type="number" id="vsR" pattern="\d*" placeholder="00" onkeydown="jumpBack(event, this, 'vmR')">
         </div>
 
         <div id="lapInputsContainer"></div>
@@ -167,16 +166,16 @@
         
         <label>Indulás (ÓÓ : PP : MM):</label>
         <div class="time-group">
-            <input type="number" id="rh1" pattern="\d*" onkeyup="jump(this, 'rm1')"> :
-            <input type="number" id="rm1" pattern="\d*" onkeyup="jump(this, 'rs1')"> :
-            <input type="number" id="rs1" pattern="\d*" onkeyup="jump(this, 'rh2')">
+            <input type="number" id="rh1" pattern="\d*" placeholder="00" oninput="jump(this, 'rm1')"> :
+            <input type="number" id="rm1" pattern="\d*" placeholder="00" oninput="jump(this, 'rs1')" onkeydown="jumpBack(event, this, 'rh1')"> :
+            <input type="number" id="rs1" pattern="\d*" placeholder="00" oninput="jump(this, 'rh2')" onkeydown="jumpBack(event, this, 'rm1')">
         </div>
 
         <label>Beérkezés (ÓÓ : PP : MM):</label>
         <div class="time-group">
-            <input type="number" id="rh2" pattern="\d*" onkeyup="jump(this, 'rm2')"> :
-            <input type="number" id="rm2" pattern="\d*" onkeyup="jump(this, 'rs2')"> :
-            <input type="number" id="rs2" pattern="\d*">
+            <input type="number" id="rh2" pattern="\d*" placeholder="00" oninput="jump(this, 'rm2')" onkeydown="jumpBack(event, this, 'rs1')"> :
+            <input type="number" id="rm2" pattern="\d*" placeholder="00" oninput="jump(this, 'rs2')" onkeydown="jumpBack(event, this, 'rh2')"> :
+            <input type="number" id="rs2" pattern="\d*" placeholder="00" onkeydown="jumpBack(event, this, 'rm2')">
         </div>
         <button class="calc-btn" onclick="calcReszido()">Részidő Számolás</button>
         <div id="res1" class="result-box" style="display:none"></div>
@@ -184,11 +183,23 @@
 </div>
 
 <script>
-    // Mobil fókusz ugrás
+    // Előre ugrás, ha 2 számjegyet beírtál
     function jump(current, nextId) {
         if (current.value.length >= 2) {
             const nextEl = document.getElementById(nextId);
             if(nextEl) nextEl.focus();
+        }
+    }
+
+    // Vissza ugrás törlés (Backspace) esetén
+    function jumpBack(event, current, prevId) {
+        if (event.key === "Backspace" && current.value === "") {
+            const prevEl = document.getElementById(prevId);
+            if (prevEl) {
+                prevEl.focus();
+                // Késleltetés nélkül a fókusz áthelyezése
+                event.preventDefault(); 
+            }
         }
     }
 
@@ -219,6 +230,7 @@
         genLaps();
     }
 
+    // Generált körökbe is beépítve a backspace ugrás
     function genLaps() {
         const count = document.getElementById('lapCount').value;
         const container = document.getElementById('lapInputsContainer');
@@ -232,9 +244,9 @@
                     <input type="number" id="vd${i}" step="0.1" placeholder="Add meg a km-t">
                     <label>${isLast ? 'Beérkezés ideje' : 'Beérkezés ideje'} (ÓÓ:PP:MM):</label>
                     <div class="time-group">
-                        <input type="number" id="vh${i}" pattern="\d*" onkeyup="jump(this, 'vm${i}')"> :
-                        <input type="number" id="vm${i}" pattern="\d*" onkeyup="jump(this, 'vs${i}')"> :
-                        <input type="number" id="vs${i}" pattern="\d*">
+                        <input type="number" id="vh${i}" pattern="\d*" placeholder="00" oninput="jump(this, 'vm${i}')"> :
+                        <input type="number" id="vm${i}" pattern="\d*" placeholder="00" oninput="jump(this, 'vs${i}')" onkeydown="jumpBack(event, this, 'vh${i}')"> :
+                        <input type="number" id="vs${i}" pattern="\d*" placeholder="00" onkeydown="jumpBack(event, this, 'vm${i}')">
                     </div>
                 </div>
             `;
