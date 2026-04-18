@@ -2,85 +2,204 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>Szállítási Kalkulátor v2</title>
+    <title>Verseny Kalkulátor</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f3; display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
-        h2 { color: #2c3e50; text-align: center; margin-top: 0; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #444; font-size: 0.9rem; }
-        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 20px; transition: 0.3s; }
-        button:hover { background: #0056b3; }
-        .results { margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; }
-        .res-item { margin-bottom: 10px; font-size: 1rem; }
-        .highlight { font-weight: bold; color: #d9534f; }
-        .speed { font-weight: bold; color: #28a745; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; justify-content: center; padding: 20px; }
+        .container { background: #2d2d2d; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 450px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; background: #444; color: white; font-weight: bold; }
+        .tab-btn.active { background: #007bff; }
+        
+        .mode-content { display: none; }
+        .mode-content.active { display: block; }
+
+        label { display: block; margin-top: 15px; font-size: 0.9rem; color: #bbb; }
+        select, input { width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #444; background: #3d3d3d; color: white; box-sizing: border-box; }
+        
+        .time-input-group { display: flex; align-items: center; gap: 5px; }
+        .time-input-group input { text-align: center; width: 60px; }
+
+        button.calc-btn { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; font-size: 1.1rem; }
+        
+        .result-box { margin-top: 20px; padding: 15px; background: #3d3d3d; border-radius: 8px; line-height: 1.6; }
+        .yellow { color: #ffff00 !important; font-weight: bold; }
+        .lap-input { border-left: 3px solid #007bff; padding-left: 10px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Menetlevél Segéd</h2>
-    
-    <label>Távolság (km):</label>
-    <input type="number" id="distance" placeholder="Pl. 15.5" step="0.1">
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchMode('reszido')">Részidő számítás</button>
+        <button class="tab-btn" onclick="switchMode('verseny')">Teljes verseny</button>
+    </div>
 
-    <label>Indulási idő (óra:perc:mperc):</label>
-    <input type="time" id="startTime" step="1">
+    <div id="reszido" class="mode-content active">
+        <label>Távolság (km):</label>
+        <input type="number" id="dist1" step="0.1" placeholder="pl: 10">
 
-    <label>Beérkezési idő (óra:perc:mperc):</label>
-    <input type="time" id="arrivalTime" step="1">
-    
-    <button onclick="szamolas()">Kalkuláció futtatása</button>
+        <label>Indulási idő (Óra : Perc : Mp):</label>
+        <div class="time-input-group">
+            <input type="text" id="h1" maxlength="2"> :
+            <input type="text" id="m1" maxlength="2" placeholder="00" onkeyup="autoFocus(this, 's1')"> :
+            <input type="text" id="s1" maxlength="2" placeholder="00">
+        </div>
 
-    <div id="resultArea" class="results" style="display:none;">
-        <div class="res-item">Átlagsebesség: <span id="resSpeed" class="speed"></span> km/h</div>
-        <div class="res-item">Pihenő utáni indulás: <span id="resNextStart" class="highlight"></span></div>
+        <label>Beérkezési idő (Óra : Perc : Mp):</label>
+        <div class="time-input-group">
+            <input type="text" id="h2" maxlength="2"> :
+            <input type="text" id="m2" maxlength="2" placeholder="00" onkeyup="autoFocus(this, 's2')"> :
+            <input type="text" id="s2" maxlength="2" placeholder="00">
+        </div>
+
+        <button class="calc-btn" onclick="calcReszido()">Számolás</button>
+        <div id="res1" class="result-box" style="display:none"></div>
+    </div>
+
+    <div id="verseny" class="mode-content">
+        <label>Össztáv választása:</label>
+        <select id="totalDist">
+            <option value="20">20 km</option>
+            <option value="40">40 km</option>
+            <option value="60">60 km</option>
+            <option value="80">80 km</option>
+            <option value="100">100 km</option>
+        </select>
+
+        <label>Körök száma (1-4):</label>
+        <select id="lapCount" onchange="generateLapInputs()">
+            <option value="1">1 kör</option>
+            <option value="2">2 kör</option>
+            <option value="3">3 kör</option>
+            <option value="4">4 kör</option>
+        </select>
+
+        <label>Verseny kezdete (Óra : Perc : Mp):</label>
+        <div class="time-input-group">
+            <input type="text" id="vhStart" maxlength="2"> :
+            <input type="text" id="vmStart" maxlength="2" onkeyup="autoFocus(this, 'vsStart')"> :
+            <input type="text" id="vsStart" maxlength="2">
+        </div>
+
+        <div id="lapInputs"></div>
+
+        <button class="calc-btn" onclick="calcVerseny()">Verseny Számítása</button>
+        <div id="res2" class="result-box" style="display:none"></div>
     </div>
 </div>
 
 <script>
-    function szamolas() {
-        const dist = parseFloat(document.getElementById('distance').value);
-        const startVal = document.getElementById('startTime').value;
-        const arrivalVal = document.getElementById('arrivalTime').value;
+    // Alapértelmezett óra beállítása minden óra mezőhöz
+    function setDefaultHours() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        document.querySelectorAll('input[id*="h"]').forEach(input => {
+            if(!input.value) input.value = h;
+        });
+    }
+    setDefaultHours();
 
-        if (!dist || !startVal || !arrivalVal) {
-            alert("Kérlek, tölts ki minden mezőt!");
-            return;
+    // Automata ugrás a következő mezőre
+    function autoFocus(current, nextId) {
+        if (current.value.length >= 2) {
+            document.getElementById(nextId).focus();
+        }
+    }
+
+    function switchMode(mode) {
+        document.querySelectorAll('.mode-content').forEach(m => m.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(mode).classList.add('active');
+        event.target.classList.add('active');
+        setDefaultHours();
+    }
+
+    function getSecs(hId, mId, sId) {
+        const h = parseInt(document.getElementById(hId).value) || 0;
+        const m = parseInt(document.getElementById(mId).value) || 0;
+        const s = parseInt(document.getElementById(sId).value) || 0;
+        return h * 3600 + m * 60 + s;
+    }
+
+    function formatTime(totalSec) {
+        if(totalSec < 0) totalSec += 24 * 3600;
+        const h = Math.floor(totalSec / 3600) % 24;
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    // --- RÉSZIDŐ SZÁMÍTÁS ---
+    function calcReszido() {
+        const d = parseFloat(document.getElementById('dist1').value);
+        const s1 = getSecs('h1', 'm1', 's1');
+        const s2 = getSecs('h2', 's2', 's2'); // Javítva az id
+        
+        let diff = s2 - s1;
+        if(diff <= 0) diff += 24 * 3600;
+
+        const speed = d / (diff / 3600);
+        const nextOut = s2 + (40 * 60);
+
+        const resDiv = document.getElementById('res1');
+        resDiv.style.display = 'block';
+        resDiv.innerHTML = `
+            Átlagsebesség: <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span><br>
+            Pihenő vége (Indulás): <strong>${formatTime(nextOut)}</strong>
+        `;
+    }
+
+    // --- VERSENY SZÁMÍTÁS ---
+    function generateLapInputs() {
+        const count = document.getElementById('lapCount').value;
+        const container = document.getElementById('lapInputs');
+        container.innerHTML = '';
+        
+        for(let i = 1; i <= count; i++) {
+            container.innerHTML += `
+                <div class="lap-input">
+                    <label>${i}. kör távja (km):</label>
+                    <input type="number" id="vDist${i}" step="0.1">
+                    <label>${i}. kör BEÉRKEZÉS (Ó:P:M):</label>
+                    <div class="time-input-group">
+                        <input type="text" id="vhArr${i}" value="${new Date().getHours()}"> :
+                        <input type="text" id="vmArr${i}" maxlength="2" onkeyup="autoFocus(this, 'vsArr${i}')"> :
+                        <input type="text" id="vsArr${i}" maxlength="2">
+                    </div>
+                </div>
+            `;
+        }
+    }
+    generateLapInputs();
+
+    function calcVerseny() {
+        const count = parseInt(document.getElementById('lapCount').value);
+        let startTime = getSecs('vhStart', 'vmStart', 'vsStart');
+        let totalDist = 0;
+        let html = "<h4>Eredmények:</h4>";
+
+        for(let i = 1; i <= count; i++) {
+            const d = parseFloat(document.getElementById(`vDist${i}`).value) || 0;
+            const arrTime = getSecs(`vhArr${i}`, `vmArr${i}`, `vsArr${i}`);
+            
+            let diff = arrTime - startTime;
+            if(diff <= 0) diff += 24 * 3600;
+            
+            const speed = d / (diff / 3600);
+            const nextStart = arrTime + (40 * 60);
+            
+            html += `
+                <p><strong>${i}. kör:</strong> Sebesség: <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span> | 
+                Következő indulás: ${formatTime(nextStart)}</p>
+            `;
+            
+            startTime = nextStart; // A következő kör indulása a pihenő után
+            totalDist += d;
         }
 
-        // Időpontok átalakítása másodpercekké a nap elejétől
-        function timeToSeconds(timeStr) {
-            const [h, m, s] = timeStr.split(':').map(Number);
-            return h * 3600 + m * 60 + (s || 0);
-        }
-
-        const startSec = timeToSeconds(startVal);
-        const arrivalSec = timeToSeconds(arrivalVal);
-
-        // 1. Sebesség számítása
-        let diffSec = arrivalSec - startSec;
-        if (diffSec <= 0) diffSec += 24 * 3600; // Ha éjfél után érkezett be
-
-        const hours = diffSec / 3600;
-        const speed = dist / hours;
-
-        // 2. Új indulási idő (beérkezés + 40 perc)
-        let nextStartSec = arrivalSec + (40 * 60);
-        if (nextStartSec >= 24 * 3600) nextStartSec -= 24 * 3600;
-
-        function secondsToTime(totalSec) {
-            const h = Math.floor(totalSec / 3600);
-            const m = Math.floor((totalSec % 3600) / 60);
-            const s = totalSec % 60;
-            return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
-        }
-
-        // Megjelenítés
-        document.getElementById('resSpeed').innerText = speed.toFixed(2);
-        document.getElementById('resNextStart').innerText = secondsToTime(nextStartSec);
-        document.getElementById('resultArea').style.display = 'block';
+        const resDiv = document.getElementById('res2');
+        resDiv.style.display = 'block';
+        resDiv.innerHTML = html;
     }
 </script>
 
