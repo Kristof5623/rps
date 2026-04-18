@@ -2,62 +2,65 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kő Papír Olló</title>
-    <link rel="stylesheet" href="rps.css">
+    <title>Menetidő Számoló</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 50px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
+        h2 { color: #333; font-size: 1.2rem; }
+        .info { color: #666; margin-bottom: 15px; font-size: 0.9rem; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #218838; }
+        .result { margin-top: 20px; padding: 10px; background: #e9ecef; border-left: 5px solid #007bff; display: none; }
+    </style>
 </head>
 <body>
-    <main class="app">
-        <header class="header">
-            <h1>Kő • Papír • Olló</h1>
-            <p class="subtitle">Játssz a gép ellen — győzz minél többször!</p>
-        </header>
 
-        <section class="board card">
-            <div class="scoreboard">
-                <div class="score">
-                    <div class="label">Player</div>
-                    <div id="win" class="value">0</div>
-                </div>
-                <div class="score">
-                    <div class="label">Ties</div>
-                    <div id="tie" class="value">0</div>
-                </div>
-                <div class="score">
-                    <div class="label">Computer</div>
-                    <div id="lose" class="value">0</div>
-                </div>
-            </div>
+<div class="card">
+    <h2>Szállítási Kalkulátor</h2>
+    <p class="info">Sebesség: <strong>100 km/óra</strong></p>
+    
+    <label for="arrivalTime">Beérkezési idő (orvosi):</label>
+    <input type="time" id="arrivalTime" value="12:00">
+    
+    <button onclick="szamol()">Kiindulási idő kiszámítása</button>
 
-            <div id="result" class="result">Válassz egyet</div>
+    <div id="resultBox" class="result">
+        <strong>Új kiindulási idő:</strong> <span id="departureTime"></span>
+        <br><small>(Beérkezés + 40 perc pihenő)</small>
+    </div>
+</div>
 
-            <div class="choices" id="container">
-                <button class="choice" data-choice="rock" aria-label="rock">🪨<span class="choice-label">Kő</span></button>
-                <button class="choice" data-choice="paper" aria-label="paper">📄<span class="choice-label">Papír</span></button>
-                <button class="choice" data-choice="sisors" aria-label="sisors">✂️<span class="choice-label">Olló</span></button>
-            </div>
+<script>
+    function szamol() {
+        const arrivalInput = document.getElementById('arrivalTime').value;
+        if (!arrivalInput) return;
 
-            <div class="picked card">
-                <div class="picked-item">
-                    <div class="picked-title">Player</div>
-                    <div id="playerChoice" class="picked-value">—</div>
-                </div>
-                <div class="picked-item">
-                    <div class="picked-title">Computer</div>
-                    <div id="computerChoice" class="picked-value">—</div>
-                </div>
-            </div>
+        // Idő szétszedése órára és percre
+        let [hours, minutes] = arrivalInput.split(':').map(Number);
 
-            <div class="controls">
-                <button id="resetGame" class="btn reset">Reset</button>
-            </div>
-        </section>
+        // 40 perc hozzáadása
+        minutes += 40;
 
-        <footer class="footer">
-            <small>Egyszerű játék — jó szórakozást!</small>
-        </footer>
-    </main>
+        // Ha a perc átlépi a 60-at, órát váltunk
+        if (minutes >= 60) {
+            hours += Math.floor(minutes / 60);
+            minutes = minutes % 60;
+        }
 
-    <script src="rps.js"></script>
+        // Ha az óra átlépi a 24-et, nullázzuk (következő nap)
+        hours = hours % 24;
+
+        // Formázás: legyen mindig két számjegy (pl. 09:05)
+        const formattedTime = 
+            String(hours).padStart(2, '0') + ":" + 
+            String(minutes).padStart(2, '0');
+
+        // Megjelenítés
+        document.getElementById('departureTime').innerText = formattedTime;
+        document.getElementById('resultBox').style.display = 'block';
+    }
+</script>
+
 </body>
 </html>
