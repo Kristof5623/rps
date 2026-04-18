@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v15</title>
+    <title>Verseny Kalkulátor v16</title>
     <style>
         :root {
             --bg: #000000;
@@ -40,6 +40,7 @@
         .plan-box { background: #1a1a1a; border-left: 4px solid var(--success); padding: 10px; margin-top: 10px; border-radius: 8px; margin-bottom: 10px; }
         .plan-header { color: var(--success); font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; display: block; }
         
+        .summary-total { background: var(--primary); color: white; padding: 15px; border-radius: 12px; margin-top: 15px; }
         h4 { margin: 0; color: var(--primary); }
     </style>
 </head>
@@ -71,7 +72,7 @@
             <input type="number" id="vsR" placeholder="00">
         </div>
         <div id="lapInputsContainer"></div>
-        <button class="calc-btn" onclick="calcVerseny()">Kiértékelés 16 km/h</button>
+        <button class="calc-btn" onclick="calcVerseny()">Kiértékelés</button>
         <div id="res2" class="result-box" style="display:none"></div>
     </div>
 
@@ -82,7 +83,7 @@
         <div class="time-group"><input type="number" id="rh1" oninput="jump(this, 'rm1')">:<input type="number" id="rm1" oninput="jump(this, 'rs1')">:<input type="number" id="rs1"></div>
         <label>Beérkezés:</label>
         <div class="time-group"><input type="number" id="rh2" oninput="jump(this, 'rm2')">:<input type="number" id="rm2" oninput="jump(this, 'rs2')">:<input type="number" id="rs2"></div>
-        <button class="calc-btn" onclick="calcReszido()">Számolás 16 km/h</button>
+        <button class="calc-btn" onclick="calcReszido()">Számolás</button>
         <div id="res1" class="result-box" style="display:none"></div>
     </div>
 
@@ -104,7 +105,7 @@
             <input type="number" id="tsR" placeholder="00" onkeydown="jumpBack(event, this, 'tmR')">
         </div>
         <div id="lapInputsContainerT"></div>
-        <button class="calc-btn" style="background: var(--primary); color:white;" onclick="calcTerv()">Terv Generálása 16 km/h</button>
+        <button class="calc-btn" style="background: var(--primary); color:white;" onclick="calcTerv()">Terv Generálása</button>
         <div id="res4" class="result-box" style="display:none; border-left-color: var(--success);"></div>
     </div>
 
@@ -117,7 +118,7 @@
             <input type="number" id="jm1" placeholder="00" oninput="jump(this, 'js1')"> :
             <input type="number" id="js1" placeholder="00">
         </div>
-        <button class="calc-btn" style="background: var(--warning);" onclick="calcMinosites()">16 km/h célidő</button>
+        <button class="calc-btn" style="background: var(--warning);" onclick="calcMinosites()">Célidő számítása</button>
         <div id="res3" class="result-box" style="display:none; border-left-color: var(--warning);"></div>
     </div>
 </div>
@@ -136,16 +137,20 @@
 
     function toSec(h, m, s) { return (parseInt(h) || 0) * 3600 + (parseInt(m) || 0) * 60 + (parseInt(s) || 0); }
     function toTimeStr(s) { 
-        s = Math.max(0, s); const h = Math.floor(s / 3600) % 24; const m = Math.floor((s % 3600) / 60); const sc = s % 60;
+        s = Math.max(0, s); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
         return [h, m, sc].map(v => String(v).padStart(2, '0')).join(':');
     }
 
-    // TELJES VERSENY KIÉRTÉKELÉS
+    // TELJES VERSENY
     function calcVerseny() {
         const count = parseInt(document.getElementById('lapCount').value);
         const rajt = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
         if(rajt === 0) return;
-        let curStart = rajt; let html = "";
+        
+        let curStart = rajt; 
+        let html = "";
+        let totalPureSec = 0;
+        let totalDist = 0;
         
         for(let i = 1; i <= count; i++) {
             const d = parseFloat(document.getElementById(`vd${i}`).value) || 0;
@@ -155,18 +160,30 @@
             let diff = arr - curStart; if(diff <= 0) diff += 86400;
             const spd = d / (diff / 3600);
             
+            totalPureSec += diff;
+            totalDist += d;
+
             html += `<div class="plan-box" style="border-left-color:${spd>=16.0?'var(--danger)':'var(--success)'}">
                 <span class="plan-header">${i}. KÖR</span>
-                Beérkezés: <b>${toTimeStr(arr)}</b><br>
                 Átlagsebesség: <b style="color:${spd>=16.0?'var(--danger)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>
                 Menetidő: <b>${toTimeStr(diff)}</b>
             </div>`;
-            curStart = arr + 2400;
+            curStart = arr + 2400; // Pihenő utáni új rajt
         }
+        
+        if (totalDist > 0) {
+            const avgSpd = totalDist / (totalPureSec / 3600);
+            html += `<div class="summary-total">
+                <strong>Összesített statisztika:</strong><br>
+                Össz menetidő (pihenők nélkül): <b>${toTimeStr(totalPureSec)}</b><br>
+                Teljes átlagsebesség: <b>${avgSpd.toFixed(2)} km/h</b>
+            </div>`;
+        }
+
         const r = document.getElementById('res2'); r.style.display = 'block'; r.innerHTML = html;
     }
 
-    // RÉSZIDŐ SZÁMOLÁS
+    // RÉSZIDŐ
     function calcReszido() {
         const d = parseFloat(document.getElementById('dist1').value);
         const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
@@ -179,7 +196,6 @@
 
         document.getElementById('res1').style.display = 'block';
         document.getElementById('res1').innerHTML = `
-            Beérkezés: <b>${toTimeStr(t2)}</b><br>
             Átlagsebesség: <b style="color:${spd>=16.0?'var(--danger)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>
             Menetidő: <b>${toTimeStr(diff)}</b><br><br>
             <span style="color:var(--warning)">Kimeneteli idő (40p pihenő): <b>${toTimeStr(nextStart)}</b></span>`;
@@ -202,7 +218,7 @@
             <div class="plan-box">
                 <span class="plan-header">${i}. KÖR</span>
                 Rajt: ${toTimeStr(currentStart)}<br>
-                Beérkezés: <strong style="color:var(--success)">${toTimeStr(minArrival)}</strong>
+                Beérkezés legkorábban: <strong style="color:var(--success)">${toTimeStr(minArrival)}</strong>
                 ${i < count ? `<br><span style="color:var(--text-dim)">Pihenő után kimenetel: ${toTimeStr(nextStart)}</span>` : ''}
             </div>`;
             currentStart = nextStart;
@@ -218,7 +234,7 @@
         if(!d || t1 === 0) return;
         const limitSec = Math.ceil(d / (CALC_LIMIT / 3600));
         document.getElementById('res3').style.display = 'block';
-        document.getElementById('res3').innerHTML = `Célidő a 16 km/h-hoz:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + limitSec)}</strong>`;
+        document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + limitSec)}</strong>`;
     }
 
     function autoSetLaps(id, cont, isReal) {
