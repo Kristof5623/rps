@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>Verseny Kalkulátor v3</title>
+    <title>Verseny Kalkulátor v4</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 20px; }
         .container { background: #1e1e1e; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); width: 500px; border: 1px solid #333; }
@@ -15,11 +15,10 @@
         .mode-content.active { display: block; }
 
         label { display: block; margin-top: 15px; font-size: 0.85rem; color: #999; text-transform: uppercase; }
-        select, input { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white; box-sizing: border-box; font-size: 1rem; }
+        select, input { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white; box-sizing: border-box; font-size: 1rem; width: 100%; }
         
         .time-group { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
         .time-group input { text-align: center; width: 55px; }
-        .km-input { width: 100%; margin-top: 5px; }
 
         button.calc-btn { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 25px; font-size: 1.1rem; }
         
@@ -40,7 +39,7 @@
 
     <div id="reszido" class="mode-content active">
         <label>Távolság (km):</label>
-        <input type="number" id="dist1" class="km-input" step="0.01">
+        <input type="number" id="dist1" step="0.01">
         <label>Indulás (ÓÓ : PP : MM):</label>
         <div class="time-group">
             <input type="text" id="rh1" maxlength="2" onkeyup="jump(this, 'rm1')"> :
@@ -59,7 +58,7 @@
 
     <div id="verseny" class="mode-content">
         <label>Össztáv választása:</label>
-        <select id="totalDist" class="km-input" onchange="autoSetLaps()">
+        <select id="totalDist" onchange="autoSetLaps()">
             <option value="20">20 km</option>
             <option value="40">40 km</option>
             <option value="60">60 km</option>
@@ -68,7 +67,7 @@
         </select>
 
         <label>Körök száma:</label>
-        <select id="lapCount" class="km-input" onchange="genLaps()">
+        <select id="lapCount" onchange="genLaps()">
             <option value="1">1 kör</option>
             <option value="2">2 kör</option>
             <option value="3">3 kör</option>
@@ -104,11 +103,16 @@
         btn.classList.add('active');
     }
 
+    // Automatikus körbeállítás a távolság alapján
     function autoSetLaps() {
         const dist = document.getElementById('totalDist').value;
         const lapSelect = document.getElementById('lapCount');
+        
         if (dist == "20") lapSelect.value = "1";
-        else lapSelect.value = "3";
+        else if (dist == "40") lapSelect.value = "2";
+        else if (dist == "60" || dist == "80") lapSelect.value = "3";
+        else if (dist == "100") lapSelect.value = "4";
+        
         genLaps();
     }
 
@@ -139,14 +143,16 @@
         const count = document.getElementById('lapCount').value;
         const container = document.getElementById('lapInputsContainer');
         container.innerHTML = '';
+        const distTotal = document.getElementById('totalDist').value;
+
         for(let i = 1; i <= count; i++) {
             const isLast = (i == count);
             container.innerHTML += `
                 <div class="lap-card">
                     <h4>${isLast ? 'CÉLBAÉRÉS' : i + '. kör'}</h4>
                     <label>Kör távja (km):</label>
-                    <input type="number" id="vd${i}" class="km-input" step="0.1" value="${(document.getElementById('totalDist').value / count).toFixed(1)}">
-                    <label>${isLast ? 'Célbaérés ideje' : 'Beérkezés ideje'} (ÓÓ:PP:MM):</label>
+                    <input type="number" id="vd${i}" step="0.1" value="${(distTotal / count).toFixed(1)}">
+                    <label>${isLast ? 'Célbaérés pontos ideje' : 'Beérkezés ideje'} (ÓÓ:PP:MM):</label>
                     <div class="time-group">
                         <input type="text" id="vh${i}" maxlength="2" onkeyup="jump(this, 'vm${i}')"> :
                         <input type="text" id="vm${i}" maxlength="2" onkeyup="jump(this, 'vs${i}')"> :
@@ -156,14 +162,14 @@
             `;
         }
     }
-    autoSetLaps();
+    autoSetLaps(); // Indításkor generálja az alapértelmezett köröket
 
     function calcVerseny() {
         const count = parseInt(document.getElementById('lapCount').value);
         const rajtSec = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
         let currentStart = rajtSec;
         let totalDist = 0;
-        let html = "<h4>Részletek:</h4>";
+        let html = "<h4>Körök részletei:</h4>";
         let lastArrSec = 0;
 
         for(let i = 1; i <= count; i++) {
@@ -179,7 +185,7 @@
             html += `<div><strong>${isLast ? 'CÉL' : i + '. kör'}:</strong> <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span>`;
             if(!isLast) {
                 const nextStart = arr + 2400;
-                html += ` | Indulás: ${toTimeStr(nextStart)}`;
+                html += ` | Köv. indulás: <strong>${toTimeStr(nextStart)}</strong>`;
                 currentStart = nextStart;
             }
             html += `</div>`;
@@ -187,14 +193,14 @@
 
         // Összesített számítás
         let bruttóIdő = lastArrSec - rajtSec; if(bruttóIdő <= 0) bruttóIdő += 86400;
-        const összesPihenő = (count - 1) * 2400;
-        const nettóMenetidő = bruttóIdő - összesPihenő;
-        const átlagSebesség = totalDist / (nettóMenetidő / 3600);
+        const összesPihenőSec = (count - 1) * 2400;
+        const nettóMenetidőSec = bruttóIdő - összesPihenőSec;
+        const átlagSebesség = totalDist / (nettóMenetidőSec / 3600);
 
         html += `<div class="summary-box">
-            <strong>Verseny végeredmény:</strong><br>
-            Tiszta menetidő (pihenők nélkül): ${toTimeStr(nettóMenetidő)}<br>
-            Teljes átlagsebesség: <span class="${átlagSebesség > 16 ? 'yellow' : ''}">${átlagSebesség.toFixed(2)} km/h</span>
+            <strong>VERSENY ÖSSZESÍTVE:</strong><br>
+            Tiszta menetidő (pihenők nélkül): ${toTimeStr(nettóMenetidőSec)}<br>
+            Átlagsebesség (tiszta): <span class="${átlagSebesség > 16 ? 'yellow' : ''}">${átlagSebesség.toFixed(2)} km/h</span>
         </div>`;
 
         const resDiv = document.getElementById('res2');
