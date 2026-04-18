@@ -2,63 +2,85 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>Menetidő Számoló</title>
+    <title>Szállítási Kalkulátor v2</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 50px; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
-        h2 { color: #333; font-size: 1.2rem; }
-        .info { color: #666; margin-bottom: 15px; font-size: 0.9rem; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #218838; }
-        .result { margin-top: 20px; padding: 10px; background: #e9ecef; border-left: 5px solid #007bff; display: none; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f3; display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        h2 { color: #2c3e50; text-align: center; margin-top: 0; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #444; font-size: 0.9rem; }
+        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 20px; transition: 0.3s; }
+        button:hover { background: #0056b3; }
+        .results { margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; }
+        .res-item { margin-bottom: 10px; font-size: 1rem; }
+        .highlight { font-weight: bold; color: #d9534f; }
+        .speed { font-weight: bold; color: #28a745; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Szállítási Kalkulátor</h2>
-    <p class="info">Sebesség: <strong>100 km/óra</strong></p>
+    <h2>Menetlevél Segéd</h2>
     
-    <label for="arrivalTime">Beérkezési idő (orvosi):</label>
-    <input type="time" id="arrivalTime" value="12:00">
-    
-    <button onclick="szamol()">Kiindulási idő kiszámítása</button>
+    <label>Távolság (km):</label>
+    <input type="number" id="distance" placeholder="Pl. 15.5" step="0.1">
 
-    <div id="resultBox" class="result">
-        <strong>Új kiindulási idő:</strong> <span id="departureTime"></span>
-        <br><small>(Beérkezés + 40 perc pihenő)</small>
+    <label>Indulási idő (óra:perc:mperc):</label>
+    <input type="time" id="startTime" step="1">
+
+    <label>Beérkezési idő (óra:perc:mperc):</label>
+    <input type="time" id="arrivalTime" step="1">
+    
+    <button onclick="szamolas()">Kalkuláció futtatása</button>
+
+    <div id="resultArea" class="results" style="display:none;">
+        <div class="res-item">Átlagsebesség: <span id="resSpeed" class="speed"></span> km/h</div>
+        <div class="res-item">Pihenő utáni indulás: <span id="resNextStart" class="highlight"></span></div>
     </div>
 </div>
 
 <script>
-    function szamol() {
-        const arrivalInput = document.getElementById('arrivalTime').value;
-        if (!arrivalInput) return;
+    function szamolas() {
+        const dist = parseFloat(document.getElementById('distance').value);
+        const startVal = document.getElementById('startTime').value;
+        const arrivalVal = document.getElementById('arrivalTime').value;
 
-        // Idő szétszedése órára és percre
-        let [hours, minutes] = arrivalInput.split(':').map(Number);
-
-        // 40 perc hozzáadása
-        minutes += 40;
-
-        // Ha a perc átlépi a 60-at, órát váltunk
-        if (minutes >= 60) {
-            hours += Math.floor(minutes / 60);
-            minutes = minutes % 60;
+        if (!dist || !startVal || !arrivalVal) {
+            alert("Kérlek, tölts ki minden mezőt!");
+            return;
         }
 
-        // Ha az óra átlépi a 24-et, nullázzuk (következő nap)
-        hours = hours % 24;
+        // Időpontok átalakítása másodpercekké a nap elejétől
+        function timeToSeconds(timeStr) {
+            const [h, m, s] = timeStr.split(':').map(Number);
+            return h * 3600 + m * 60 + (s || 0);
+        }
 
-        // Formázás: legyen mindig két számjegy (pl. 09:05)
-        const formattedTime = 
-            String(hours).padStart(2, '0') + ":" + 
-            String(minutes).padStart(2, '0');
+        const startSec = timeToSeconds(startVal);
+        const arrivalSec = timeToSeconds(arrivalVal);
+
+        // 1. Sebesség számítása
+        let diffSec = arrivalSec - startSec;
+        if (diffSec <= 0) diffSec += 24 * 3600; // Ha éjfél után érkezett be
+
+        const hours = diffSec / 3600;
+        const speed = dist / hours;
+
+        // 2. Új indulási idő (beérkezés + 40 perc)
+        let nextStartSec = arrivalSec + (40 * 60);
+        if (nextStartSec >= 24 * 3600) nextStartSec -= 24 * 3600;
+
+        function secondsToTime(totalSec) {
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+        }
 
         // Megjelenítés
-        document.getElementById('departureTime').innerText = formattedTime;
-        document.getElementById('resultBox').style.display = 'block';
+        document.getElementById('resSpeed').innerText = speed.toFixed(2);
+        document.getElementById('resNextStart').innerText = secondsToTime(nextStartSec);
+        document.getElementById('resultArea').style.display = 'block';
     }
 </script>
 
