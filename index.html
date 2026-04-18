@@ -2,33 +2,31 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>Profi Verseny Kalkulátor</title>
+    <title>Verseny Kalkulátor v3</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; display: flex; justify-content: center; padding: 20px; }
-        .container { background: #1e1e1e; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); width: 480px; border: 1px solid #333; }
+        .container { background: #1e1e1e; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); width: 500px; border: 1px solid #333; }
         
         .tabs { display: flex; gap: 10px; margin-bottom: 25px; }
-        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #333; color: #bbb; font-weight: bold; transition: 0.3s; }
+        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #333; color: #bbb; font-weight: bold; }
         .tab-btn.active { background: #007bff; color: white; box-shadow: 0 0 10px rgba(0,123,255,0.5); }
         
         .mode-content { display: none; }
         .mode-content.active { display: block; }
 
-        label { display: block; margin-top: 15px; font-size: 0.85rem; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+        label { display: block; margin-top: 15px; font-size: 0.85rem; color: #999; text-transform: uppercase; }
         select, input { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white; box-sizing: border-box; font-size: 1rem; }
         
         .time-group { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
-        .time-group input { text-align: center; width: 55px; border-color: #555; }
-        .time-group span { font-weight: bold; color: #666; }
-
+        .time-group input { text-align: center; width: 55px; }
         .km-input { width: 100%; margin-top: 5px; }
 
-        button.calc-btn { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 25px; font-size: 1.1rem; transition: 0.2s; }
-        button.calc-btn:hover { background: #218838; transform: translateY(-2px); }
+        button.calc-btn { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 25px; font-size: 1.1rem; }
         
-        .result-box { margin-top: 20px; padding: 15px; background: #252525; border-radius: 8px; border-left: 5px solid #007bff; line-height: 1.8; font-size: 1.05rem; }
-        .yellow { color: #ffff00 !important; font-weight: bold; text-shadow: 0 0 5px rgba(255,255,0,0.3); }
+        .result-box { margin-top: 20px; padding: 15px; background: #252525; border-radius: 8px; border-left: 5px solid #007bff; line-height: 1.6; }
+        .yellow { color: #ffff00 !important; font-weight: bold; }
         .lap-card { background: #2a2a2a; padding: 15px; border-radius: 10px; margin-top: 15px; border: 1px solid #3a3a3a; }
+        .summary-box { background: #004085; color: white; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #0056b3; }
         h4 { margin: 0 0 10px 0; color: #007bff; }
     </style>
 </head>
@@ -42,29 +40,26 @@
 
     <div id="reszido" class="mode-content active">
         <label>Távolság (km):</label>
-        <input type="number" id="dist1" class="km-input" step="0.01" placeholder="pl: 15.2">
-
-        <label>Indulási idő (ÓÓ : PP : MM):</label>
+        <input type="number" id="dist1" class="km-input" step="0.01">
+        <label>Indulás (ÓÓ : PP : MM):</label>
         <div class="time-group">
-            <input type="text" id="h1" maxlength="2" placeholder="00" onkeyup="jump(this, 'm1')"> <span>:</span>
-            <input type="text" id="m1" maxlength="2" placeholder="00" onkeyup="jump(this, 's1')"> <span>:</span>
-            <input type="text" id="s1" maxlength="2" placeholder="00" onkeyup="jump(this, 'h2')">
+            <input type="text" id="rh1" maxlength="2" onkeyup="jump(this, 'rm1')"> :
+            <input type="text" id="rm1" maxlength="2" onkeyup="jump(this, 'rs1')"> :
+            <input type="text" id="rs1" maxlength="2" onkeyup="jump(this, 'rh2')">
         </div>
-
-        <label>Beérkezési idő (ÓÓ : PP : MM):</label>
+        <label>Beérkezés (ÓÓ : PP : MM):</label>
         <div class="time-group">
-            <input type="text" id="h2" maxlength="2" placeholder="00" onkeyup="jump(this, 'm2')"> <span>:</span>
-            <input type="text" id="m2" maxlength="2" placeholder="00" onkeyup="jump(this, 's2')"> <span>:</span>
-            <input type="text" id="s2" maxlength="2" placeholder="00">
+            <input type="text" id="rh2" maxlength="2" onkeyup="jump(this, 'rm2')"> :
+            <input type="text" id="rm2" maxlength="2" onkeyup="jump(this, 'rs2')"> :
+            <input type="text" id="rs2" maxlength="2">
         </div>
-
         <button class="calc-btn" onclick="calcReszido()">SZÁMOLÁS</button>
         <div id="res1" class="result-box" style="display:none"></div>
     </div>
 
     <div id="verseny" class="mode-content">
         <label>Össztáv választása:</label>
-        <select id="totalDist" class="km-input">
+        <select id="totalDist" class="km-input" onchange="autoSetLaps()">
             <option value="20">20 km</option>
             <option value="40">40 km</option>
             <option value="60">60 km</option>
@@ -82,9 +77,9 @@
 
         <label>Verseny rajtja (ÓÓ : PP : MM):</label>
         <div class="time-group">
-            <input type="text" id="vhR" maxlength="2" placeholder="00" onkeyup="jump(this, 'vmR')"> <span>:</span>
-            <input type="text" id="vmR" maxlength="2" placeholder="00" onkeyup="jump(this, 'vsR')"> <span>:</span>
-            <input type="text" id="vsR" maxlength="2" placeholder="00">
+            <input type="text" id="vhR" maxlength="2" onkeyup="jump(this, 'vmR')"> :
+            <input type="text" id="vmR" maxlength="2" onkeyup="jump(this, 'vsR')"> :
+            <input type="text" id="vsR" maxlength="2">
         </div>
 
         <div id="lapInputsContainer"></div>
@@ -95,7 +90,6 @@
 </div>
 
 <script>
-    // Automatikus ugrás a következő mezőre
     function jump(current, nextId) {
         if (current.value.length >= 2) {
             const nextEl = document.getElementById(nextId);
@@ -110,55 +104,49 @@
         btn.classList.add('active');
     }
 
-    // Segédfüggvény: Másodpercre váltás
+    function autoSetLaps() {
+        const dist = document.getElementById('totalDist').value;
+        const lapSelect = document.getElementById('lapCount');
+        if (dist == "20") lapSelect.value = "1";
+        else lapSelect.value = "3";
+        genLaps();
+    }
+
     function toSec(h, m, s) {
         return (parseInt(h) || 0) * 3600 + (parseInt(m) || 0) * 60 + (parseInt(s) || 0);
     }
 
-    // Segédfüggvény: Idő formázása
     function toTimeStr(totalSec) {
-        if(totalSec < 0) totalSec += 86400;
-        totalSec %= 86400;
-        const h = Math.floor(totalSec / 3600);
+        totalSec = Math.max(0, totalSec);
+        const h = Math.floor(totalSec / 3600) % 24;
         const m = Math.floor((totalSec % 3600) / 60);
         const s = totalSec % 60;
         return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
     }
 
-    // RÉSZIDŐ SZÁMOLÁS
     function calcReszido() {
         const d = parseFloat(document.getElementById('dist1').value);
-        const t1 = toSec(document.getElementById('h1').value, document.getElementById('m1').value, document.getElementById('s1').value);
-        const t2 = toSec(document.getElementById('h2').value, document.getElementById('m2').value, document.getElementById('s2').value);
-
-        if(!d || t1 === 0 || t2 === 0) { alert("Tölts ki minden mezőt!"); return; }
-
-        let diff = t2 - t1;
-        if(diff <= 0) diff += 86400;
-
+        const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
+        const t2 = toSec(document.getElementById('rh2').value, document.getElementById('rm2').value, document.getElementById('rs2').value);
+        let diff = t2 - t1; if(diff <= 0) diff += 86400;
         const speed = d / (diff / 3600);
-        const nextStart = t2 + 2400; // 40 perc pihenő
-
         const resDiv = document.getElementById('res1');
         resDiv.style.display = 'block';
-        resDiv.innerHTML = `
-            Átlagsebesség: <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span><br>
-            Következő indulás: <strong>${toTimeStr(nextStart)}</strong>
-        `;
+        resDiv.innerHTML = `Sebesség: <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span><br>Pihenő vége: <strong>${toTimeStr(t2 + 2400)}</strong>`;
     }
 
-    // KÖRÖK GENERÁLÁSA
     function genLaps() {
         const count = document.getElementById('lapCount').value;
         const container = document.getElementById('lapInputsContainer');
         container.innerHTML = '';
         for(let i = 1; i <= count; i++) {
+            const isLast = (i == count);
             container.innerHTML += `
                 <div class="lap-card">
-                    <h4>${i}. kör</h4>
-                    <label>Táv (km):</label>
-                    <input type="number" id="vd${i}" class="km-input" step="0.1">
-                    <label>Beérkezés (ÓÓ:PP:MM):</label>
+                    <h4>${isLast ? 'CÉLBAÉRÉS' : i + '. kör'}</h4>
+                    <label>Kör távja (km):</label>
+                    <input type="number" id="vd${i}" class="km-input" step="0.1" value="${(document.getElementById('totalDist').value / count).toFixed(1)}">
+                    <label>${isLast ? 'Célbaérés ideje' : 'Beérkezés ideje'} (ÓÓ:PP:MM):</label>
                     <div class="time-group">
                         <input type="text" id="vh${i}" maxlength="2" onkeyup="jump(this, 'vm${i}')"> :
                         <input type="text" id="vm${i}" maxlength="2" onkeyup="jump(this, 'vs${i}')"> :
@@ -168,32 +156,46 @@
             `;
         }
     }
-    genLaps();
+    autoSetLaps();
 
-    // VERSENY SZÁMOLÁS
     function calcVerseny() {
         const count = parseInt(document.getElementById('lapCount').value);
-        let currentStart = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
-        let html = "<h4>Eredmények:</h4>";
+        const rajtSec = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
+        let currentStart = rajtSec;
+        let totalDist = 0;
+        let html = "<h4>Részletek:</h4>";
+        let lastArrSec = 0;
 
         for(let i = 1; i <= count; i++) {
             const d = parseFloat(document.getElementById(`vd${i}`).value) || 0;
             const arr = toSec(document.getElementById(`vh${i}`).value, document.getElementById(`vm${i}`).value, document.getElementById(`vs${i}`).value);
+            totalDist += d;
+            lastArrSec = arr;
             
-            let diff = arr - currentStart;
-            if(diff <= 0) diff += 86400;
-
+            let diff = arr - currentStart; if(diff <= 0) diff += 86400;
             const speed = d / (diff / 3600);
-            const nextStart = arr + 2400;
+            const isLast = (i == count);
 
-            html += `
-                <div style="margin-bottom:10px; border-bottom:1px solid #444; padding-bottom:5px;">
-                    <strong>${i}. kör:</strong> <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span><br>
-                    <span>Pihenő utáni indulás: <strong>${toTimeStr(nextStart)}</strong></span>
-                </div>
-            `;
-            currentStart = nextStart; // A pihenő utáni idő az új rajt
+            html += `<div><strong>${isLast ? 'CÉL' : i + '. kör'}:</strong> <span class="${speed > 16 ? 'yellow' : ''}">${speed.toFixed(2)} km/h</span>`;
+            if(!isLast) {
+                const nextStart = arr + 2400;
+                html += ` | Indulás: ${toTimeStr(nextStart)}`;
+                currentStart = nextStart;
+            }
+            html += `</div>`;
         }
+
+        // Összesített számítás
+        let bruttóIdő = lastArrSec - rajtSec; if(bruttóIdő <= 0) bruttóIdő += 86400;
+        const összesPihenő = (count - 1) * 2400;
+        const nettóMenetidő = bruttóIdő - összesPihenő;
+        const átlagSebesség = totalDist / (nettóMenetidő / 3600);
+
+        html += `<div class="summary-box">
+            <strong>Verseny végeredmény:</strong><br>
+            Tiszta menetidő (pihenők nélkül): ${toTimeStr(nettóMenetidő)}<br>
+            Teljes átlagsebesség: <span class="${átlagSebesség > 16 ? 'yellow' : ''}">${átlagSebesség.toFixed(2)} km/h</span>
+        </div>`;
 
         const resDiv = document.getElementById('res2');
         resDiv.style.display = 'block';
