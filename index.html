@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor Pro v6</title>
+    <title>Verseny Kalkulátor Pro v7</title>
     <style>
         :root {
             --bg: #000000;
@@ -11,6 +11,7 @@
             --primary: #0A84FF;
             --success: #32D74B;
             --warning: #FFD60A;
+            --danger: #FF453A;
             --text: #ffffff;
             --text-dim: #8e8e93;
         }
@@ -35,17 +36,17 @@
             border: 1px solid #333;
         }
 
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
         .tab-btn { 
-            flex: 1; 
-            padding: 15px; 
+            flex: 1 1 30%; 
+            padding: 12px 5px; 
             border: none; 
             border-radius: 12px; 
             cursor: pointer; 
             background: #333; 
             color: var(--text-dim); 
             font-weight: bold; 
-            font-size: 1rem;
+            font-size: 0.95rem;
         }
         .tab-btn.active { background: var(--primary); color: white; }
 
@@ -116,6 +117,15 @@
             margin-top: 20px; 
             box-shadow: 0 4px 15px rgba(10, 132, 255, 0.3);
         }
+        
+        .warning-box {
+            background: #B25000;
+            color: white;
+            padding: 18px;
+            border-radius: 16px;
+            margin-top: 20px;
+            border: 1px solid #FF8C00;
+        }
 
         .lap-time-info { color: #bfbfbf; font-size: 0.95rem; }
         h4 { margin: 0 0 10px 0; font-size: 1.2rem; }
@@ -127,6 +137,7 @@
     <div class="tabs">
         <button id="btn-verseny" class="tab-btn active" onclick="switchMode('verseny', this)">Full Verseny</button>
         <button id="btn-reszido" class="tab-btn" onclick="switchMode('reszido', this)">Részidő</button>
+        <button id="btn-javasolt" class="tab-btn" onclick="switchMode('javasolt', this)">Célidő (16km/h)</button>
     </div>
 
     <div id="verseny" class="mode-content active">
@@ -180,10 +191,24 @@
         <button class="calc-btn" onclick="calcReszido()">Részidő Számolás</button>
         <div id="res1" class="result-box" style="display:none"></div>
     </div>
+
+    <div id="javasolt" class="mode-content">
+        <label>Megtenni kívánt táv (km):</label>
+        <input type="number" id="distJ" step="0.01" placeholder="pl: 20">
+        
+        <label>Indulás / Rajt ideje (ÓÓ : PP : MM):</label>
+        <div class="time-group">
+            <input type="number" id="jh1" pattern="\d*" placeholder="00" oninput="jump(this, 'jm1')"> :
+            <input type="number" id="jm1" pattern="\d*" placeholder="00" oninput="jump(this, 'js1')" onkeydown="jumpBack(event, this, 'jh1')"> :
+            <input type="number" id="js1" pattern="\d*" placeholder="00" onkeydown="jumpBack(event, this, 'jm1')">
+        </div>
+
+        <button class="calc-btn" style="background: var(--warning);" onclick="calcJavasolt()">Célidő kiszámolása</button>
+        <div id="res3" class="result-box" style="display:none; border-left-color: var(--warning);"></div>
+    </div>
 </div>
 
 <script>
-    // Előre ugrás, ha 2 számjegyet beírtál
     function jump(current, nextId) {
         if (current.value.length >= 2) {
             const nextEl = document.getElementById(nextId);
@@ -191,13 +216,11 @@
         }
     }
 
-    // Vissza ugrás törlés (Backspace) esetén
     function jumpBack(event, current, prevId) {
         if (event.key === "Backspace" && current.value === "") {
             const prevEl = document.getElementById(prevId);
             if (prevEl) {
                 prevEl.focus();
-                // Késleltetés nélkül a fókusz áthelyezése
                 event.preventDefault(); 
             }
         }
@@ -220,6 +243,7 @@
         return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
     }
 
+    // -- TELJES VERSENY LOGIKA --
     function autoSetLaps() {
         const dist = document.getElementById('totalDist').value;
         const lapSelect = document.getElementById('lapCount');
@@ -230,7 +254,6 @@
         genLaps();
     }
 
-    // Generált körökbe is beépítve a backspace ugrás
     function genLaps() {
         const count = document.getElementById('lapCount').value;
         const container = document.getElementById('lapInputsContainer');
@@ -302,6 +325,7 @@
         resDiv.scrollIntoView({behavior: "smooth"});
     }
 
+    // -- RÉSZIDŐ LOGIKA --
     function calcReszido() {
         const d = parseFloat(document.getElementById('dist1').value);
         const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
@@ -311,6 +335,33 @@
         const resDiv = document.getElementById('res1');
         resDiv.style.display = 'block';
         resDiv.innerHTML = `Sebesség: <span class="speed-val ${speed > 16 ? 'yellow' : 'green'}">${speed.toFixed(2)} km/h</span><br>Idő: ${toTimeStr(diff)}<br>Köv. indulás: <strong>${toTimeStr(t2 + 2400)}</strong>`;
+    }
+
+    // -- JAVASOLT CÉLIDŐ (16km/h) LOGIKA --
+    function calcJavasolt() {
+        const d = parseFloat(document.getElementById('distJ').value);
+        const t1 = toSec(document.getElementById('jh1').value, document.getElementById('jm1').value, document.getElementById('js1').value);
+        
+        if(!d) { alert("Add meg a távolságot!"); return; }
+
+        // 16 km/h esetén 1 km megtételéhez 225 másodperc kell (3600 / 16)
+        const requiredTimeSec = d * 225;
+        const targetArrivalSec = t1 + requiredTimeSec;
+
+        const resDiv = document.getElementById('res3');
+        resDiv.style.display = 'block';
+        resDiv.innerHTML = `
+            Táv: <strong>${d} km</strong><br>
+            Szükséges menetidő: <strong style="color:var(--text-dim);">${toTimeStr(requiredTimeSec)}</strong><br>
+            
+            <div class="warning-box">
+                <span style="font-size:0.9rem; text-transform:uppercase;">Legkorábbi beérkezés (16 km/h határ):</span><br>
+                <span style="font-size: 2rem; font-weight: bold; color: #fff;">${toTimeStr(targetArrivalSec)}</span><br>
+                <span style="font-size: 0.85rem; color: #ffe6cc; display:block; margin-top:5px;">
+                    ⚠️ Ha ennél az időpontnál hamarabb érsz be, átlépted a 16 km/h sebességhatárt!
+                </span>
+            </div>
+        `;
     }
 </script>
 
