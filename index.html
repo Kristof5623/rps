@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v22 - Menü, Visszaszámláló & Adatlap</title>
+    <title>Verseny Kalkulátor v23 - Enter Fix & Profi Adatlap</title>
     <style>
         :root {
             --bg: #000000;
@@ -19,17 +19,14 @@
 
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: row; min-height: 100vh; }
         
-        /* ALAP ELRENDEZÉS GÉPRE */
         .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; box-sizing: border-box; border-right: 1px solid #333; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
         .main-wrapper { flex: 1; padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; }
         .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; box-sizing: border-box; border: 1px solid #333; }
         
-        /* MOBIL MENÜ GOMB */
         .mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; width: 100%; box-sizing: border-box; }
         .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; }
         .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 998; }
 
-        /* GOMBOK ÉS MENÜPONTOK */
         .menu-title { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 15px; margin-top: 20px; letter-spacing: 1px; }
         .sidebar-btn { width: 100%; text-align: left; background: transparent; border: none; color: var(--text); padding: 12px 10px; border-radius: 8px; cursor: pointer; font-size: 1rem; margin-bottom: 5px; transition: 0.2s; }
         .sidebar-btn:hover { background: #222; }
@@ -43,7 +40,6 @@
         .mode-content.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* ŰRLAP ELEMEK */
         label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
         select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; box-sizing: border-box; font-size: 1rem; width: 100%; margin-top: 5px; }
         .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
@@ -60,25 +56,23 @@
         .plan-data-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px; }
         .plan-data-label { color: var(--text-dim); }
         
-        /* LISTÁK ÉS TÁBLÁZATOK */
         .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); cursor: pointer; }
         .competitor-info { font-size: 1rem; }
         .competitor-bib { font-weight: bold; color: var(--warning); font-size: 1.2rem; margin-right: 10px; }
         
-        /* ADATLAP TÁBLÁZAT */
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-        .data-table th, .data-table td { border: 1px solid #444; padding: 8px; text-align: center; }
-        .data-table th { background: #333; color: var(--primary); }
+        /* ADATLAP TÁBLÁZAT FRISSÍTVE */
+        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #444; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 400px; }
+        .data-table th, .data-table td { border: 1px solid #444; padding: 8px 4px; text-align: center; }
+        .data-table th { background: #333; color: var(--primary); font-weight: 600; }
         .data-table tr:nth-child(even) { background: #222; }
 
-        /* ÉLŐ VISSZASZÁMLÁLÓ */
         .live-item { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
         .live-time { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
         .live-time.warning { color: var(--danger); animation: blink 1s infinite; }
         .live-time.expired { color: var(--text-dim); font-size: 1.2rem; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
-        /* MOBIL NÉZET SZABÁLYOK */
         @media (max-width: 800px) {
             body { flex-direction: column; }
             .mobile-header { display: block; }
@@ -235,14 +229,11 @@
         document.getElementById(targetId).classList.add('active');
         if(btn) btn.classList.add('active');
         
-        // Ha mobilon vagyunk, zárjuk be a menüt kattintás után
         if(window.innerWidth <= 800) toggleMenu();
-
         if (targetId === 'adatlapok') renderAdatlapList();
     }
 
     function switchMainTab(targetId) {
-        // Visszatér a "Regisztráció / Verseny" fő blokkra
         switchSidebarMode(targetId, document.querySelector('.sidebar-btn:nth-child(2)'));
     }
 
@@ -254,9 +245,36 @@
     }
     // --------------------
 
+    // --- JAVÍTOTT ENTER/BACKSPACE LOGIKA ---
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
     
-    // Alap idő és formázó függvények
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName.toLowerCase() === 'input') {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                // CSAK a képernyőn aktuálisan látható beviteli elemeket gyűjtjük össze!
+                const elements = Array.from(document.querySelectorAll('input, select, button.calc-btn'))
+                    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+                
+                const index = elements.indexOf(e.target);
+                if (index > -1 && index < elements.length - 1) {
+                    elements[index + 1].focus();
+                }
+            } 
+            else if (e.key === 'Backspace' && e.target.value === '') {
+                const group = e.target.closest('.time-group');
+                if (group) {
+                    const timeInputs = Array.from(group.querySelectorAll('input'));
+                    const idx = timeInputs.indexOf(e.target);
+                    if (idx > 0) {
+                        e.preventDefault();
+                        timeInputs[idx - 1].focus();
+                    }
+                }
+            }
+        }
+    });
+
     function toSec(h, m, s) { return (parseInt(h) || 0) * 3600 + (parseInt(m) || 0) * 60 + (parseInt(s) || 0); }
     function toTimeStr(s) { 
         let isNeg = s < 0;
@@ -271,8 +289,6 @@
         const name = document.getElementById('regName').value;
         const dist = document.getElementById('regDist').value;
         if (!bib || !name) { alert("Kérlek add meg a rajtszámot és a nevet is!"); return; }
-
-        // Létezik már?
         if (competitors.find(c => c.bib === bib)) { alert("Ez a rajtszám már foglalt!"); return; }
 
         competitors.push({ bib: bib, name: name, dist: dist, startTime: { h: '', m: '', s: '' }, laps: [] });
@@ -349,7 +365,6 @@
             const arr = toSec(document.getElementById(`vh${i}`).value, document.getElementById(`vm${i}`).value, document.getElementById(`vs${i}`).value);
             const vet = toSec(document.getElementById(`ovh${i}`).value, document.getElementById(`ovm${i}`).value, document.getElementById(`ovs${i}`).value);
             
-            // Mentés az objektumba, hogy az adatlap és a visszaszámláló is tudja használni
             let lapData = { 
                 d: document.getElementById(`vd${i}`).value,
                 h: document.getElementById(`vh${i}`).value, m: document.getElementById(`vm${i}`).value, s: document.getElementById(`vs${i}`).value,
@@ -405,7 +420,6 @@
         resBox.style.display = 'block'; resBox.innerHTML = html;
     }
 
-    // --- ÚJ: ÉLŐ VISSZASZÁMLÁLÓ LOGIKA ---
     setInterval(updateLiveCountdown, 1000);
 
     function updateLiveCountdown() {
@@ -415,18 +429,13 @@
         const now = new Date();
         const currentSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
         
-        let pending = [];
-        let expired = [];
+        let pending = []; let expired = [];
 
         competitors.forEach(comp => {
             if (!comp.laps || comp.laps.length === 0) return;
-            // Megkeressük az UTOLSÓ kitöltött kört (ahol van vet vagy arr idő)
-            // Fontos: Az utolsó körnél nem kell már kiindulni, azt is kiszűrjük!
             let completedLaps = comp.laps.filter(l => l.isComplete);
             if (completedLaps.length === 0) return;
             
-            // Ha már befejezte az összes tervezett körét, nem indul ki újra.
-            // (A selectből kivettük a max kört, de pl ha 80km, 3 kör, és megvan a 3., nem kell pihenő)
             const expectedLaps = (comp.dist == 20) ? 1 : (comp.dist == 40 ? 2 : (comp.dist == 100 ? 4 : 3));
             if (completedLaps.length >= expectedLaps) return;
 
@@ -434,19 +443,14 @@
             
             if (lastLap.nextStartSec > 0) {
                 let diff = lastLap.nextStartSec - currentSec;
-                if (diff < -43200) diff += 86400; // éjfél átfordulás korrekció
+                if (diff < -43200) diff += 86400;
 
-                if (diff >= 0) {
-                    pending.push({ comp, diff, startStr: toTimeStr(lastLap.nextStartSec) });
-                } else if (diff >= -60) {
-                    expired.push({ comp, diff, startStr: toTimeStr(lastLap.nextStartSec) });
-                }
+                if (diff >= 0) pending.push({ comp, diff, startStr: toTimeStr(lastLap.nextStartSec) });
+                else if (diff >= -60) expired.push({ comp, diff, startStr: toTimeStr(lastLap.nextStartSec) });
             }
         });
 
-        // Rendezzük: akiknek kevesebb van hátra, azok vannak felül
         pending.sort((a, b) => a.diff - b.diff);
-        // Lejártak is sorrendben, de ezek mennek legalulra
         expired.sort((a, b) => b.diff - a.diff);
 
         let container = document.getElementById('liveCountdownContainer');
@@ -458,32 +462,18 @@
         let html = '';
         pending.forEach(item => {
             let mins = Math.floor(item.diff / 60);
-            let timeClass = mins < 2 ? 'live-time warning' : 'live-time'; // Villogás, ha 2 perc alatti
-            html += `
-            <div class="live-item">
-                <div>
-                    <span style="color:var(--text-dim); font-size:0.8rem;">Cél: ${item.startStr}</span><br>
-                    <strong style="font-size:1.2rem;">#${item.comp.bib} ${item.comp.name}</strong>
-                </div>
-                <div class="${timeClass}">${toTimeStr(item.diff)}</div>
-            </div>`;
+            let timeClass = mins < 2 ? 'live-time warning' : 'live-time';
+            html += `<div class="live-item"><div><span style="color:var(--text-dim); font-size:0.8rem;">Cél: ${item.startStr}</span><br><strong style="font-size:1.2rem;">#${item.comp.bib} ${item.comp.name}</strong></div><div class="${timeClass}">${toTimeStr(item.diff)}</div></div>`;
         });
 
         expired.forEach(item => {
-            html += `
-            <div class="live-item" style="border-color: #440000; background:#1a0505;">
-                <div>
-                    <span style="color:var(--danger); font-size:0.8rem;">Késett! (Cél: ${item.startStr})</span><br>
-                    <strong style="font-size:1.2rem; color:#ccc;">#${item.comp.bib} ${item.comp.name}</strong>
-                </div>
-                <div class="live-time expired">${toTimeStr(item.diff)}</div>
-            </div>`;
+            html += `<div class="live-item" style="border-color: #440000; background:#1a0505;"><div><span style="color:var(--danger); font-size:0.8rem;">Késett! (Cél: ${item.startStr})</span><br><strong style="font-size:1.2rem; color:#ccc;">#${item.comp.bib} ${item.comp.name}</strong></div><div class="live-time expired">${toTimeStr(item.diff)}</div></div>`;
         });
 
         container.innerHTML = html;
     }
 
-    // --- ÚJ: ADATLAP TÁBLÁZAT ---
+    // --- PROFIBB ADATLAP TÁBLÁZAT ---
     function renderAdatlapList() {
         const listContainer = document.getElementById('adatlapList');
         const reszletContainer = document.getElementById('adatlapReszletek');
@@ -496,11 +486,7 @@
 
         let html = '';
         competitors.sort((a, b) => parseInt(a.bib) - parseInt(b.bib)).forEach(comp => {
-            html += `
-            <div class="competitor-item" onclick="showAdatlap('${comp.bib}')">
-                <div><span class="competitor-bib">#${comp.bib}</span><strong>${comp.name}</strong></div>
-                <div style="font-size:0.8rem; color:var(--text-dim);">Részletek megtekintése ></div>
-            </div>`;
+            html += `<div class="competitor-item" onclick="showAdatlap('${comp.bib}')"><div><span class="competitor-bib">#${comp.bib}</span><strong>${comp.name}</strong></div><div style="font-size:0.8rem; color:var(--text-dim);">Részletek megtekintése ></div></div>`;
         });
         listContainer.innerHTML = html;
     }
@@ -515,33 +501,40 @@
         if (!comp.laps || comp.laps.filter(l => l.isComplete).length === 0) {
             html += `<div style="color:var(--text-dim); font-size:0.9rem;">Még nincs kitöltött köreredmény.</div>`;
         } else {
-            html += `<table class="data-table">
-                <tr><th>Kör</th><th>Táv</th><th>Kapu seb.</th><th>Pulzus</th><th>Orvosi seb.</th><th>Pihenő vége</th></tr>`;
+            // Táblázat felépítése profi versenyek mintájára
+            html += `<div class="table-container"><table class="data-table">
+                <tr><th>Kör</th><th>Táv</th><th>Kapu beérk.</th><th>Vet beérk.</th><th>Pulzus idő</th><th>Sebesség</th><th>Kiindulás</th></tr>`;
             
             comp.laps.forEach((lap, i) => {
                 if (!lap.isComplete) return;
-                const spdC = lap.spdArr >= 16 ? 'color:var(--warning)' : 'color:var(--success)';
-                const vSpdC = lap.spdVet >= 16 ? 'color:var(--warning)' : 'color:var(--success)';
+                
+                // Ha van orvosi sebesség, az a hivatalos, különben a kapu
+                let dispSpd = lap.spdVet > 0 ? lap.spdVet : lap.spdArr;
+                let spdC = dispSpd >= 16 ? 'color:var(--warning)' : 'color:var(--success)';
+                
+                let arrTimeStr = lap.arrSec > 0 ? toTimeStr(lap.arrSec) : '-';
+                let vetTimeStr = lap.vetSec > 0 ? toTimeStr(lap.vetSec) : '-';
+                let pulseStr = lap.pulzusSec > 0 ? toTimeStr(lap.pulzusSec) : '-';
+                let nextStr = lap.nextStartSec > 0 ? toTimeStr(lap.nextStartSec) : '-';
                 
                 html += `<tr>
                     <td><b>${i+1}.</b></td>
                     <td>${lap.d}km</td>
-                    <td style="${spdC}"><b>${lap.spdArr.toFixed(1)}</b></td>
-                    <td>${lap.pulzusSec > 0 ? toTimeStr(lap.pulzusSec) : '-'}</td>
-                    <td style="${vSpdC}"><b>${lap.spdVet > 0 ? lap.spdVet.toFixed(1) : '-'}</b></td>
-                    <td>${lap.nextStartSec > 0 ? toTimeStr(lap.nextStartSec) : '-'}</td>
+                    <td>${arrTimeStr}</td>
+                    <td style="color:var(--primary)">${vetTimeStr}</td>
+                    <td>${pulseStr}</td>
+                    <td style="${spdC}"><b>${dispSpd.toFixed(2)} km/h</b></td>
+                    <td>${nextStr}</td>
                 </tr>`;
             });
-            html += `</table>`;
+            html += `</table></div>`;
         }
         
         container.innerHTML = html;
         container.style.display = 'block';
-        // Görgetés az adatlaphoz mobilon
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // RÉGI FÜGGVÉNYEK 
     function calcReszido() { /* ... */ }
     function calcTerv() { /* ... */ }
     function calcMinosites() { /* ... */ }
