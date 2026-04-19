@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v16</title>
+    <title>Verseny Kalkulátor v17</title>
     <style>
         :root {
             --bg: #000000;
             --card: #1c1c1e;
             --primary: #0A84FF;
             --success: #32D74B;
-            --warning: #FFD60A;
+            --warning: #FF9F0A; /* Narancssárga lett */
             --danger: #FF453A;
             --text: #ffffff;
             --text-dim: #8e8e93;
@@ -40,7 +40,8 @@
         .plan-box { background: #1a1a1a; border-left: 4px solid var(--success); padding: 10px; margin-top: 10px; border-radius: 8px; margin-bottom: 10px; }
         .plan-header { color: var(--success); font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; display: block; }
         
-        .summary-total { background: var(--primary); color: white; padding: 15px; border-radius: 12px; margin-top: 15px; }
+        /* Frissített stílus az összesítő blokkhoz */
+        .summary-total { background: #1c1c1e; color: var(--text); padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid var(--primary); }
         h4 { margin: 0; color: var(--primary); }
     </style>
 </head>
@@ -128,30 +129,22 @@
 
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
     
-    // Globális billentyűzet eseménykezelő - Enter és Backspace intelligens navigáció
+    // Globális billentyűzet eseménykezelő - Enter és Backspace navigáció
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
-            
-            // 1. ENTER navigáció (ugrás a következő mezőre)
             if (e.key === 'Enter') {
                 e.preventDefault();
-                // Kikeressük az éppen aktív fülön található összes input mezőt és gombot
                 const elements = Array.from(document.querySelectorAll('.mode-content.active input, .mode-content.active button.calc-btn'));
                 const index = elements.indexOf(e.target);
-                
-                // Ha van következő elem, ráugrunk
                 if (index > -1 && index < elements.length - 1) {
                     elements[index + 1].focus();
                 }
             } 
-            
-            // 2. BACKSPACE navigáció (visszaugrás idő blokkokon belül)
             else if (e.key === 'Backspace' && e.target.value === '') {
                 const group = e.target.closest('.time-group');
                 if (group) {
                     const timeInputs = Array.from(group.querySelectorAll('input'));
                     const idx = timeInputs.indexOf(e.target);
-                    // Ha nem az első elem (pl. nem az óra), ugorjunk vissza az előzőre (pl. mp -> perc)
                     if (idx > 0) {
                         e.preventDefault();
                         timeInputs[idx - 1].focus();
@@ -195,20 +188,25 @@
             totalPureSec += diff;
             totalDist += d;
 
-            html += `<div class="plan-box" style="border-left-color:${spd>=16.0?'var(--danger)':'var(--success)'}">
-                <span class="plan-header">${i}. KÖR</span>
-                Átlagsebesség: <b style="color:${spd>=16.0?'var(--danger)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>
+            const nextStart = arr + 2400; // 40 perc pihenő
+            const colorVar = spd >= 16.0 ? 'var(--warning)' : 'var(--success)';
+
+            html += `<div class="plan-box" style="border-left-color:${colorVar}">
+                <span class="plan-header" style="color:${colorVar}">${i}. KÖR</span>
+                Átlagsebesség: <b style="color:${colorVar}">${spd.toFixed(2)} km/h</b><br>
                 Menetidő: <b>${toTimeStr(diff)}</b>
+                ${i < count ? `<br><span style="color:var(--text-dim); display:inline-block; margin-top:5px;">Kimenetel pihenő (40p) után: <b style="color:white;">${toTimeStr(nextStart)}</b></span>` : ''}
             </div>`;
-            curStart = arr + 2400; // Pihenő utáni új rajt
+            curStart = nextStart;
         }
         
         if (totalDist > 0) {
             const avgSpd = totalDist / (totalPureSec / 3600);
+            const avgColor = avgSpd >= 16.0 ? 'var(--warning)' : 'var(--success)';
             html += `<div class="summary-total">
-                <strong>Összesített statisztika:</strong><br>
+                <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
                 Össz menetidő (pihenők nélkül): <b>${toTimeStr(totalPureSec)}</b><br>
-                Teljes átlagsebesség: <b>${avgSpd.toFixed(2)} km/h</b>
+                Teljes átlagsebesség: <b style="font-size:1.3rem; color:${avgColor}">${avgSpd.toFixed(2)} km/h</b>
             </div>`;
         }
 
@@ -228,9 +226,9 @@
 
         document.getElementById('res1').style.display = 'block';
         document.getElementById('res1').innerHTML = `
-            Átlagsebesség: <b style="color:${spd>=16.0?'var(--danger)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>
+            Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>
             Menetidő: <b>${toTimeStr(diff)}</b><br><br>
-            <span style="color:var(--warning)">Kimeneteli idő (40p pihenő): <b>${toTimeStr(nextStart)}</b></span>`;
+            <span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
     }
 
     // VERSENY TERV
@@ -239,7 +237,7 @@
         let currentStart = toSec(document.getElementById('thR').value, document.getElementById('tmR').value, document.getElementById('tsR').value);
         if (currentStart === 0) return;
         
-        let html = "<strong>Terv 16 km/h alatti átlaghoz:</strong><br>";
+        let html = "<strong style='color:var(--text);'>Terv 16 km/h alatti átlaghoz:</strong><br>";
         for(let i = 1; i <= count; i++) {
             const d = parseFloat(document.getElementById(`td${i}`).value) || 0;
             if(d <= 0) continue;
@@ -251,7 +249,7 @@
                 <span class="plan-header">${i}. KÖR</span>
                 Rajt: ${toTimeStr(currentStart)}<br>
                 Beérkezés legkorábban: <strong style="color:var(--success)">${toTimeStr(minArrival)}</strong>
-                ${i < count ? `<br><span style="color:var(--text-dim)">Pihenő után kimenetel: ${toTimeStr(nextStart)}</span>` : ''}
+                ${i < count ? `<br><span style="color:var(--text-dim)">Kimenetel pihenő (40p) után: <b style="color:white;">${toTimeStr(nextStart)}</b></span>` : ''}
             </div>`;
             currentStart = nextStart;
         }
