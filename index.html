@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v18 - Versenyzőkkel</title>
+    <title>Verseny Kalkulátor v19 - Memória Mentéssel</title>
     <style>
         :root {
             --bg: #000000;
@@ -44,7 +44,6 @@
         .summary-total { background: #1c1c1e; color: var(--text); padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid var(--primary); }
         h4 { margin: 0; color: var(--primary); }
 
-        /* Új stílus a versenyzők listájához */
         .competitor-item { background: #2c2c2e; padding: 10px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); }
         .competitor-info { font-size: 0.9rem; }
         .competitor-bib { font-weight: bold; color: var(--warning); font-size: 1.1rem; margin-right: 10px; }
@@ -164,12 +163,11 @@
 <script>
     const CALC_LIMIT = 15.99;
     
-    // VERSENYZŐK TÁROLÁSA (Egyelőre a böngésző memóriájában)
+    // VERSENYZŐK TÁROLÁSA: Kibővítve a körök adataival!
     let competitors = [];
 
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
     
-    // Globális billentyűzet eseménykezelő
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
             if (e.key === 'Enter') {
@@ -206,7 +204,6 @@
         return [h, m, sc].map(v => String(v).padStart(2, '0')).join(':');
     }
 
-    // --- ÚJ: VERSENYZŐ KEZELŐ FÜGGVÉNYEK ---
     function addCompetitor() {
         const bib = document.getElementById('regBib').value;
         const name = document.getElementById('regName').value;
@@ -217,10 +214,15 @@
             return;
         }
 
-        // Hozzáadjuk a tömbhöz
-        competitors.push({ bib: bib, name: name, dist: dist });
+        // Új profil mentése üres időadatokkal
+        competitors.push({ 
+            bib: bib, 
+            name: name, 
+            dist: dist,
+            startTime: { h: '', m: '', s: '' },
+            laps: []
+        });
         
-        // Mezők törlése
         document.getElementById('regBib').value = '';
         document.getElementById('regName').value = '';
         document.getElementById('regBib').focus();
@@ -229,19 +231,15 @@
     }
 
     function updateCompetitorDisplays() {
-        // 1. Lista frissítése a "Versenyzők" fülön
         const listContainer = document.getElementById('competitorList');
         listContainer.innerHTML = '';
         
-        // 2. Legördülő frissítése a "Teljes verseny" fülön
         const selectContainer = document.getElementById('selectCompetitor');
         selectContainer.innerHTML = '<option value="">-- Manuális bevitel --</option>';
 
-        // Rendezzük rajtszám szerint
         competitors.sort((a, b) => parseInt(a.bib) - parseInt(b.bib));
 
         competitors.forEach(comp => {
-            // Listaelem generálása
             listContainer.innerHTML += `
                 <div class="competitor-item">
                     <div class="competitor-info">
@@ -251,29 +249,87 @@
                     <div style="color:var(--primary); font-weight:bold;">${comp.dist} km</div>
                 </div>
             `;
-            // Option generálása a dropdownba
             selectContainer.innerHTML += `<option value="${comp.bib}">#${comp.bib} - ${comp.name} (${comp.dist}km)</option>`;
         });
     }
 
     function loadCompetitorData() {
         const selectedBib = document.getElementById('selectCompetitor').value;
-        if (!selectedBib) return; // Ha a "Manuális"-ra vált vissza
+        const resBox = document.getElementById('res2');
+        
+        if (!selectedBib) {
+            // Ha visszavált manuálisra, ürítsük ki
+            resBox.style.display = 'none';
+            document.getElementById('vhR').value = '';
+            document.getElementById('vmR').value = '';
+            document.getElementById('vsR').value = '';
+            return; 
+        }
 
         const comp = competitors.find(c => c.bib === selectedBib);
         if (comp) {
-            // Beállítjuk a távot és frissítjük a köröket automatikusan
+            // 1. Távolság és körök beállítása
             document.getElementById('totalDist').value = comp.dist;
             autoSetLaps('lapCount', 'lapInputsContainer', true);
+
+            // 2. Mentett idők visszatöltése
+            document.getElementById('vhR').value = comp.startTime.h || '';
+            document.getElementById('vmR').value = comp.startTime.m || '';
+            document.getElementById('vsR').value = comp.startTime.s || '';
+
+            comp.laps.forEach((lap, idx) => {
+                const i = idx + 1;
+                if (document.getElementById(`vd${i}`)) {
+                    document.getElementById(`vd${i}`).value = lap.d || '';
+                    document.getElementById(`vh${i}`).value = lap.h || '';
+                    document.getElementById(`vm${i}`).value = lap.m || '';
+                    document.getElementById(`vs${i}`).value = lap.s || '';
+                }
+            });
+
+            // 3. Automatikus kiértékelés az adatok alapján
+            if (comp.startTime.h || comp.laps.length > 0) {
+                calcVerseny();
+            } else {
+                resBox.style.display = 'none';
+            }
         }
     }
-    // ----------------------------------------
 
-    // TELJES VERSENY
+    // TELJES VERSENY - Beépítve a memóriába mentést
     function calcVerseny() {
         const count = parseInt(document.getElementById('lapCount').value);
+        
+        // --- ADATOK MENTÉSE A KIVÁLASZTOTT VERSENYZŐHÖZ ---
+        const selectedBib = document.getElementById('selectCompetitor').value;
+        if (selectedBib) {
+            const comp = competitors.find(c => c.bib === selectedBib);
+            if (comp) {
+                comp.startTime = {
+                    h: document.getElementById('vhR').value,
+                    m: document.getElementById('vmR').value,
+                    s: document.getElementById('vsR').value
+                };
+                comp.laps = [];
+                for(let i = 1; i <= count; i++) {
+                    comp.laps.push({
+                        d: document.getElementById(`vd${i}`).value,
+                        h: document.getElementById(`vh${i}`).value,
+                        m: document.getElementById(`vm${i}`).value,
+                        s: document.getElementById(`vs${i}`).value
+                    });
+                }
+            }
+        }
+        // ---------------------------------------------------
+
         const rajt = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
-        if(rajt === 0) return;
+        const resBox = document.getElementById('res2');
+        
+        if(rajt === 0) {
+            resBox.style.display = 'none';
+            return;
+        }
         
         let curStart = rajt; 
         let html = "";
@@ -291,7 +347,7 @@
             totalPureSec += diff;
             totalDist += d;
 
-            const nextStart = arr + 2400; // 40 perc pihenő
+            const nextStart = arr + 2400;
             const colorVar = spd >= 16.0 ? 'var(--warning)' : 'var(--success)';
 
             html += `<div class="plan-box" style="border-left-color:${colorVar}">
@@ -313,7 +369,8 @@
             </div>`;
         }
 
-        const r = document.getElementById('res2'); r.style.display = 'block'; r.innerHTML = html;
+        resBox.style.display = 'block'; 
+        resBox.innerHTML = html;
     }
 
     // RÉSZIDŐ
