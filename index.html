@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v17</title>
+    <title>Verseny Kalkulátor v18 - Versenyzőkkel</title>
     <style>
         :root {
             --bg: #000000;
             --card: #1c1c1e;
             --primary: #0A84FF;
             --success: #32D74B;
-            --warning: #FF9F0A; /* Narancssárga lett */
+            --warning: #FF9F0A;
             --danger: #FF453A;
             --text: #ffffff;
             --text-dim: #8e8e93;
@@ -20,7 +20,7 @@
         .container { width: 100%; max-width: 500px; background: var(--card); padding: 20px; border-radius: 20px; box-sizing: border-box; border: 1px solid #333; }
         
         .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
-        .tab-btn { flex: 1 1 45%; padding: 12px 5px; border: none; border-radius: 10px; cursor: pointer; background: #333; color: var(--text-dim); font-weight: bold; font-size: 0.85rem; }
+        .tab-btn { flex: 1 1 30%; padding: 12px 5px; border: none; border-radius: 10px; cursor: pointer; background: #333; color: var(--text-dim); font-weight: bold; font-size: 0.85rem; }
         .tab-btn.active { background: var(--primary); color: white; }
 
         .mode-content { display: none; }
@@ -33,6 +33,7 @@
         .time-group input { text-align: center; }
 
         button.calc-btn { width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.1rem; text-transform: uppercase; }
+        button.add-btn { background: var(--primary); color: white; }
 
         .result-box { margin-top: 20px; padding: 15px; background: #2c2c2e; border-radius: 14px; border-left: 6px solid var(--primary); line-height: 1.6; }
         .lap-card { background: #3a3a3c; padding: 12px; border-radius: 14px; margin-top: 15px; border: 1px solid #48484a; }
@@ -40,22 +41,58 @@
         .plan-box { background: #1a1a1a; border-left: 4px solid var(--success); padding: 10px; margin-top: 10px; border-radius: 8px; margin-bottom: 10px; }
         .plan-header { color: var(--success); font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; display: block; }
         
-        /* Frissített stílus az összesítő blokkhoz */
         .summary-total { background: #1c1c1e; color: var(--text); padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid var(--primary); }
         h4 { margin: 0; color: var(--primary); }
+
+        /* Új stílus a versenyzők listájához */
+        .competitor-item { background: #2c2c2e; padding: 10px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); }
+        .competitor-info { font-size: 0.9rem; }
+        .competitor-bib { font-weight: bold; color: var(--warning); font-size: 1.1rem; margin-right: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="tabs">
-        <button id="btn-verseny" class="tab-btn active" onclick="switchMode('verseny', this)">Teljes verseny</button>
+        <button id="btn-versenyzok" class="tab-btn active" onclick="switchMode('versenyzok', this)">Versenyzők</button>
+        <button id="btn-verseny" class="tab-btn" onclick="switchMode('verseny', this)">Teljes verseny</button>
         <button id="btn-reszido" class="tab-btn" onclick="switchMode('reszido', this)">Részidő</button>
         <button id="btn-terv" class="tab-btn" onclick="switchMode('terv', this)">Verseny Terv</button>
-        <button id="btn-minosites" class="tab-btn" onclick="switchMode('minosites', this)">Minősítés kör avg</button>
+        <button id="btn-minosites" class="tab-btn" onclick="switchMode('minosites', this)">Kör avg</button>
     </div>
 
-    <div id="verseny" class="mode-content active">
+    <div id="versenyzok" class="mode-content active">
+        <h4 style="margin-bottom: 15px; color: white;">Új versenyző regisztrálása</h4>
+        
+        <label>Rajtszám:</label>
+        <input type="number" id="regBib" placeholder="pl. 23">
+        
+        <label>Versenyző neve:</label>
+        <input type="text" id="regName" placeholder="pl. Kovács János">
+        
+        <label>Versenytáv:</label>
+        <select id="regDist">
+            <option value="20">20 km</option>
+            <option value="40">40 km</option>
+            <option value="60">60 km</option>
+            <option value="80">80 km</option>
+            <option value="100">100 km</option>
+        </select>
+        
+        <button class="calc-btn add-btn" onclick="addCompetitor()">Hozzáadás</button>
+
+        <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
+        <div id="competitorList">
+            <div style="color: var(--text-dim); font-size: 0.8rem; font-style: italic;">Még nincs versenyző regisztrálva.</div>
+        </div>
+    </div>
+
+    <div id="verseny" class="mode-content">
+        <label style="color: var(--primary);">Versenyző kiválasztása:</label>
+        <select id="selectCompetitor" onchange="loadCompetitorData()" style="border-color: var(--primary);">
+            <option value="">-- Manuális bevitel --</option>
+        </select>
+
         <label>Össztáv & Körök:</label>
         <select id="totalDist" onchange="autoSetLaps('lapCount', 'lapInputsContainer', true)">
             <option value="20">20 km (1 kör)</option>
@@ -126,15 +163,18 @@
 
 <script>
     const CALC_LIMIT = 15.99;
+    
+    // VERSENYZŐK TÁROLÁSA (Egyelőre a böngésző memóriájában)
+    let competitors = [];
 
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
     
-    // Globális billentyűzet eseménykezelő - Enter és Backspace navigáció
+    // Globális billentyűzet eseménykezelő
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const elements = Array.from(document.querySelectorAll('.mode-content.active input, .mode-content.active button.calc-btn'));
+                const elements = Array.from(document.querySelectorAll('.mode-content.active input, .mode-content.active select, .mode-content.active button.calc-btn'));
                 const index = elements.indexOf(e.target);
                 if (index > -1 && index < elements.length - 1) {
                     elements[index + 1].focus();
@@ -165,6 +205,69 @@
         s = Math.max(0, s); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
         return [h, m, sc].map(v => String(v).padStart(2, '0')).join(':');
     }
+
+    // --- ÚJ: VERSENYZŐ KEZELŐ FÜGGVÉNYEK ---
+    function addCompetitor() {
+        const bib = document.getElementById('regBib').value;
+        const name = document.getElementById('regName').value;
+        const dist = document.getElementById('regDist').value;
+
+        if (!bib || !name) {
+            alert("Kérlek add meg a rajtszámot és a nevet is!");
+            return;
+        }
+
+        // Hozzáadjuk a tömbhöz
+        competitors.push({ bib: bib, name: name, dist: dist });
+        
+        // Mezők törlése
+        document.getElementById('regBib').value = '';
+        document.getElementById('regName').value = '';
+        document.getElementById('regBib').focus();
+
+        updateCompetitorDisplays();
+    }
+
+    function updateCompetitorDisplays() {
+        // 1. Lista frissítése a "Versenyzők" fülön
+        const listContainer = document.getElementById('competitorList');
+        listContainer.innerHTML = '';
+        
+        // 2. Legördülő frissítése a "Teljes verseny" fülön
+        const selectContainer = document.getElementById('selectCompetitor');
+        selectContainer.innerHTML = '<option value="">-- Manuális bevitel --</option>';
+
+        // Rendezzük rajtszám szerint
+        competitors.sort((a, b) => parseInt(a.bib) - parseInt(b.bib));
+
+        competitors.forEach(comp => {
+            // Listaelem generálása
+            listContainer.innerHTML += `
+                <div class="competitor-item">
+                    <div class="competitor-info">
+                        <span class="competitor-bib">#${comp.bib}</span>
+                        <strong>${comp.name}</strong>
+                    </div>
+                    <div style="color:var(--primary); font-weight:bold;">${comp.dist} km</div>
+                </div>
+            `;
+            // Option generálása a dropdownba
+            selectContainer.innerHTML += `<option value="${comp.bib}">#${comp.bib} - ${comp.name} (${comp.dist}km)</option>`;
+        });
+    }
+
+    function loadCompetitorData() {
+        const selectedBib = document.getElementById('selectCompetitor').value;
+        if (!selectedBib) return; // Ha a "Manuális"-ra vált vissza
+
+        const comp = competitors.find(c => c.bib === selectedBib);
+        if (comp) {
+            // Beállítjuk a távot és frissítjük a köröket automatikusan
+            document.getElementById('totalDist').value = comp.dist;
+            autoSetLaps('lapCount', 'lapInputsContainer', true);
+        }
+    }
+    // ----------------------------------------
 
     // TELJES VERSENY
     function calcVerseny() {
