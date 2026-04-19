@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v30 - Admin Bejelentkezés</title>
+    <title>Verseny Kalkulátor v31 - Auto-Login & Okos Hibaüzenet</title>
     <style>
         :root {
             --bg: #000000;
@@ -32,7 +32,6 @@
         .sidebar-btn:hover { background: #222; }
         .sidebar-btn.active { background: #2c2c2e; color: var(--primary); border-left: 4px solid var(--primary); }
 
-        /* BEJELENTKEZŐ MEZŐK A MENÜBEN */
         .sidebar-input { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 6px; background: #222; border: 1px solid #444; color: white; box-sizing: border-box; font-size: 0.9rem; }
         .sidebar-submit { width: 100%; padding: 10px; border-radius: 6px; background: #333; color: white; border: 1px solid #444; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .sidebar-submit:hover { background: var(--primary); border-color: var(--primary); }
@@ -125,6 +124,7 @@
         <input type="text" id="loginUser" class="sidebar-input" placeholder="Felhasználónév" autocomplete="off">
         <input type="password" id="loginPass" class="sidebar-input" placeholder="Jelszó" autocomplete="off">
         <button class="sidebar-submit" onclick="doLogin()">Bejelentkezés</button>
+        <div id="loginError" style="color:var(--danger); display:none; font-size:0.85rem; margin-top:10px; text-align:center; font-weight:bold;">Helytelen felhasználónév vagy jelszó!</div>
     </div>
 
     <div id="logout-section" style="display: none;">
@@ -236,7 +236,6 @@
         "20":  { h:'', m:'', s:'', laps: [''] }
     };
 
-    // --- BEJELENTKEZÉSI LOGIKA ---
     function doLogin() {
         const u = document.getElementById('loginUser').value;
         const p = document.getElementById('loginPass').value;
@@ -245,13 +244,13 @@
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('logout-section').style.display = 'block';
             document.getElementById('admin-menu').style.display = 'block';
-            
-            // Automatikus ugrás a Verseny Kezelés fülre belépés után
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
-            alert('Helytelen felhasználónév vagy jelszó!');
+            const err = document.getElementById('loginError');
+            err.style.display = 'block';
+            setTimeout(() => { err.style.display = 'none'; }, 3000);
         }
-        document.getElementById('loginPass').value = ''; // Jelszó mező törlése biztonsági okból
+        document.getElementById('loginPass').value = '';
     }
 
     function doLogout() {
@@ -259,11 +258,8 @@
         document.getElementById('admin-menu').style.display = 'none';
         document.getElementById('login-section').style.display = 'block';
         document.getElementById('loginUser').value = '';
-        
-        // Visszadob a publikus Terv fülre
         switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     }
-    // -----------------------------
 
     function toggleMenu() {
         document.getElementById('sidebar').classList.toggle('open');
@@ -334,16 +330,12 @@
             const index = elements.indexOf(e.target);
 
             if (e.key === 'Enter') {
-                // Ha bejelentkezés mezőkön nyom entert, próbáljon belépni
-                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') {
-                    doLogin();
-                    return;
-                }
+                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') { doLogin(); return; }
                 e.preventDefault();
                 if (index > -1 && index < elements.length - 1) elements[index + 1].focus();
             }
             else if (e.key === 'Backspace' && e.target.value === '') {
-                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') return; // login mezőket kihagyjuk
+                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') return; 
                 e.preventDefault();
                 if (index > 0) elements[index - 1].focus(); 
             }
@@ -566,6 +558,11 @@
     window.onload = function() {
         renderKiiras();
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
+        
+        // --- AUTOMATIKUS BEJELENTKEZÉS TESZTELÉSHEZ ---
+        document.getElementById('loginUser').value = 'admin';
+        document.getElementById('loginPass').value = 'endurance.admin';
+        doLogin();
     };
     
     function calcReszido() {
