@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v20 - Orvosi és Pulzus idővel</title>
+    <title>Verseny Kalkulátor v21 - Szigorú Minősítés</title>
     <style>
         :root {
             --bg: #000000;
@@ -257,7 +257,7 @@
         const resBox = document.getElementById('res2');
         
         if (!selectedBib) {
-            // MANUÁLIS MÓD: Mindent kiürítünk
+            // MANUÁLIS MÓD
             resBox.style.display = 'none';
             document.getElementById('vhR').value = '';
             document.getElementById('vmR').value = '';
@@ -276,7 +276,6 @@
             return; 
         }
 
-        // KIVÁLASZTOTT VERSENYZŐ BETÖLTÉSE
         const comp = competitors.find(c => c.bib === selectedBib);
         if (comp) {
             document.getElementById('totalDist').value = comp.dist;
@@ -311,7 +310,6 @@
         const count = parseInt(document.getElementById('lapCount').value);
         const selectedBib = document.getElementById('selectCompetitor').value;
         
-        // MENTÉS CSAK AKKOR, HA VAN KIVÁLASZTOTT VERSENYZŐ (Nem manuális)
         if (selectedBib !== "") {
             const comp = competitors.find(c => c.bib === selectedBib);
             if (comp) {
@@ -347,6 +345,7 @@
         let html = "";
         let totalPureSec = 0;
         let totalDist = 0;
+        let anyLapExceeded = false; // ÚJ: Figyelő, hogy volt-e túl gyors kör
         
         for(let i = 1; i <= count; i++) {
             const d = parseFloat(document.getElementById(`vd${i}`).value) || 0;
@@ -355,23 +354,26 @@
             
             if(d === 0 || arr === 0) continue;
             
-            // Kapu (Beérkezés) számolása
             let diffArr = arr - curStart; if(diffArr <= 0) diffArr += 86400;
             const spdArr = d / (diffArr / 3600);
             
+            // ELLENŐRZÉS: Ha ez a kör 16 km/h felett van, bekapcsoljuk a figyelőt
+            if (spdArr >= 16.0) {
+                anyLapExceeded = true;
+            }
+            
             let pureSecForLap = diffArr;
-            let nextStart = arr + 2400; // Alapból a kaputól számolunk pihenőt, ha nincs még orvosi
+            let nextStart = arr + 2400; 
             let vetHtml = "";
 
-            // Ha van orvosi idő beírva, akkor az alapján számolunk tovább
             if (vet > 0) {
                 let diffVet = vet - curStart; if(diffVet <= 0) diffVet += 86400;
                 const spdVet = d / (diffVet / 3600);
                 
                 let pulzusTime = vet - arr; if(pulzusTime < 0) pulzusTime += 86400;
                 
-                pureSecForLap = diffVet; // Teljes menetidő orvosival
-                nextStart = vet + 2400; // Pihenő az ORVOSITÓL indul!
+                pureSecForLap = diffVet; 
+                nextStart = vet + 2400; 
                 
                 const vetColor = spdVet >= 16.0 ? 'var(--warning)' : 'var(--success)';
                 
@@ -400,7 +402,10 @@
         
         if (totalDist > 0) {
             const avgSpd = totalDist / (totalPureSec / 3600);
-            const avgColor = avgSpd >= 16.0 ? 'var(--warning)' : 'var(--success)';
+            
+            // ÚJ LOGIKA: Ha maga az átlag magas, VAGY bármelyik kör magas volt, akkor sárga lesz!
+            const avgColor = (avgSpd >= 16.0 || anyLapExceeded) ? 'var(--warning)' : 'var(--success)';
+            
             html += `<div class="summary-total">
                 <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
                 <div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Össz menetidő:</span> <b style="color:white;">${toTimeStr(totalPureSec)}</b></div>
