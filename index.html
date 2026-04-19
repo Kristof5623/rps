@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v31 - Auto-Login & Okos Hibaüzenet</title>
+    <title>Verseny Kalkulátor v32 - Alapértelmezett Admin Státusz</title>
     <style>
         :root {
             --bg: #000000;
@@ -559,10 +559,11 @@
         renderKiiras();
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
         
-        // --- AUTOMATIKUS BEJELENTKEZÉS TESZTELÉSHEZ ---
-        document.getElementById('loginUser').value = 'admin';
-        document.getElementById('loginPass').value = 'endurance.admin';
-        doLogin();
+        // --- ALAPBÓL BEJELENTKEZETT ÁLLAPOT TESZTELÉSHEZ ---
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('logout-section').style.display = 'block';
+        document.getElementById('admin-menu').style.display = 'block';
+        switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
     };
     
     function calcReszido() {
