@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v23 - Enter Fix & Profi Adatlap</title>
+    <title>Verseny Kalkulátor v24 - Yamamah Táblázat</title>
     <style>
         :root {
             --bg: #000000;
@@ -60,12 +60,14 @@
         .competitor-info { font-size: 1rem; }
         .competitor-bib { font-weight: bold; color: var(--warning); font-size: 1.2rem; margin-right: 10px; }
         
-        /* ADATLAP TÁBLÁZAT FRISSÍTVE */
+        /* ADATLAP TÁBLÁZAT - YAMAMAH STÍLUS */
         .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #444; }
-        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 400px; }
-        .data-table th, .data-table td { border: 1px solid #444; padding: 8px 4px; text-align: center; }
-        .data-table th { background: #333; color: var(--primary); font-weight: 600; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 650px; }
+        .data-table th, .data-table td { border: 1px solid #444; padding: 10px 5px; text-align: center; }
+        .data-table th { background: #2c2c2e; color: var(--primary); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; }
         .data-table tr:nth-child(even) { background: #222; }
+        .data-table tr:hover { background: #333; }
+        .col-highlight { background: rgba(10, 132, 255, 0.05); }
 
         .live-item { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
         .live-time { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
@@ -163,7 +165,7 @@
         </div>
 
         <div id="elo-rajtok" class="mode-content">
-            <h3 style="color: var(--danger); margin-top:0;">🔴 Élő Kiindulások (Visszaszámláló)</h3>
+            <h3 style="color: var(--danger); margin-top:0;">🔴 Élő Kiindulások</h3>
             <p style="color:var(--text-dim); font-size:0.85rem;">A lista automatikusan frissül. Azok jelennek meg itt, akik már túl vannak az orvosi (vet) ellenőrzésen, és ketyeg a 40 perces pihenőjük.</p>
             <div id="liveCountdownContainer">
                 <div style="text-align:center; padding: 20px; color:var(--text-dim);">Nincs aktív várakozó versenyző.</div>
@@ -172,7 +174,7 @@
 
         <div id="adatlapok" class="mode-content">
             <h3 style="color: var(--primary); margin-top:0;">📊 Versenyzői Adatlapok</h3>
-            <p style="color:var(--text-dim); font-size:0.85rem;">Kattints egy versenyzőre a részletes táblázat megtekintéséhez!</p>
+            <p style="color:var(--text-dim); font-size:0.85rem;">Kattints egy versenyzőre a részletes, Yamamah-stílusú táblázat megtekintéséhez! (Mobilon húzd el a táblázatot balra-jobbra).</p>
             <div id="adatlapList"></div>
             <div id="adatlapReszletek" style="display:none; margin-top: 20px; background: #222; padding: 15px; border-radius: 12px; border: 1px solid #444;"></div>
         </div>
@@ -243,7 +245,6 @@
         document.getElementById(mode).style.display = 'block';
         btn.classList.add('active');
     }
-    // --------------------
 
     // --- JAVÍTOTT ENTER/BACKSPACE LOGIKA ---
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
@@ -252,7 +253,6 @@
         if (e.target.tagName.toLowerCase() === 'input') {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                // CSAK a képernyőn aktuálisan látható beviteli elemeket gyűjtjük össze!
                 const elements = Array.from(document.querySelectorAll('input, select, button.calc-btn'))
                     .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
                 
@@ -369,7 +369,8 @@
                 d: document.getElementById(`vd${i}`).value,
                 h: document.getElementById(`vh${i}`).value, m: document.getElementById(`vm${i}`).value, s: document.getElementById(`vs${i}`).value,
                 oh: document.getElementById(`ovh${i}`).value, om: document.getElementById(`ovm${i}`).value, os: document.getElementById(`ovs${i}`).value,
-                arrSec: arr, vetSec: vet, nextStartSec: 0, spdArr: 0, spdVet: 0, pulzusSec: 0, pureSec: 0, isComplete: false
+                arrSec: arr, vetSec: vet, nextStartSec: 0, spdArr: 0, spdVet: 0, pulzusSec: 0, pureSecForLap: 0, 
+                cumulativeTime: 0, cumulativeDist: 0, cumulativeSpd: 0, isComplete: false
             };
 
             if(d === 0 || arr === 0) {
@@ -393,18 +394,24 @@
                 
                 pureSecForLap = diffVet; nextStart = vet + 2400; 
                 
-                lapData.spdVet = spdVet; lapData.pulzusSec = pulzusTime; lapData.pureSec = diffVet;
-
+                lapData.spdVet = spdVet; lapData.pulzusSec = pulzusTime; 
+                
                 const vetColor = spdVet >= 16.0 ? 'var(--warning)' : 'var(--success)';
                 vetHtml = `<div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div><div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${toTimeStr(diffVet)}</b></div><div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${vetColor};">${spdVet.toFixed(2)} km/h</b></div><div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(pulzusTime)}</b></div>`;
-            } else {
-                lapData.pureSec = diffArr;
             }
 
+            // Kummulatív adatok számolása (Yamamah stílushoz)
+            totalPureSec += pureSecForLap;
+            totalDist += d;
+            
+            lapData.pureSecForLap = pureSecForLap;
+            lapData.cumulativeTime = totalPureSec;
+            lapData.cumulativeDist = totalDist;
+            lapData.cumulativeSpd = totalDist / (totalPureSec / 3600);
             lapData.nextStartSec = nextStart;
+            
             if(comp) comp.laps.push(lapData);
 
-            totalPureSec += pureSecForLap; totalDist += d;
             const colorVar = spdArr >= 16.0 ? 'var(--warning)' : 'var(--success)';
 
             html += `<div class="plan-box" style="border-left-color:${colorVar}"><span class="plan-header" style="color:${colorVar}">${i}. KÖR</span><div class="plan-data-row"><span class="plan-data-label">Kapu idő:</span> <b style="color:white;">${toTimeStr(diffArr)}</b></div><div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${colorVar}">${spdArr.toFixed(2)} km/h</b></div>${vetHtml}${i < count ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #333; font-size:0.9rem; color:var(--text-dim);">Kimenetel pihenő (40p) után: <b style="color:white; float:right;">${toTimeStr(nextStart)}</b></div>` : ''}</div>`;
@@ -473,7 +480,7 @@
         container.innerHTML = html;
     }
 
-    // --- PROFIBB ADATLAP TÁBLÁZAT ---
+    // --- PROFIBB ADATLAP TÁBLÁZAT - YAMAMAH MÓD ---
     function renderAdatlapList() {
         const listContainer = document.getElementById('adatlapList');
         const reszletContainer = document.getElementById('adatlapReszletek');
@@ -501,29 +508,43 @@
         if (!comp.laps || comp.laps.filter(l => l.isComplete).length === 0) {
             html += `<div style="color:var(--text-dim); font-size:0.9rem;">Még nincs kitöltött köreredmény.</div>`;
         } else {
-            // Táblázat felépítése profi versenyek mintájára
+            // YAMAMAH STÍLUSÚ TÁBLÁZAT FEJLÉC
             html += `<div class="table-container"><table class="data-table">
-                <tr><th>Kör</th><th>Táv</th><th>Kapu beérk.</th><th>Vet beérk.</th><th>Pulzus idő</th><th>Sebesség</th><th>Kiindulás</th></tr>`;
+                <tr>
+                    <th>Szakasz</th>
+                    <th>Táv</th>
+                    <th class="col-highlight">Kapu (In)</th>
+                    <th class="col-highlight">Vet</th>
+                    <th>Megnyugvás</th>
+                    <th>Menetidő</th>
+                    <th>Szakasz Seb.</th>
+                    <th style="color:var(--success);">Össz. Seb.</th>
+                    <th>Kiindulás</th>
+                </tr>`;
             
             comp.laps.forEach((lap, i) => {
                 if (!lap.isComplete) return;
                 
-                // Ha van orvosi sebesség, az a hivatalos, különben a kapu
                 let dispSpd = lap.spdVet > 0 ? lap.spdVet : lap.spdArr;
-                let spdC = dispSpd >= 16 ? 'color:var(--warning)' : 'color:var(--success)';
+                let phaseSpdC = dispSpd >= 16 ? 'color:var(--warning)' : '';
+                let cumSpdC = lap.cumulativeSpd >= 16 ? 'color:var(--warning)' : 'color:var(--success); font-weight:bold;';
                 
                 let arrTimeStr = lap.arrSec > 0 ? toTimeStr(lap.arrSec) : '-';
                 let vetTimeStr = lap.vetSec > 0 ? toTimeStr(lap.vetSec) : '-';
                 let pulseStr = lap.pulzusSec > 0 ? toTimeStr(lap.pulzusSec) : '-';
+                let phaseTimeStr = lap.pureSecForLap > 0 ? toTimeStr(lap.pureSecForLap) : '-';
                 let nextStr = lap.nextStartSec > 0 ? toTimeStr(lap.nextStartSec) : '-';
+                let cumSpdStr = lap.cumulativeSpd > 0 ? lap.cumulativeSpd.toFixed(2) + ' km/h' : '-';
                 
                 html += `<tr>
                     <td><b>${i+1}.</b></td>
                     <td>${lap.d}km</td>
-                    <td>${arrTimeStr}</td>
-                    <td style="color:var(--primary)">${vetTimeStr}</td>
+                    <td class="col-highlight">${arrTimeStr}</td>
+                    <td class="col-highlight" style="color:var(--primary); font-weight:bold;">${vetTimeStr}</td>
                     <td>${pulseStr}</td>
-                    <td style="${spdC}"><b>${dispSpd.toFixed(2)} km/h</b></td>
+                    <td>${phaseTimeStr}</td>
+                    <td style="${phaseSpdC}"><b>${dispSpd.toFixed(2)} km/h</b></td>
+                    <td style="${cumSpdC}">${cumSpdStr}</td>
                     <td>${nextStr}</td>
                 </tr>`;
             });
