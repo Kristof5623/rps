@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v25 - T-Track Felugró Ablak</title>
+    <title>Verseny Kalkulátor v26 - Magyar Adatlap & Fixek</title>
     <style>
         :root {
             --bg: #000000;
@@ -67,7 +67,7 @@
         .live-time.expired { color: var(--text-dim); font-size: 1.2rem; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
-        /* T-TRACK MODAL ÉS TÁBLÁZAT */
+        /* MODAL ÉS TÁBLÁZAT */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
         .modal-content { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #444; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0px 10px 30px rgba(0,0,0,0.5); }
         .close-btn { position: absolute; top: 15px; right: 20px; color: var(--text-dim); font-size: 1.8rem; cursor: pointer; font-weight: bold; }
@@ -173,7 +173,7 @@
 
         <div id="elo-rajtok" class="mode-content">
             <h3 style="color: var(--danger); margin-top:0;">🔴 Élő Kiindulások</h3>
-            <p style="color:var(--text-dim); font-size:0.85rem;">A lista automatikusan frissül. Azok jelennek meg itt, akik már túl vannak az orvosi (vet) ellenőrzésen, és ketyeg a 40 perces pihenőjük.</p>
+            <p style="color:var(--text-dim); font-size:0.85rem;">A lista automatikusan frissül a valós időhöz képest. Azok jelennek meg itt, akik már túl vannak az orvosi (vet) ellenőrzésen, és ketyeg a 40 perces pihenőjük.</p>
             <div id="liveCountdownContainer">
                 <div style="text-align:center; padding: 20px; color:var(--text-dim);">Nincs aktív várakozó versenyző.</div>
             </div>
@@ -181,7 +181,7 @@
 
         <div id="adatlapok" class="mode-content">
             <h3 style="color: var(--primary); margin-top:0;">📊 Versenyzői Adatlapok</h3>
-            <p style="color:var(--text-dim); font-size:0.85rem;">Kattints egy versenyzőre a részletes T-Track stílusú táblázat megtekintéséhez!</p>
+            <p style="color:var(--text-dim); font-size:0.85rem;">Kattints egy versenyzőre a részletes eredménytáblázat megtekintéséhez!</p>
             <div id="adatlapList"></div>
         </div>
 
@@ -231,7 +231,6 @@
     const CALC_LIMIT = 15.99;
     let competitors = [];
 
-    // --- MENÜ KEZELÉS ---
     function toggleMenu() {
         document.getElementById('sidebar').classList.toggle('open');
         document.querySelector('.overlay').classList.toggle('open');
@@ -294,7 +293,7 @@
         s = Math.abs(s); 
         const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
         let str = (h>0 ? String(h)+':' : '') + String(m).padStart(2, '0') + ':' + String(sc).padStart(2, '0');
-        if (h === 0 && str.length < 5) str = "0:" + str; // fallback for pure minutes
+        if (h === 0 && str.length < 5) str = "0:" + str; 
         return isNeg ? "-" + str : str;
     }
 
@@ -329,12 +328,16 @@
         const selectedBib = document.getElementById('selectCompetitor').value;
         const resBox = document.getElementById('res2');
         
+        // JAVÍTÁS: Manuális módnál MINDENT töröl!
         if (!selectedBib) {
             resBox.style.display = 'none';
             document.getElementById('vhR').value = ''; document.getElementById('vmR').value = ''; document.getElementById('vsR').value = '';
             const count = parseInt(document.getElementById('lapCount').value) || 1;
             for(let i = 1; i <= count; i++) {
-                ['d','h','m','s','oh','om','os'].forEach(p => { let el=document.getElementById((p==='d'?'v':(p.startsWith('o')?'':'v'))+p+i); if(el) el.value=''; });
+                ['vd','vh','vm','vs','ovh','ovm','ovs'].forEach(prefix => { 
+                    let el = document.getElementById(prefix + i); 
+                    if(el) el.value = ''; 
+                });
             }
             return; 
         }
@@ -392,7 +395,6 @@
                 continue;
             }
             
-            // Loop = Rajttól a Kapuig
             let loopTime = arr - curStart; if(loopTime <= 0) loopTime += 86400;
             lapData.loopTimeSec = loopTime;
             lapData.loopSpeed = d / (loopTime / 3600);
@@ -402,7 +404,6 @@
 
             lapData.isComplete = true;
 
-            // Phase = Rajttól a VET-ig (ha van orvosi)
             if (vet > 0) {
                 phaseTime = vet - curStart; if (phaseTime <= 0) phaseTime += 86400;
                 lapData.pulzusSec = vet - arr; if(lapData.pulzusSec < 0) lapData.pulzusSec += 86400;
@@ -412,7 +413,6 @@
             lapData.phaseTimeSec = phaseTime;
             lapData.phaseSpeed = d / (phaseTime / 3600);
 
-            // Összesített Ride
             totalRideTimeSec += phaseTime;
             totalDist += d;
             
@@ -438,7 +438,7 @@
         if (totalDist > 0) {
             const avgSpd = totalDist / (totalRideTimeSec / 3600);
             const avgColor = (avgSpd >= 16.0 || anyLapExceeded) ? 'var(--warning)' : 'var(--success)';
-            html += `<div class="summary-total"><strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong><div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Ride time (Menetidő):</span> <b style="color:white;">${toTimeStr(totalRideTimeSec)}</b></div><div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Ride speed (Átlag):</span> <b style="font-size:1.3rem; color:${avgColor}">${avgSpd.toFixed(2)} km/h</b></div></div>`;
+            html += `<div class="summary-total"><strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong><div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Össz. menetidő:</span> <b style="color:white;">${toTimeStr(totalRideTimeSec)}</b></div><div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${avgSpd.toFixed(2)} km/h</b></div></div>`;
         }
 
         resBox.style.display = 'block'; resBox.innerHTML = html;
@@ -467,7 +467,7 @@
             
             if (lastLap.nextStartSec > 0) {
                 let diff = lastLap.nextStartSec - currentSec;
-                if (diff < -43200) diff += 86400;
+                if (diff < -43200) diff += 86400; // Éjfél átfordulás korrekció
 
                 if (diff >= 0) pending.push({ comp, diff, startStr: toTimeStr(lastLap.nextStartSec) });
                 else if (diff >= -60) expired.push({ comp, diff, startStr: toTimeStr(lastLap.nextStartSec) });
@@ -497,7 +497,7 @@
         container.innerHTML = html;
     }
 
-    // --- T-TRACK MODAL MEGJELENÍTÉS ---
+    // --- MAGYARÍTOTT MODAL ---
     function renderAdatlapList() {
         const listContainer = document.getElementById('adatlapList');
         if (competitors.length === 0) {
@@ -507,94 +507,95 @@
 
         let html = '';
         competitors.sort((a, b) => parseInt(a.bib) - parseInt(b.bib)).forEach(comp => {
-            html += `<div class="competitor-item" onclick="openAdatlap('${comp.bib}')"><div><span class="competitor-bib">#${comp.bib}</span><strong>${comp.name}</strong></div><div style="font-size:0.8rem; color:var(--text-dim);">T-Track nézet ></div></div>`;
+            html += `<div class="competitor-item" onclick="openAdatlap('${comp.bib}')"><div><span class="competitor-bib">#${comp.bib}</span><strong>${comp.name}</strong></div><div style="font-size:0.8rem; color:var(--text-dim);">Adatok megtekintése ></div></div>`;
         });
         listContainer.innerHTML = html;
     }
 
     function openAdatlap(bib) {
-        const comp = competitors.find(c => c.bib === bib);
-        if (!comp) return;
+        const comp = competitors.find(c => c.bib === selectedBib); // Fix: this was an issue in previous, need to use parameter bib
+        const compData = competitors.find(c => c.bib === bib);
+        if (!compData) return;
 
         const modalBody = document.getElementById('modalBody');
-        let html = `<h3 style="margin-top:0; color:var(--primary); font-size:1.4rem; border-bottom: 1px solid #333; padding-bottom:10px;">#${comp.bib} ${comp.name} <span style="color:var(--text-dim); font-size:1rem;">(${comp.dist}km)</span></h3>`;
+        let html = `<h3 style="margin-top:0; color:var(--primary); font-size:1.4rem; border-bottom: 1px solid #333; padding-bottom:10px;">#${compData.bib} ${compData.name} <span style="color:var(--text-dim); font-size:1rem;">(${compData.dist}km)</span></h3>`;
         
-        let phases = comp.laps ? comp.laps.filter(l => l.isComplete) : [];
+        let phases = compData.laps ? compData.laps.filter(l => l.isComplete) : [];
 
         if (phases.length === 0) {
             html += `<div style="color:var(--text-dim); padding: 20px 0;">Nincs még rögzített köreredmény.</div>`;
         } else {
             html += `<div class="table-responsive"><table class="ttrack-table">`;
             
-            // T-Track Header
-            html += `<tr><th class="row-header">T-Track</th>`;
-            phases.forEach((_, i) => { html += `<th class="col-header">Fase ${i+1}</th>`; });
+            // Fejléc
+            html += `<tr><th class="row-header">Eredmények</th>`;
+            phases.forEach((_, i) => { html += `<th class="col-header">${i+1}. Szakasz</th>`; });
             html += `</tr>`;
 
-            // Km
-            html += `<tr><th class="row-header">Km</th>`;
+            // Táv
+            html += `<tr><th class="row-header">Táv (km)</th>`;
             phases.forEach(l => html += `<td>${l.d}</td>`);
             html += `</tr>`;
 
-            // Start
-            html += `<tr><th class="row-header">Start</th>`;
+            // Rajt
+            html += `<tr><th class="row-header">Rajt ideje</th>`;
             phases.forEach(l => html += `<td>${toTimeStr(l.startSec)}</td>`);
             html += `</tr>`;
 
-            // Arrival
-            html += `<tr><th class="row-header">Arrival</th>`;
+            // Kapu beérk
+            html += `<tr><th class="row-header">Kapu beérk.</th>`;
             phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
             html += `</tr>`;
 
-            // Loop time
-            html += `<tr><th class="row-header">Loop time</th>`;
+            // Szakasz idő (Loop time)
+            html += `<tr><th class="row-header">Szakasz idő</th>`;
             phases.forEach(l => html += `<td>${toTimeStr(l.loopTimeSec)}</td>`);
             html += `</tr>`;
 
-            // Loop speed
-            html += `<tr><th class="row-header">Loop speed</th>`;
+            // Kapu átlag (Loop speed)
+            html += `<tr><th class="row-header">Kapu átlag</th>`;
             phases.forEach(l => {
                 let spdC = l.loopSpeed >= 16 ? 'warning-speed' : 'highlight-speed';
                 html += `<td class="${spdC}">${l.loopSpeed.toFixed(2)}</td>`;
             });
             html += `</tr>`;
 
-            // In time (Vet)
-            html += `<tr><th class="row-header">In time</th>`;
+            // Orvosi idő
+            html += `<tr><th class="row-header">Orvosi (Vet)</th>`;
             phases.forEach(l => html += `<td>${l.vetSec > 0 ? toTimeStr(l.vetSec) : '-'}</td>`);
             html += `</tr>`;
 
-            // Recovery
-            html += `<tr><th class="row-header">Recovery</th>`;
+            // Pulzus idő
+            html += `<tr><th class="row-header">Pulzus idő</th>`;
             phases.forEach(l => html += `<td>${l.pulzusSec > 0 ? toTimeStr(l.pulzusSec) : '-'}</td>`);
             html += `</tr>`;
 
-            // Phase speed
-            html += `<tr><th class="row-header">Phase speed</th>`;
+            // Orvosi átlag
+            html += `<tr><th class="row-header">Orvosi átlag</th>`;
             phases.forEach(l => {
                 let pSpdC = l.phaseSpeed >= 16 ? 'warning-speed' : (l.phaseSpeed > 0 ? 'highlight-speed' : '');
                 html += `<td class="${pSpdC}">${l.phaseSpeed > 0 ? l.phaseSpeed.toFixed(2) : '-'}</td>`;
             });
             html += `</tr>`;
 
-            // Ride time
-            html += `<tr><th class="row-header">Ride time</th>`;
+            // Össz menetidő
+            html += `<tr><th class="row-header">Össz. menetidő</th>`;
             phases.forEach(l => html += `<td>${l.rideTimeSec > 0 ? toTimeStr(l.rideTimeSec) : '-'}</td>`);
             html += `</tr>`;
 
-            // Ride speed
-            html += `<tr><th class="row-header">Ride speed</th>`;
+            // Össz átlag
+            html += `<tr><th class="row-header">Össz. átlag</th>`;
             phases.forEach(l => {
                 let rSpdC = l.rideSpeed >= 16 ? 'warning-speed' : (l.rideSpeed > 0 ? 'highlight-speed' : '');
                 html += `<td class="${rSpdC}">${l.rideSpeed > 0 ? l.rideSpeed.toFixed(2) : '-'}</td>`;
             });
             html += `</tr>`;
 
-            // Rank & Trail by (Jövőbeli fejlesztés)
-            html += `<tr><th class="row-header" style="color:#555;">Rank</th>`;
+            // Helyezés / Lemaradás
+            html += `<tr><th class="row-header" style="color:#555;">Helyezés</th>`;
             phases.forEach(l => html += `<td style="color:#555;">-</td>`);
             html += `</tr>`;
-            html += `<tr><th class="row-header" style="color:#555;">Trail by</th>`;
+            html += `<tr><th class="row-header" style="color:#555;">Lemaradás</th>`;
             phases.forEach(l => html += `<td style="color:#555;">-</td>`);
             html += `</tr>`;
 
@@ -609,10 +610,48 @@
         document.getElementById('adatlapModal').style.display = 'none';
     }
 
-    // Régiek
-    function calcReszido() { /* ... */ }
-    function calcTerv() { /* ... */ }
-    function calcMinosites() { /* ... */ }
+    // --- RÉSZIDŐ ÉS TERV MOTOR (Visszaállítva!) ---
+    function calcReszido() {
+        const d = parseFloat(document.getElementById('dist1').value);
+        const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
+        const t2 = toSec(document.getElementById('rh2').value, document.getElementById('rm2').value, document.getElementById('rs2').value);
+        if(!d || t1 === 0 || t2 === 0) return;
+        
+        let diff = t2 - t1; if(diff <= 0) diff += 86400;
+        const spd = d / (diff / 3600);
+        const nextStart = t2 + 2400;
+
+        document.getElementById('res1').style.display = 'block';
+        document.getElementById('res1').innerHTML = `Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
+    }
+
+    function calcTerv() {
+        const count = parseInt(document.getElementById('lapCountT').value);
+        let currentStart = toSec(document.getElementById('thR').value, document.getElementById('tmR').value, document.getElementById('tsR').value);
+        if (currentStart === 0) return;
+        
+        let html = "<strong style='color:var(--text);'>Terv 16 km/h alatti átlaghoz:</strong><br>";
+        for(let i = 1; i <= count; i++) {
+            const d = parseFloat(document.getElementById(`td${i}`).value) || 0;
+            if(d <= 0) continue;
+            const minArrival = currentStart + Math.ceil(d / (CALC_LIMIT / 3600));
+            const nextStart = minArrival + 2400;
+
+            html += `<div class="plan-box"><span class="plan-header">${i}. KÖR</span>Rajt: ${toTimeStr(currentStart)}<br>Beérkezés legkorábban: <strong style="color:var(--success)">${toTimeStr(minArrival)}</strong>${i < count ? `<br><span style="color:var(--text-dim)">Kimenetel pihenő (40p) után: <b style="color:white;">${toTimeStr(nextStart)}</b></span>` : ''}</div>`;
+            currentStart = nextStart;
+        }
+        document.getElementById('res4').style.display = 'block';
+        document.getElementById('res4').innerHTML = html;
+    }
+
+    function calcMinosites() {
+        const d = parseFloat(document.getElementById('distJ').value);
+        const t1 = toSec(document.getElementById('jh1').value, document.getElementById('jm1').value, document.getElementById('js1').value);
+        if(!d || t1 === 0) return;
+        const limitSec = Math.ceil(d / (CALC_LIMIT / 3600));
+        document.getElementById('res3').style.display = 'block';
+        document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + limitSec)}</strong>`;
+    }
     
     function autoSetLaps(id, cont, isReal) {
         const d = document.getElementById(id === 'lapCount' ? 'totalDist' : 'totalDistT').value;
