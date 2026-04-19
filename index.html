@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v28 - Villámgyors Bevitel & UI Fixek</title>
+    <title>Verseny Kalkulátor v29 - Backspace Fix & UI</title>
     <style>
         :root {
             --bg: #000000;
@@ -40,15 +40,12 @@
         .mode-content.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* JAVÍTÁS: CSÚNYA NYILAK ELTÜNTETÉSE SZÁM MEZŐKBŐL */
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-        input[type="number"] {
-            -moz-appearance: textfield;
-        }
+        input[type="number"] { -moz-appearance: textfield; }
 
         label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
         select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; box-sizing: border-box; font-size: 1rem; width: 100%; margin-top: 5px; }
@@ -58,19 +55,17 @@
         button.calc-btn { width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.1rem; text-transform: uppercase; transition: 0.2s; }
         button.add-btn { background: var(--primary); color: white; }
 
-        /* JAVÍTÁS: SZÉP KIÉRTÉKELŐ DOBOZOK */
         .result-box { margin-top: 20px; padding: 15px; background: #2c2c2e; border-radius: 14px; border-left: 6px solid var(--primary); line-height: 1.6; }
         .lap-card { background: #3a3a3c; padding: 12px; border-radius: 14px; margin-top: 15px; border: 1px solid #48484a; }
         
         .plan-box { background: #1a1a1a; border-left: 4px solid var(--success); padding: 12px; margin-top: 10px; border-radius: 8px; margin-bottom: 10px; }
         .plan-header { color: var(--success); font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; display: block; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .plan-data-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
+        .plan-data-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; align-items: center; }
         .plan-data-label { color: var(--text-dim); }
         .summary-total { background: #1c1c1e; color: var(--text); padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid var(--primary); }
 
         .kiiras-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 4px solid var(--warning); }
 
-        /* MODAL */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
         .modal-content { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #444; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; }
         .close-btn { position: absolute; top: 15px; right: 20px; color: var(--text-dim); font-size: 1.8rem; cursor: pointer; }
@@ -211,12 +206,13 @@
     const CALC_LIMIT = 15.99;
     let competitors = [];
     
+    // Alapértelmezetten üres adatok!
     let raceConfig = {
-        "100": { h:'', m:'', s:'', laps: [25, 25, 25, 25] },
-        "80":  { h:'', m:'', s:'', laps: [30, 30, 20] },
-        "60":  { h:'', m:'', s:'', laps: [20, 20, 20] },
-        "40":  { h:'', m:'', s:'', laps: [20, 20] },
-        "20":  { h:'', m:'', s:'', laps: [20] }
+        "100": { h:'', m:'', s:'', laps: ['', '', '', ''] },
+        "80":  { h:'', m:'', s:'', laps: ['', '', ''] },
+        "60":  { h:'', m:'', s:'', laps: ['', '', ''] },
+        "40":  { h:'', m:'', s:'', laps: ['', ''] },
+        "20":  { h:'', m:'', s:'', laps: [''] }
     };
 
     function toggleMenu() {
@@ -277,20 +273,24 @@
     }
 
     function updateRaceConfig(dist, field, val) { raceConfig[dist][field] = val; }
-    function updateRaceLap(dist, idx, val) { raceConfig[dist].laps[idx] = parseFloat(val) || 0; }
+    function updateRaceLap(dist, idx, val) { raceConfig[dist].laps[idx] = val; } // Szövegként is menthetjük
 
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
     
-    // JAVÍTÁS: OKOS ENTER GOMB (Átugorja a "vd" azaz távolság mezőket)
+    // JAVÍTÁS: OKOS ENTER ÉS BACKSPACE
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
+            const elements = Array.from(document.querySelectorAll('input, select, button.calc-btn'))
+                .filter(el => el.offsetWidth > 0 && !el.id.startsWith('vd') && !el.id.startsWith('td'));
+            const index = elements.indexOf(e.target);
+
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const elements = Array.from(document.querySelectorAll('input, select, button.calc-btn'))
-                    .filter(el => el.offsetWidth > 0 && !el.id.startsWith('vd') && !el.id.startsWith('td'));
-                
-                const index = elements.indexOf(e.target);
                 if (index > -1 && index < elements.length - 1) elements[index + 1].focus();
+            }
+            else if (e.key === 'Backspace' && e.target.value === '') {
+                e.preventDefault();
+                if (index > 0) elements[index - 1].focus(); // Visszalépés a szűrt listán!
             }
         }
     });
@@ -351,7 +351,6 @@
         calcVerseny();
     }
 
-    // JAVÍTÁS: A SZÉP KIÉRTÉKELŐ DOBOZ VISSZAÁLLÍTÁSA
     function calcVerseny() {
         const count = parseInt(document.getElementById('lapCount').value);
         const bib = document.getElementById('selectCompetitor').value;
@@ -409,9 +408,10 @@
         if(totalD > 0) {
             const avg = totalD / (totalPure/3600);
             let avgColor = (avg >= 16 || anyHigh) ? 'var(--warning)' : 'var(--success)';
+            // JAVÍTÁS: Nagyobb betűméret az össz menetidőhöz
             html += `<div class="summary-total">
                 <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="color:white;">${toTimeStr(totalPure)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalPure)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${avg.toFixed(2)} km/h</b></div>
             </div>`;
         }
@@ -465,7 +465,6 @@
         html += `</tr><tr><th class="row-header">Össz. átlag</th>`;
         phases.forEach(l => html += `<td class="${l.rideSpd>=16?'warning-speed':'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`);
         
-        // JAVÍTÁS: A MAGYAR FORDÍTÁSOK FIXÁLÁSA
         html += `</tr><tr><th class="row-header" style="color:#555;">Helyezés</th>`;
         phases.forEach(l => html += `<td style="color:#555;">-</td>`);
         html += `</tr><tr><th class="row-header" style="color:#555;">Lemaradás</th>`;
@@ -486,7 +485,6 @@
         genLaps(id, cont, isReal);
     }
 
-    // JAVÍTÁS: IDŐUGORÁS (JUMP) VISSZARAKÁSA A KÖRÖKBE
     function genLaps(id, cont, isReal) {
         const count = document.getElementById(id).value;
         const container = document.getElementById(cont); container.innerHTML = '';
@@ -516,7 +514,6 @@
         autoSetLaps('lapCount', 'lapInputsContainer', true);
     };
     
-    // --- ESZKÖZÖK (Részidő, Terv stb) ---
     function calcReszido() {
         const d = parseFloat(document.getElementById('dist1').value);
         const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
