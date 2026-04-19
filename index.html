@@ -241,17 +241,16 @@
         const p = document.getElementById('loginPass').value;
         
         if (u === 'admin' && p === 'endurance.admin') {
-            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('login-section').style.display = 'block';
             document.getElementById('logout-section').style.display = 'block';
-            document.getElementById('admin-menu').style.display = 'block';
+            document.getElementById('admin-menu').style.display = 'none';
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
             const err = document.getElementById('loginError');
             err.style.display = 'block';
             setTimeout(() => { err.style.display = 'none'; }, 3000);
         }
-        document.getElementById('loginUser').value = 'admin';
-        document.getElementById('loginPass').value = 'endurance.admin';
+        document.getElementById('loginPass').value = '';
     }
 
     function doLogout() {
