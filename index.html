@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v32 - Alapértelmezett Admin Státusz</title>
+    <title>Verseny Kalkulátor v34 - Jelszó Mentés Támogatása</title>
     <style>
         :root {
             --bg: #000000;
@@ -120,11 +120,13 @@
     <div style="margin-top: 40px;"></div>
     
     <div id="login-section">
-        <div class="menu-title">Adminisztráció</div>
-        <input type="text" id="loginUser" class="sidebar-input" placeholder="Felhasználónév" autocomplete="off">
-        <input type="password" id="loginPass" class="sidebar-input" placeholder="Jelszó" autocomplete="off">
-        <button class="sidebar-submit" onclick="doLogin()">Bejelentkezés</button>
-        <div id="loginError" style="color:var(--danger); display:none; font-size:0.85rem; margin-top:10px; text-align:center; font-weight:bold;">Helytelen felhasználónév vagy jelszó!</div>
+        <form onsubmit="handleLoginSubmit(event)">
+            <div class="menu-title">Adminisztráció</div>
+            <input type="text" id="loginUser" name="username" class="sidebar-input" placeholder="Felhasználónév" autocomplete="username" required>
+            <input type="password" id="loginPass" name="password" class="sidebar-input" placeholder="Jelszó" autocomplete="current-password" required>
+            <button type="submit" class="sidebar-submit">Bejelentkezés</button>
+            <div id="loginError" style="color:var(--danger); display:none; font-size:0.85rem; margin-top:10px; text-align:center; font-weight:bold;">Helytelen felhasználónév vagy jelszó!</div>
+        </form>
     </div>
 
     <div id="logout-section" style="display: none;">
@@ -225,6 +227,9 @@
 </div>
 
 <script>
+    // TESZTELÉSHEZ ALAPBÓL IGAZ. Élesítéskor ezt írjuk át false-ra!
+    let isAdmin = true; 
+
     const CALC_LIMIT = 15.99;
     let competitors = [];
     
@@ -236,27 +241,44 @@
         "20":  { h:'', m:'', s:'', laps: [''] }
     };
 
+    function applyAuthUI() {
+        if (isAdmin) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('logout-section').style.display = 'block';
+            document.getElementById('admin-menu').style.display = 'block';
+        } else {
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('logout-section').style.display = 'none';
+            document.getElementById('admin-menu').style.display = 'none';
+        }
+    }
+
+    // ÚJ FUNKCIÓ A FORM BEKÜLDÉSÉNEK KEZELÉSÉRE
+    function handleLoginSubmit(event) {
+        event.preventDefault(); // Ez gátolja meg, hogy az oldal teljesen újratöltsön (marad a gyors működés)
+        doLogin();
+    }
+
     function doLogin() {
         const u = document.getElementById('loginUser').value;
         const p = document.getElementById('loginPass').value;
         
         if (u === 'admin' && p === 'endurance.admin') {
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('logout-section').style.display = 'block';
-            document.getElementById('admin-menu').style.display = 'block';
+            isAdmin = true;
+            applyAuthUI();
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
             const err = document.getElementById('loginError');
             err.style.display = 'block';
             setTimeout(() => { err.style.display = 'none'; }, 3000);
         }
-        document.getElementById('loginPass').value = '';
+        // Csak sikeres belépés után töröljük a jelszót a mezőből
+        if(isAdmin) document.getElementById('loginPass').value = '';
     }
 
     function doLogout() {
-        document.getElementById('logout-section').style.display = 'none';
-        document.getElementById('admin-menu').style.display = 'none';
-        document.getElementById('login-section').style.display = 'block';
+        isAdmin = false;
+        applyAuthUI();
         document.getElementById('loginUser').value = '';
         switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     }
@@ -330,7 +352,10 @@
             const index = elements.indexOf(e.target);
 
             if (e.key === 'Enter') {
-                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') { doLogin(); return; }
+                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') { 
+                    // A form submit most már megoldja ezt!
+                    return; 
+                }
                 e.preventDefault();
                 if (index > -1 && index < elements.length - 1) elements[index + 1].focus();
             }
@@ -559,11 +584,12 @@
         renderKiiras();
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
         
-        // --- ALAPBÓL BEJELENTKEZETT ÁLLAPOT TESZTELÉSHEZ ---
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('logout-section').style.display = 'block';
-        document.getElementById('admin-menu').style.display = 'block';
-        switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+        applyAuthUI();
+        if(isAdmin) {
+            switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+        } else {
+            switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
+        }
     };
     
     function calcReszido() {
