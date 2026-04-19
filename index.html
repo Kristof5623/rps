@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v19 - Memória Mentéssel</title>
+    <title>Verseny Kalkulátor v20 - Orvosi és Pulzus idővel</title>
     <style>
         :root {
             --bg: #000000;
@@ -40,6 +40,8 @@
         
         .plan-box { background: #1a1a1a; border-left: 4px solid var(--success); padding: 10px; margin-top: 10px; border-radius: 8px; margin-bottom: 10px; }
         .plan-header { color: var(--success); font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; display: block; }
+        .plan-data-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px; }
+        .plan-data-label { color: var(--text-dim); }
         
         .summary-total { background: #1c1c1e; color: var(--text); padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid var(--primary); }
         h4 { margin: 0; color: var(--primary); }
@@ -162,8 +164,6 @@
 
 <script>
     const CALC_LIMIT = 15.99;
-    
-    // VERSENYZŐK TÁROLÁSA: Kibővítve a körök adataival!
     let competitors = [];
 
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
@@ -214,7 +214,6 @@
             return;
         }
 
-        // Új profil mentése üres időadatokkal
         competitors.push({ 
             bib: bib, 
             name: name, 
@@ -258,21 +257,31 @@
         const resBox = document.getElementById('res2');
         
         if (!selectedBib) {
-            // Ha visszavált manuálisra, ürítsük ki
+            // MANUÁLIS MÓD: Mindent kiürítünk
             resBox.style.display = 'none';
             document.getElementById('vhR').value = '';
             document.getElementById('vmR').value = '';
             document.getElementById('vsR').value = '';
+            
+            const count = parseInt(document.getElementById('lapCount').value) || 1;
+            for(let i = 1; i <= count; i++) {
+                if(document.getElementById(`vd${i}`)) document.getElementById(`vd${i}`).value = '';
+                if(document.getElementById(`vh${i}`)) document.getElementById(`vh${i}`).value = '';
+                if(document.getElementById(`vm${i}`)) document.getElementById(`vm${i}`).value = '';
+                if(document.getElementById(`vs${i}`)) document.getElementById(`vs${i}`).value = '';
+                if(document.getElementById(`ovh${i}`)) document.getElementById(`ovh${i}`).value = '';
+                if(document.getElementById(`ovm${i}`)) document.getElementById(`ovm${i}`).value = '';
+                if(document.getElementById(`ovs${i}`)) document.getElementById(`ovs${i}`).value = '';
+            }
             return; 
         }
 
+        // KIVÁLASZTOTT VERSENYZŐ BETÖLTÉSE
         const comp = competitors.find(c => c.bib === selectedBib);
         if (comp) {
-            // 1. Távolság és körök beállítása
             document.getElementById('totalDist').value = comp.dist;
             autoSetLaps('lapCount', 'lapInputsContainer', true);
 
-            // 2. Mentett idők visszatöltése
             document.getElementById('vhR').value = comp.startTime.h || '';
             document.getElementById('vmR').value = comp.startTime.m || '';
             document.getElementById('vsR').value = comp.startTime.s || '';
@@ -284,10 +293,12 @@
                     document.getElementById(`vh${i}`).value = lap.h || '';
                     document.getElementById(`vm${i}`).value = lap.m || '';
                     document.getElementById(`vs${i}`).value = lap.s || '';
+                    document.getElementById(`ovh${i}`).value = lap.oh || '';
+                    document.getElementById(`ovm${i}`).value = lap.om || '';
+                    document.getElementById(`ovs${i}`).value = lap.os || '';
                 }
             });
 
-            // 3. Automatikus kiértékelés az adatok alapján
             if (comp.startTime.h || comp.laps.length > 0) {
                 calcVerseny();
             } else {
@@ -296,13 +307,12 @@
         }
     }
 
-    // TELJES VERSENY - Beépítve a memóriába mentést
     function calcVerseny() {
         const count = parseInt(document.getElementById('lapCount').value);
-        
-        // --- ADATOK MENTÉSE A KIVÁLASZTOTT VERSENYZŐHÖZ ---
         const selectedBib = document.getElementById('selectCompetitor').value;
-        if (selectedBib) {
+        
+        // MENTÉS CSAK AKKOR, HA VAN KIVÁLASZTOTT VERSENYZŐ (Nem manuális)
+        if (selectedBib !== "") {
             const comp = competitors.find(c => c.bib === selectedBib);
             if (comp) {
                 comp.startTime = {
@@ -316,12 +326,14 @@
                         d: document.getElementById(`vd${i}`).value,
                         h: document.getElementById(`vh${i}`).value,
                         m: document.getElementById(`vm${i}`).value,
-                        s: document.getElementById(`vs${i}`).value
+                        s: document.getElementById(`vs${i}`).value,
+                        oh: document.getElementById(`ovh${i}`).value,
+                        om: document.getElementById(`ovm${i}`).value,
+                        os: document.getElementById(`ovs${i}`).value
                     });
                 }
             }
         }
-        // ---------------------------------------------------
 
         const rajt = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
         const resBox = document.getElementById('res2');
@@ -339,22 +351,49 @@
         for(let i = 1; i <= count; i++) {
             const d = parseFloat(document.getElementById(`vd${i}`).value) || 0;
             const arr = toSec(document.getElementById(`vh${i}`).value, document.getElementById(`vm${i}`).value, document.getElementById(`vs${i}`).value);
+            const vet = toSec(document.getElementById(`ovh${i}`).value, document.getElementById(`ovm${i}`).value, document.getElementById(`ovs${i}`).value);
+            
             if(d === 0 || arr === 0) continue;
             
-            let diff = arr - curStart; if(diff <= 0) diff += 86400;
-            const spd = d / (diff / 3600);
+            // Kapu (Beérkezés) számolása
+            let diffArr = arr - curStart; if(diffArr <= 0) diffArr += 86400;
+            const spdArr = d / (diffArr / 3600);
             
-            totalPureSec += diff;
+            let pureSecForLap = diffArr;
+            let nextStart = arr + 2400; // Alapból a kaputól számolunk pihenőt, ha nincs még orvosi
+            let vetHtml = "";
+
+            // Ha van orvosi idő beírva, akkor az alapján számolunk tovább
+            if (vet > 0) {
+                let diffVet = vet - curStart; if(diffVet <= 0) diffVet += 86400;
+                const spdVet = d / (diffVet / 3600);
+                
+                let pulzusTime = vet - arr; if(pulzusTime < 0) pulzusTime += 86400;
+                
+                pureSecForLap = diffVet; // Teljes menetidő orvosival
+                nextStart = vet + 2400; // Pihenő az ORVOSITÓL indul!
+                
+                const vetColor = spdVet >= 16.0 ? 'var(--warning)' : 'var(--success)';
+                
+                vetHtml = `
+                    <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${toTimeStr(diffVet)}</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${vetColor};">${spdVet.toFixed(2)} km/h</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(pulzusTime)}</b></div>
+                `;
+            }
+
+            totalPureSec += pureSecForLap;
             totalDist += d;
 
-            const nextStart = arr + 2400;
-            const colorVar = spd >= 16.0 ? 'var(--warning)' : 'var(--success)';
+            const colorVar = spdArr >= 16.0 ? 'var(--warning)' : 'var(--success)';
 
             html += `<div class="plan-box" style="border-left-color:${colorVar}">
                 <span class="plan-header" style="color:${colorVar}">${i}. KÖR</span>
-                Átlagsebesség: <b style="color:${colorVar}">${spd.toFixed(2)} km/h</b><br>
-                Menetidő: <b>${toTimeStr(diff)}</b>
-                ${i < count ? `<br><span style="color:var(--text-dim); display:inline-block; margin-top:5px;">Kimenetel pihenő (40p) után: <b style="color:white;">${toTimeStr(nextStart)}</b></span>` : ''}
+                <div class="plan-data-row"><span class="plan-data-label">Kapu idő:</span> <b style="color:white;">${toTimeStr(diffArr)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${colorVar}">${spdArr.toFixed(2)} km/h</b></div>
+                ${vetHtml}
+                ${i < count ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #333; font-size:0.9rem; color:var(--text-dim);">Kimenetel pihenő (40p) után: <b style="color:white; float:right;">${toTimeStr(nextStart)}</b></div>` : ''}
             </div>`;
             curStart = nextStart;
         }
@@ -364,8 +403,8 @@
             const avgColor = avgSpd >= 16.0 ? 'var(--warning)' : 'var(--success)';
             html += `<div class="summary-total">
                 <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                Össz menetidő (pihenők nélkül): <b>${toTimeStr(totalPureSec)}</b><br>
-                Teljes átlagsebesség: <b style="font-size:1.3rem; color:${avgColor}">${avgSpd.toFixed(2)} km/h</b>
+                <div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Össz menetidő:</span> <b style="color:white;">${toTimeStr(totalPureSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label" style="color:#ccc;">Teljes átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${avgSpd.toFixed(2)} km/h</b></div>
             </div>`;
         }
 
@@ -441,7 +480,19 @@
         container.innerHTML = '';
         const prefix = isReal ? 'v' : 't';
         for(let i = 1; i <= count; i++) {
-            container.innerHTML += `<div class="lap-card"><h4>${i}. KÖR</h4><label>Táv (km):</label><input type="number" id="${prefix}d${i}" step="0.1" placeholder="20">${isReal ? `<label>Beérkezés:</label><div class="time-group"><input type="number" id="${prefix}h${i}" oninput="jump(this, '${prefix}m${i}')">:<input type="number" id="${prefix}m${i}" oninput="jump(this, '${prefix}s${i}')">:<input type="number" id="${prefix}s${i}"></div>` : ''}</div>`;
+            let inputs = `<div class="lap-card"><h4>${i}. KÖR</h4><label>Táv (km):</label><input type="number" id="${prefix}d${i}" step="0.1" placeholder="20">`;
+            
+            if(isReal) {
+                inputs += `
+                <label>Beérkezés (Kapu):</label>
+                <div class="time-group"><input type="number" id="${prefix}h${i}" oninput="jump(this, '${prefix}m${i}')">:<input type="number" id="${prefix}m${i}" oninput="jump(this, '${prefix}s${i}')">:<input type="number" id="${prefix}s${i}"></div>
+                <label>Orvosi beérkezés (Vet):</label>
+                <div class="time-group"><input type="number" id="o${prefix}h${i}" oninput="jump(this, 'o${prefix}m${i}')">:<input type="number" id="o${prefix}m${i}" oninput="jump(this, 'o${prefix}s${i}')">:<input type="number" id="o${prefix}s${i}"></div>
+                `;
+            }
+            
+            inputs += `</div>`;
+            container.innerHTML += inputs;
         }
     }
 
