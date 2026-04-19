@@ -241,9 +241,9 @@
         const p = document.getElementById('loginPass').value;
         
         if (u === 'admin' && p === 'endurance.admin') {
-            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('login-section').style.display = 'none';
             document.getElementById('logout-section').style.display = 'block';
-            document.getElementById('admin-menu').style.display = 'none';
+            document.getElementById('admin-menu').style.display = 'block';
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
             const err = document.getElementById('loginError');
