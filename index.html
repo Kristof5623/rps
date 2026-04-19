@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v32 - Alapértelmezett Admin Státusz</title>
+    <title>Verseny Kalkulátor v33 - Valódi Auto-Login Változó</title>
     <style>
         :root {
             --bg: #000000;
@@ -114,7 +114,7 @@
     
     <div class="menu-title">Eszközök</div>
     <button class="sidebar-btn" onclick="switchSidebarMode('reszido', this)">⏳ Részidő</button>
-    <button id="btn-menu-terv" class="sidebar-btn active" onclick="switchSidebarMode('terv', this)">📋 Verseny Terv</button>
+    <button id="btn-menu-terv" class="sidebar-btn" onclick="switchSidebarMode('terv', this)">📋 Verseny Terv</button>
     <button class="sidebar-btn" onclick="switchSidebarMode('minosites', this)">⚖️ Kör Avg</button>
 
     <div style="margin-top: 40px;"></div>
@@ -202,7 +202,7 @@
             <div id="res1" class="result-box" style="display:none"></div>
         </div>
 
-        <div id="terv" class="mode-content active">
+        <div id="terv" class="mode-content">
             <h3>📋 Verseny Terv</h3>
             <label>Rajt:</label><div class="time-group"><input type="number" id="thR" oninput="jump(this, 'tmR')">:<input type="number" id="tmR" oninput="jump(this, 'tsR')">:<input type="number" id="tsR"></div>
             <div id="lapInputsContainerT"></div>
@@ -225,6 +225,9 @@
 </div>
 
 <script>
+    // TESZTELÉSHEZ ALAPBÓL IGAZ. Élesítéskor ezt írjuk át false-ra!
+    let isAdmin = true; 
+
     const CALC_LIMIT = 15.99;
     let competitors = [];
     
@@ -236,14 +239,25 @@
         "20":  { h:'', m:'', s:'', laps: [''] }
     };
 
+    function applyAuthUI() {
+        if (isAdmin) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('logout-section').style.display = 'block';
+            document.getElementById('admin-menu').style.display = 'block';
+        } else {
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('logout-section').style.display = 'none';
+            document.getElementById('admin-menu').style.display = 'none';
+        }
+    }
+
     function doLogin() {
         const u = document.getElementById('loginUser').value;
         const p = document.getElementById('loginPass').value;
         
         if (u === 'admin' && p === 'endurance.admin') {
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('logout-section').style.display = 'block';
-            document.getElementById('admin-menu').style.display = 'block';
+            isAdmin = true;
+            applyAuthUI();
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
             const err = document.getElementById('loginError');
@@ -254,9 +268,8 @@
     }
 
     function doLogout() {
-        document.getElementById('logout-section').style.display = 'none';
-        document.getElementById('admin-menu').style.display = 'none';
-        document.getElementById('login-section').style.display = 'block';
+        isAdmin = false;
+        applyAuthUI();
         document.getElementById('loginUser').value = '';
         switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     }
@@ -559,11 +572,13 @@
         renderKiiras();
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
         
-        // --- ALAPBÓL BEJELENTKEZETT ÁLLAPOT TESZTELÉSHEZ ---
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('logout-section').style.display = 'block';
-        document.getElementById('admin-menu').style.display = 'block';
-        switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+        // Csekkoljuk a státuszt a betöltés pillanatában
+        applyAuthUI();
+        if(isAdmin) {
+            switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+        } else {
+            switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
+        }
     };
     
     function calcReszido() {
