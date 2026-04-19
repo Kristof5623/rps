@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v29 - Backspace Fix & UI</title>
+    <title>Verseny Kalkulátor v30 - Admin Bejelentkezés</title>
     <style>
         :root {
             --bg: #000000;
@@ -32,6 +32,11 @@
         .sidebar-btn:hover { background: #222; }
         .sidebar-btn.active { background: #2c2c2e; color: var(--primary); border-left: 4px solid var(--primary); }
 
+        /* BEJELENTKEZŐ MEZŐK A MENÜBEN */
+        .sidebar-input { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 6px; background: #222; border: 1px solid #444; color: white; box-sizing: border-box; font-size: 0.9rem; }
+        .sidebar-submit { width: 100%; padding: 10px; border-radius: 6px; background: #333; color: white; border: 1px solid #444; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .sidebar-submit:hover { background: var(--primary); border-color: var(--primary); }
+
         .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
         .tab-btn { flex: 1 1 30%; padding: 12px 8px; border: none; border-radius: 10px; cursor: pointer; background: #333; color: var(--text-dim); font-weight: bold; font-size: 0.8rem; }
         .tab-btn.active { background: var(--primary); color: white; }
@@ -41,10 +46,7 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         input[type="number"]::-webkit-outer-spin-button,
-        input[type="number"]::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
 
         label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
@@ -101,21 +103,41 @@
 
 <div class="sidebar" id="sidebar">
     <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: white;">⏱️ Verseny Kalkulátor</div>
-    <div class="menu-title">Fő funkciók</div>
-    <button class="sidebar-btn active" onclick="switchMainTab('fo-mod')">📝 Verseny Kezelés</button>
+    
+    <div id="admin-menu" style="display: none;">
+        <div class="menu-title">Fő funkciók</div>
+        <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 Verseny Kezelés</button>
+    </div>
+
     <div class="menu-title">Élő adatok</div>
     <button class="sidebar-btn" onclick="switchSidebarMode('elo-rajtok', this)">🔴 Élő Kiindulások</button>
     <button class="sidebar-btn" onclick="switchSidebarMode('adatlapok', this)">📊 Versenyzői Adatlapok</button>
+    
     <div class="menu-title">Eszközök</div>
     <button class="sidebar-btn" onclick="switchSidebarMode('reszido', this)">⏳ Részidő</button>
-    <button class="sidebar-btn" onclick="switchSidebarMode('terv', this)">📋 Verseny Terv</button>
+    <button id="btn-menu-terv" class="sidebar-btn active" onclick="switchSidebarMode('terv', this)">📋 Verseny Terv</button>
     <button class="sidebar-btn" onclick="switchSidebarMode('minosites', this)">⚖️ Kör Avg</button>
+
+    <div style="margin-top: 40px;"></div>
+    
+    <div id="login-section">
+        <div class="menu-title">Adminisztráció</div>
+        <input type="text" id="loginUser" class="sidebar-input" placeholder="Felhasználónév" autocomplete="off">
+        <input type="password" id="loginPass" class="sidebar-input" placeholder="Jelszó" autocomplete="off">
+        <button class="sidebar-submit" onclick="doLogin()">Bejelentkezés</button>
+    </div>
+
+    <div id="logout-section" style="display: none;">
+        <div class="menu-title">Adminisztráció</div>
+        <div style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Adminisztrátor</div>
+        <button class="sidebar-submit" style="background:#440000; border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
+    </div>
 </div>
 
 <div class="main-wrapper">
     <div class="container">
         
-        <div id="fo-mod" class="mode-content active">
+        <div id="fo-mod" class="mode-content">
             <div class="tabs">
                 <button id="btn-kiiras" class="tab-btn active" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
                 <button id="btn-versenyzok" class="tab-btn" onclick="switchSubMode('versenyzok', this)">Versenyzők</button>
@@ -180,7 +202,7 @@
             <div id="res1" class="result-box" style="display:none"></div>
         </div>
 
-        <div id="terv" class="mode-content">
+        <div id="terv" class="mode-content active">
             <h3>📋 Verseny Terv</h3>
             <label>Rajt:</label><div class="time-group"><input type="number" id="thR" oninput="jump(this, 'tmR')">:<input type="number" id="tmR" oninput="jump(this, 'tsR')">:<input type="number" id="tsR"></div>
             <div id="lapInputsContainerT"></div>
@@ -206,7 +228,6 @@
     const CALC_LIMIT = 15.99;
     let competitors = [];
     
-    // Alapértelmezetten üres adatok!
     let raceConfig = {
         "100": { h:'', m:'', s:'', laps: ['', '', '', ''] },
         "80":  { h:'', m:'', s:'', laps: ['', '', ''] },
@@ -214,6 +235,35 @@
         "40":  { h:'', m:'', s:'', laps: ['', ''] },
         "20":  { h:'', m:'', s:'', laps: [''] }
     };
+
+    // --- BEJELENTKEZÉSI LOGIKA ---
+    function doLogin() {
+        const u = document.getElementById('loginUser').value;
+        const p = document.getElementById('loginPass').value;
+        
+        if (u === 'admin' && p === 'endurance.admin') {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('logout-section').style.display = 'block';
+            document.getElementById('admin-menu').style.display = 'block';
+            
+            // Automatikus ugrás a Verseny Kezelés fülre belépés után
+            switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+        } else {
+            alert('Helytelen felhasználónév vagy jelszó!');
+        }
+        document.getElementById('loginPass').value = ''; // Jelszó mező törlése biztonsági okból
+    }
+
+    function doLogout() {
+        document.getElementById('logout-section').style.display = 'none';
+        document.getElementById('admin-menu').style.display = 'none';
+        document.getElementById('login-section').style.display = 'block';
+        document.getElementById('loginUser').value = '';
+        
+        // Visszadob a publikus Terv fülre
+        switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
+    }
+    // -----------------------------
 
     function toggleMenu() {
         document.getElementById('sidebar').classList.toggle('open');
@@ -229,8 +279,8 @@
         if (targetId === 'adatlapok') renderAdatlapList();
     }
 
-    function switchMainTab(targetId) {
-        switchSidebarMode(targetId, document.querySelector('.sidebar-btn:nth-child(2)'));
+    function switchMainTab(targetId, btn) {
+        switchSidebarMode(targetId, btn || document.getElementById('btn-menu-fomod'));
     }
 
     function switchSubMode(mode, btn) {
@@ -273,24 +323,29 @@
     }
 
     function updateRaceConfig(dist, field, val) { raceConfig[dist][field] = val; }
-    function updateRaceLap(dist, idx, val) { raceConfig[dist].laps[idx] = val; } // Szövegként is menthetjük
+    function updateRaceLap(dist, idx, val) { raceConfig[dist].laps[idx] = val; } 
 
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
     
-    // JAVÍTÁS: OKOS ENTER ÉS BACKSPACE
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
             const elements = Array.from(document.querySelectorAll('input, select, button.calc-btn'))
-                .filter(el => el.offsetWidth > 0 && !el.id.startsWith('vd') && !el.id.startsWith('td'));
+                .filter(el => el.offsetWidth > 0 && !el.id.startsWith('vd') && !el.id.startsWith('td') && el.id !== 'loginUser' && el.id !== 'loginPass');
             const index = elements.indexOf(e.target);
 
             if (e.key === 'Enter') {
+                // Ha bejelentkezés mezőkön nyom entert, próbáljon belépni
+                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') {
+                    doLogin();
+                    return;
+                }
                 e.preventDefault();
                 if (index > -1 && index < elements.length - 1) elements[index + 1].focus();
             }
             else if (e.key === 'Backspace' && e.target.value === '') {
+                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') return; // login mezőket kihagyjuk
                 e.preventDefault();
-                if (index > 0) elements[index - 1].focus(); // Visszalépés a szűrt listán!
+                if (index > 0) elements[index - 1].focus(); 
             }
         }
     });
@@ -408,7 +463,6 @@
         if(totalD > 0) {
             const avg = totalD / (totalPure/3600);
             let avgColor = (avg >= 16 || anyHigh) ? 'var(--warning)' : 'var(--success)';
-            // JAVÍTÁS: Nagyobb betűméret az össz menetidőhöz
             html += `<div class="summary-total">
                 <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
                 <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalPure)}</b></div>
@@ -511,7 +565,7 @@
 
     window.onload = function() {
         renderKiiras();
-        autoSetLaps('lapCount', 'lapInputsContainer', true);
+        autoSetLaps('lapCountT', 'lapInputsContainerT', false);
     };
     
     function calcReszido() {
