@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v35 - Vendég Mód & Jelszó Mentés Fix</title>
+    <title>Verseny Kalkulátor v36.1 - Teljes, Javított Kód</title>
     <style>
         :root {
             --bg: #000000;
@@ -159,10 +159,15 @@
                 <label>Versenyző neve:</label> <input type="text" id="regName" placeholder="pl. Kovács János">
                 <label>Versenytáv:</label>
                 <select id="regDist">
-                    <option value="20">20 km</option><option value="40">40 km</option>
-                    <option value="60">60 km</option><option value="80">80 km</option>
+                    <option value="20">20 km</option>
+                    <option value="40">40 km</option>
+                    <option value="60">60 km</option>
+                    <option value="80">80 km</option>
                     <option value="100">100 km</option>
                 </select>
+                <label>Belső megjegyzés (Rejtett):</label>
+                <input type="text" id="regInternal" placeholder="pl. Chip kód, telefonszám stb.">
+                
                 <button class="calc-btn add-btn" onclick="addCompetitor()">Hozzáadás</button>
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
                 <div id="competitorList"></div>
@@ -175,8 +180,10 @@
                 </select>
                 <label>Össztáv & Körök:</label>
                 <select id="totalDist" onchange="autoSetLaps('lapCount', 'lapInputsContainer', true)">
-                    <option value="20">20 km</option><option value="40">40 km</option>
-                    <option value="60">60 km</option><option value="80">80 km</option>
+                    <option value="20">20 km</option>
+                    <option value="40">40 km</option>
+                    <option value="60">60 km</option>
+                    <option value="80">80 km</option>
                     <option value="100">100 km</option>
                 </select>
                 <select id="lapCount" onchange="genLaps('lapCount', 'lapInputsContainer', true)" style="margin-top:10px;"></select>
@@ -206,7 +213,21 @@
 
         <div id="terv" class="mode-content active">
             <h3>📋 Verseny Terv</h3>
-            <label>Rajt:</label><div class="time-group"><input type="number" id="thR" oninput="jump(this, 'tmR')">:<input type="number" id="tmR" oninput="jump(this, 'tsR')">:<input type="number" id="tsR"></div>
+            <label>Távolság:</label>
+            <select id="totalDistT" onchange="autoSetLaps('lapCountT', 'lapInputsContainerT', false)">
+                <option value="20">20 km</option>
+                <option value="40">40 km</option>
+                <option value="60">60 km</option>
+                <option value="80">80 km</option>
+                <option value="100">100 km</option>
+            </select>
+            <select id="lapCountT" onchange="genLaps('lapCountT', 'lapInputsContainerT', false)" style="margin-top:10px;"></select>
+            <label>Rajt ideje:</label>
+            <div class="time-group">
+                <input type="number" id="thR" placeholder="00" oninput="jump(this, 'tmR')"> :
+                <input type="number" id="tmR" placeholder="00" oninput="jump(this, 'tsR')"> :
+                <input type="number" id="tsR" placeholder="00">
+            </div>
             <div id="lapInputsContainerT"></div>
             <button class="calc-btn" style="background:var(--primary); color:white;" onclick="calcTerv()">Generálás</button>
             <div id="res4" class="result-box" style="display:none"></div>
@@ -227,7 +248,7 @@
 </div>
 
 <script>
-    // AZ ALAPÁLLAPOT MOST MÁR SZIGORÚAN FALSE (VENDÉG MÓD)
+    // VENDÉG MÓD ALAPÉRTELMEZETT
     let isAdmin = false; 
 
     const CALC_LIMIT = 15.99;
@@ -261,7 +282,6 @@
             isAdmin = true;
             applyAuthUI();
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
-            // A jelszót direkt NEM töröljük ki azonnal, hogy a böngésző biztonsággal menthesse!
         } else {
             const err = document.getElementById('loginError');
             err.style.display = 'block';
@@ -274,7 +294,7 @@
         isAdmin = false;
         applyAuthUI();
         document.getElementById('loginUser').value = '';
-        document.getElementById('loginPass').value = ''; // Csak kijelentkezéskor töröljük
+        document.getElementById('loginPass').value = '';
         switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     }
 
@@ -288,7 +308,7 @@
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
         if(btn) btn.classList.add('active');
-        if(window.innerWidth <= 800) toggleMenu();
+        if(window.innerWidth <= 800) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
         if (targetId === 'adatlapok') renderAdatlapList();
     }
 
@@ -343,7 +363,7 @@
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
             const elements = Array.from(document.querySelectorAll('input, select, button.calc-btn'))
-                .filter(el => el.offsetWidth > 0 && !el.id.startsWith('vd') && !el.id.startsWith('td') && el.id !== 'loginUser' && el.id !== 'loginPass');
+                .filter(el => el.offsetWidth > 0 && !el.id.startsWith('vd') && el.id !== 'loginUser' && el.id !== 'loginPass');
             const index = elements.indexOf(e.target);
 
             if (e.key === 'Enter') {
@@ -370,9 +390,14 @@
         const bib = document.getElementById('regBib').value;
         const name = document.getElementById('regName').value;
         const dist = document.getElementById('regDist').value;
+        const internal = document.getElementById('regInternal').value; // Belső rejtett adat elmentése
         if (!bib || !name) { alert("Név és rajtszám kötelező!"); return; }
-        competitors.push({ bib, name, dist, startTime: { h: '', m: '', s: '' }, laps: [] });
-        document.getElementById('regBib').value = ''; document.getElementById('regName').value = '';
+        
+        competitors.push({ bib, name, dist, internal, startTime: { h: '', m: '', s: '' }, laps: [] });
+        
+        document.getElementById('regBib').value = ''; 
+        document.getElementById('regName').value = ''; 
+        document.getElementById('regInternal').value = ''; 
         updateCompetitorDisplays();
     }
 
