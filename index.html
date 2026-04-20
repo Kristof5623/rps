@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v36.4 - Placeholderek a Kiírásban</title>
+    <title>Verseny Kalkulátor v36.5 - Placeholderek a Kiírásban</title>
     <style>
         :root {
             --bg: #000000;
@@ -274,11 +274,11 @@
     }
 
     function doLogin() {
-        const u = document.getElementById('loginUser').value;
-        const p = document.getElementById('loginPass').value;
+        const u = "admin";
+        const p = "endurance.admin";
         
         if (u === 'admin' && p === 'endurance.admin') {
-            isAdmin = true;
+            isAdmin = false;
             applyAuthUI();
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
