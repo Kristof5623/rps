@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v36.4 - Placeholderek a Kiírásban</title>
+    <title>Verseny Kalkulátor v37 - FIREBASE ÉLŐ ADATBÁZIS</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
     <style>
         :root {
             --bg: #000000;
@@ -247,9 +251,22 @@
 </div>
 
 <script>
-    // VENDÉG MÓD ALAPÉRTELMEZETT
-    let isAdmin = false; 
+    // --- FIREBASE INICIALIZÁLÁS ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyCzlVhZr9yqWB-rEV-b-jTBb-KYG1YCwIM",
+      authDomain: "endurance-race-tracker.firebaseapp.com",
+      databaseURL: "https://endurance-race-tracker-default-rtdb.europe-west1.firebasedatabase.app", // Hozzáadva az európai eléréshez!
+      projectId: "endurance-race-tracker",
+      storageBucket: "endurance-race-tracker.firebasestorage.app",
+      messagingSenderId: "1015097239730",
+      appId: "1:1015097239730:web:4c60ec2907a62e68ef41ab"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    // ------------------------------
 
+    let isAdmin = false; 
     const CALC_LIMIT = 15.99;
     let competitors = [];
     
@@ -260,6 +277,32 @@
         "40":  { h:'', m:'', s:'', laps: ['', ''] },
         "20":  { h:'', m:'', s:'', laps: [''] }
     };
+
+    // --- FIREBASE ADATSZINKRONIZÁLÁS (FIGYELŐK) ---
+    // Ha valaki elmenti a kiírást, frissíti az oldalon
+    db.ref('raceConfig').on('value', (snapshot) => {
+        if(snapshot.exists()) {
+            raceConfig = snapshot.val();
+        }
+        renderKiiras();
+    });
+
+    // Ha új versenyző jön, vagy frissül az ideje, frissíti a listákat
+    db.ref('competitors').on('value', (snapshot) => {
+        if(snapshot.exists()) {
+            const data = snapshot.val();
+            // Átalakítjuk a Firebase objektumot sima tömbbé
+            competitors = Object.values(data);
+        } else {
+            competitors = [];
+        }
+        updateCompetitorDisplays();
+        // Ha épp nyitva van az adatlapok fül, azt is frissítjük azonnal
+        if(document.getElementById('adatlapok').classList.contains('active')) {
+            renderAdatlapList();
+        }
+    });
+    // ----------------------------------------------
 
     function applyAuthUI() {
         if (isAdmin) {
@@ -322,14 +365,17 @@
         btn.classList.add('active');
     }
 
+    // FIREBASE: Kiírás mentése az adatbázisba
     function saveKiiras() {
-        const btn = document.getElementById('saveKiirasBtn');
-        btn.innerHTML = 'Sikeresen mentve! ✅';
-        btn.style.background = 'var(--success)';
-        setTimeout(() => {
-            btn.innerHTML = 'Beállítások Mentése';
-            btn.style.background = 'var(--primary)';
-        }, 2000);
+        db.ref('raceConfig').set(raceConfig).then(() => {
+            const btn = document.getElementById('saveKiirasBtn');
+            btn.innerHTML = 'Sikeresen mentve! ✅';
+            btn.style.background = 'var(--success)';
+            setTimeout(() => {
+                btn.innerHTML = 'Beállítások Mentése';
+                btn.style.background = 'var(--primary)';
+            }, 2000);
+        });
     }
 
     function renderKiiras() {
@@ -385,28 +431,36 @@
         return (isNeg ? "-" : "") + (h>0 ? h+":" : "0:") + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
     }
 
+    // FIREBASE: Új versenyző feltöltése
     function addCompetitor() {
         const bib = document.getElementById('regBib').value;
         const name = document.getElementById('regName').value;
         const dist = document.getElementById('regDist').value;
-        const internal = document.getElementById('regInternal').value; // Belső rejtett adat elmentése
+        const internal = document.getElementById('regInternal').value;
         if (!bib || !name) { alert("Név és rajtszám kötelező!"); return; }
         
-        competitors.push({ bib, name, dist, internal, startTime: { h: '', m: '', s: '' }, laps: [] });
+        const newComp = { bib, name, dist, internal, startTime: { h: '', m: '', s: '' }, laps: [] };
+        
+        // Mentjük az adatbázisba a rajtszáma alá
+        db.ref('competitors/' + bib).set(newComp);
         
         document.getElementById('regBib').value = ''; 
         document.getElementById('regName').value = ''; 
         document.getElementById('regInternal').value = ''; 
-        updateCompetitorDisplays();
     }
 
     function updateCompetitorDisplays() {
         const list = document.getElementById('competitorList'); list.innerHTML = '';
-        const sel = document.getElementById('selectCompetitor'); sel.innerHTML = '<option value="">-- Manuális --</option>';
-        competitors.sort((a,b) => a.bib - b.bib).forEach(c => {
+        const sel = document.getElementById('selectCompetitor');
+        const currentSelected = sel.value; // Megőrizzük az aktuálisan kiválasztottat frissítéskor
+        sel.innerHTML = '<option value="">-- Manuális --</option>';
+        
+        competitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             list.innerHTML += `<div class="competitor-item" onclick="switchSubMode('verseny', document.getElementById('btn-verseny')); document.getElementById('selectCompetitor').value='${c.bib}'; loadCompetitorData();"><div><span class="competitor-bib">#${c.bib}</span>${c.name}</div><b style="color:var(--primary);">${c.dist}km</b></div>`;
             sel.innerHTML += `<option value="${c.bib}">#${c.bib} - ${c.name}</option>`;
         });
+        
+        if(currentSelected) sel.value = currentSelected;
     }
 
     function loadCompetitorData() {
@@ -416,25 +470,28 @@
             document.getElementById('res2').style.display = 'none';
             return;
         }
-        const comp = competitors.find(c => c.bib === bib);
+        const comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+
         document.getElementById('totalDist').value = comp.dist;
         autoSetLaps('lapCount', 'lapInputsContainer', true);
 
-        const cfg = raceConfig[comp.dist];
+        const cfg = raceConfig[comp.dist] || { h:'', m:'', s:'', laps:[] };
         document.getElementById('vhR').value = comp.startTime.h || cfg.h;
         document.getElementById('vmR').value = comp.startTime.m || cfg.m;
         document.getElementById('vsR').value = comp.startTime.s || cfg.s;
 
-        comp.laps.forEach((l, i) => {
+        const lapsArr = comp.laps || [];
+        lapsArr.forEach((l, i) => {
             const idx = i + 1;
             if(document.getElementById(`vd${idx}`)) {
-                document.getElementById(`vd${idx}`).value = l.d;
-                document.getElementById(`vh${idx}`).value = l.h; document.getElementById(`vm${idx}`).value = l.m; document.getElementById(`vs${idx}`).value = l.s;
-                document.getElementById(`ovh${idx}`).value = l.oh; document.getElementById(`ovm${idx}`).value = l.om; document.getElementById(`ovs${idx}`).value = l.os;
+                document.getElementById(`vd${idx}`).value = l.d || '';
+                document.getElementById(`vh${idx}`).value = l.h || ''; document.getElementById(`vm${idx}`).value = l.m || ''; document.getElementById(`vs${idx}`).value = l.s || '';
+                document.getElementById(`ovh${idx}`).value = l.oh || ''; document.getElementById(`ovm${idx}`).value = l.om || ''; document.getElementById(`ovs${idx}`).value = l.os || '';
             }
         });
-        if(comp.laps.length === 0) {
-            cfg.laps.forEach((ld, i) => { if(document.getElementById(`vd${i+1}`)) document.getElementById(`vd${i+1}`).value = ld; });
+        if(lapsArr.length === 0) {
+            (cfg.laps || []).forEach((ld, i) => { if(document.getElementById(`vd${i+1}`)) document.getElementById(`vd${i+1}`).value = ld; });
         }
         calcVerseny();
     }
@@ -444,7 +501,7 @@
         const bib = document.getElementById('selectCompetitor').value;
         const rajt = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
         
-        let comp = competitors.find(c => c.bib === bib);
+        let comp = competitors.find(c => c.bib == bib);
         if (comp) {
             comp.startTime = { h: document.getElementById('vhR').value, m: document.getElementById('vmR').value, s: document.getElementById('vsR').value };
             comp.laps = [];
@@ -503,6 +560,14 @@
             </div>`;
         }
         document.getElementById('res2').style.display='block'; document.getElementById('res2').innerHTML = html;
+
+        // FIREBASE: Változások mentése valós időben
+        if (comp) {
+            // A Firebase nem szereti a letisztítatlan array-eket (pl. ha valami undefined marad),
+            // a JSON hack tökéletesen megoldja ezt.
+            const cleanComp = JSON.parse(JSON.stringify(comp)); 
+            db.ref('competitors/' + comp.bib).set(cleanComp);
+        }
     }
 
     setInterval(() => {
@@ -511,6 +576,7 @@
         const now = new Date(); const nowS = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
         let html = "";
         competitors.forEach(c => {
+            if(!c.laps) return;
             let last = c.laps.filter(l => l.isComplete).pop();
             if(!last || !last.nextStart) return;
             const expected = c.dist == 20 ? 1 : (c.dist == 40 ? 2 : (c.dist == 100 ? 4 : 3));
@@ -526,15 +592,15 @@
 
     function renderAdatlapList() {
         const cont = document.getElementById('adatlapList'); cont.innerHTML = '';
-        competitors.sort((a,b)=>a.bib-b.bib).forEach(c => {
+        competitors.sort((a,b)=> parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             cont.innerHTML += `<div class="competitor-item" onclick="openAdatlap('${c.bib}')"><div><span class="competitor-bib">#${c.bib}</span>${c.name}</div><span style="font-size:0.8rem; color:var(--text-dim);">Adatok ></span></div>`;
         });
     }
 
     function openAdatlap(bib) {
-        const c = competitors.find(comp => comp.bib === bib);
+        const c = competitors.find(comp => comp.bib == bib);
         if(!c) return;
-        let phases = c.laps.filter(l => l.isComplete);
+        let phases = (c.laps || []).filter(l => l.isComplete);
         let html = `<h3>#${c.bib} ${c.name} (${c.dist}km)</h3><div class="table-responsive"><table class="ttrack-table"><tr><th class="row-header">Szakasz</th>`;
         phases.forEach((_,i) => html += `<th class="col-header">${i+1}.</th>`);
         html += `</tr><tr><th class="row-header">Táv (km)</th>`;
@@ -597,7 +663,7 @@
     }
 
     window.onload = function() {
-        renderKiiras();
+        // A renderKiiras() kikerült innen, mert a Firebase automatikusan betölti és kirajzolja
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
         
         applyAuthUI();
