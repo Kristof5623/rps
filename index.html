@@ -255,7 +255,7 @@
     const firebaseConfig = {
       apiKey: "AIzaSyCzlVhZr9yqWB-rEV-b-jTBb-KYG1YCwIM",
       authDomain: "endurance-race-tracker.firebaseapp.com",
-      databaseURL: "https://endurance-race-tracker-default-rtdb.europe-west1.firebasedatabase.app", // Hozzáadva az európai eléréshez!
+      databaseURL: "https://endurance-race-tracker-default-rtdb.europe-west1.firebasedatabase.app",
       projectId: "endurance-race-tracker",
       storageBucket: "endurance-race-tracker.firebasestorage.app",
       messagingSenderId: "1015097239730",
@@ -279,7 +279,6 @@
     };
 
     // --- FIREBASE ADATSZINKRONIZÁLÁS (FIGYELŐK) ---
-    // Ha valaki elmenti a kiírást, frissíti az oldalon
     db.ref('raceConfig').on('value', (snapshot) => {
         if(snapshot.exists()) {
             raceConfig = snapshot.val();
@@ -287,17 +286,14 @@
         renderKiiras();
     });
 
-    // Ha új versenyző jön, vagy frissül az ideje, frissíti a listákat
     db.ref('competitors').on('value', (snapshot) => {
         if(snapshot.exists()) {
             const data = snapshot.val();
-            // Átalakítjuk a Firebase objektumot sima tömbbé
             competitors = Object.values(data);
         } else {
             competitors = [];
         }
         updateCompetitorDisplays();
-        // Ha épp nyitva van az adatlapok fül, azt is frissítjük azonnal
         if(document.getElementById('adatlapok').classList.contains('active')) {
             renderAdatlapList();
         }
@@ -365,7 +361,6 @@
         btn.classList.add('active');
     }
 
-    // FIREBASE: Kiírás mentése az adatbázisba
     function saveKiiras() {
         db.ref('raceConfig').set(raceConfig).then(() => {
             const btn = document.getElementById('saveKiirasBtn');
@@ -431,17 +426,15 @@
         return (isNeg ? "-" : "") + (h>0 ? h+":" : "0:") + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
     }
 
-    // FIREBASE: Új versenyző feltöltése
     function addCompetitor() {
         const bib = document.getElementById('regBib').value;
         const name = document.getElementById('regName').value;
         const dist = document.getElementById('regDist').value;
-        const internal = document.getElementById('regInternal').value;
+        const internal = document.getElementById('regInternal').value; 
         if (!bib || !name) { alert("Név és rajtszám kötelező!"); return; }
         
         const newComp = { bib, name, dist, internal, startTime: { h: '', m: '', s: '' }, laps: [] };
         
-        // Mentjük az adatbázisba a rajtszáma alá
         db.ref('competitors/' + bib).set(newComp);
         
         document.getElementById('regBib').value = ''; 
@@ -452,7 +445,7 @@
     function updateCompetitorDisplays() {
         const list = document.getElementById('competitorList'); list.innerHTML = '';
         const sel = document.getElementById('selectCompetitor');
-        const currentSelected = sel.value; // Megőrizzük az aktuálisan kiválasztottat frissítéskor
+        const currentSelected = sel.value;
         sel.innerHTML = '<option value="">-- Manuális --</option>';
         
         competitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
@@ -561,10 +554,7 @@
         }
         document.getElementById('res2').style.display='block'; document.getElementById('res2').innerHTML = html;
 
-        // FIREBASE: Változások mentése valós időben
         if (comp) {
-            // A Firebase nem szereti a letisztítatlan array-eket (pl. ha valami undefined marad),
-            // a JSON hack tökéletesen megoldja ezt.
             const cleanComp = JSON.parse(JSON.stringify(comp)); 
             db.ref('competitors/' + comp.bib).set(cleanComp);
         }
@@ -663,9 +653,7 @@
     }
 
     window.onload = function() {
-        // A renderKiiras() kikerült innen, mert a Firebase automatikusan betölti és kirajzolja
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
-        
         applyAuthUI();
         switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     };
