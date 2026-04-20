@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v44 - Törlés & Élő Szinkron</title>
+    <title>Verseny Kalkulátor v45 - Versenyek Szekció</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -65,6 +65,12 @@
         .edit-btn:hover { background: var(--primary); }
         .cancel-btn { background: #444; color: white; padding: 15px; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 10px; width: 100%; text-transform: uppercase; display: none; }
 
+        /* VERSENY KÁRTYÁK STÍLUSA */
+        .race-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
+        .race-card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; color: white; }
+        .race-card-date { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px; }
+        .race-admin-controls { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #444; display: none; gap: 5px; }
+
         .result-box { margin-top: 20px; padding: 15px; background: #2c2c2e; border-radius: 14px; border-left: 6px solid var(--primary); line-height: 1.6; }
         .lap-card { background: #3a3a3c; padding: 12px; border-radius: 14px; margin-top: 15px; border: 1px solid #48484a; }
         
@@ -88,7 +94,6 @@
         
         .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; }
         
-        /* ADATLAP ÚJ DIZÁJN - STATISZTIKA DOBOZOK */
         .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; }
         .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
         .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
@@ -100,7 +105,6 @@
         .stat-btn:hover { background: #eee; }
         .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
 
-        /* ADATLAP KÁRTYÁK ÚJ DIZÁJN */
         .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; padding-bottom: 25px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; }
         .adatlap-card:hover { background: #d5d5d5; }
         .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; margin-right: 15px; flex-shrink: 0; }
@@ -118,7 +122,6 @@
         .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-top-left-radius: 8px; }
         .adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; }
 
-        /* Switch Stílusok (Kiesett/Versenyben) */
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--danger); transition: .4s; border-radius: 26px; }
@@ -155,6 +158,7 @@
     </div>
 
     <div class="menu-title">Élő adatok</div>
+    <button id="btn-menu-versenyek" class="sidebar-btn" onclick="switchSidebarMode('versenyek', this)">🏁 Versenyek</button>
     <button id="btn-menu-elo-rajtok" class="sidebar-btn" onclick="switchSidebarMode('elo-rajtok', this)">🔴 Élő Kiindulások</button>
     <button id="btn-menu-adatlapok" class="sidebar-btn" onclick="switchSidebarMode('adatlapok', this)">📊 Versenyzői Adatlapok</button>
     
@@ -185,6 +189,55 @@
 <div class="main-wrapper">
     <div class="container">
         
+        <div id="versenyek" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">🏁 Események / Versenyek</h3>
+            <div class="tabs">
+                <button id="btn-v-mult" class="tab-btn" onclick="switchVersenyekTab('v-mult', this)">Múltbeli</button>
+                <button id="btn-v-jovo" class="tab-btn" onclick="switchVersenyekTab('v-jovo', this)">Jövőbeli</button>
+                <button id="btn-v-jelen" class="tab-btn active" onclick="switchVersenyekTab('v-jelen', this)">Jelenlegi</button>
+            </div>
+
+            <div class="race-admin-controls" style="margin-bottom: 15px;">
+                <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="alert('Új verseny hozzáadása modul hamarosan...')">+ Új verseny felvitele</button>
+            </div>
+
+            <div id="v-mult" class="verseny-tab-content" style="display:none;">
+                <h4 style="color:var(--text-dim);">Múltbeli versenyek</h4>
+                <div class="race-card" style="border-left-color: #666;">
+                    <div class="race-card-title">Országos Bajnokság Döntője 2023</div>
+                    <div class="race-card-date">2023. október 12. | Helyszín: Solt</div>
+                    <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="alert('Eredmények betöltése...')">Eredmények megtekintése</button>
+                    <div class="race-admin-controls" style="display:flex;">
+                        <button class="edit-btn">Szerkesztés</button>
+                        <button class="edit-btn" style="background:var(--danger);">Törlés</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="v-jovo" class="verseny-tab-content" style="display:none;">
+                <h4 style="color:var(--text-dim);">Elkövetkezendő versenyek</h4>
+                <div class="race-card" style="border-left-color:var(--warning);">
+                    <div class="race-card-title">Tavaszi Távlovas Bajnokság 2024</div>
+                    <div class="race-card-date">2024. május 20. | Helyszín: Bábolna</div>
+                    <div class="race-admin-controls" style="display:flex;">
+                        <button class="edit-btn">Szerkesztés</button>
+                        <button class="edit-btn" style="background:var(--danger);">Törlés</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="v-jelen" class="verseny-tab-content" style="display:block;">
+                <h4 style="color:var(--text-dim);">Jelenleg zajló verseny</h4>
+                <div class="race-card" style="border-left-color:var(--success);">
+                    <div class="race-card-title">Nemzeti Bajnokság - 1. Forduló</div>
+                    <div class="race-card-date">Élő most! | Helyszín: Solt</div>
+                    <button class="calc-btn" style="padding:10px; margin-top:10px;" onclick="switchSidebarMode('adatlapok', document.getElementById('btn-menu-adatlapok'))">Élő Eredmények</button>
+                    <div class="race-admin-controls" style="display:flex;">
+                        <button class="edit-btn" onclick="switchSidebarMode('fo-mod', document.getElementById('btn-menu-fomod'))">Kezelőpult megnyitása</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="fo-mod" class="mode-content">
             <div class="tabs">
                 <button id="btn-kiiras" class="tab-btn active" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
@@ -373,15 +426,12 @@
         }
         updateCompetitorDisplays();
         
-        // Adatlapok Élő Frissítése
         if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) {
             renderAdatlapList(); 
         }
 
-        // TELJES VERSENY FÜL ÉLŐ SZINKRONIZÁLÁSA
         if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
             const selectedBib = document.getElementById('selectCompetitor').value;
-            // Biztonsági ellenőrzés: Csak akkor frissítjük az űrlapot, ha a felhasználó NEM gépel éppen bele (ne zavarjuk meg a kurzort)
             const activeEl = document.activeElement;
             const isInputFocused = activeEl && activeEl.tagName === 'INPUT' && document.getElementById('verseny').contains(activeEl);
             
@@ -401,6 +451,11 @@
             document.getElementById('logout-section').style.display = 'none';
             document.getElementById('admin-menu').style.display = 'none';
         }
+        
+        // Verseny szerkesztő gombok elrejtése/megjelenítése
+        document.querySelectorAll('.race-admin-controls').forEach(el => {
+            el.style.display = isAdmin ? 'flex' : 'none';
+        });
     }
 
     function doLogin() {
@@ -410,7 +465,7 @@
             isAdmin = true;
             localStorage.setItem('isAdmin', 'true');
             applyAuthUI();
-            switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+            switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
         } else {
             const err = document.getElementById('loginError');
             err.style.display = 'block';
@@ -425,7 +480,7 @@
         applyAuthUI();
         document.getElementById('loginUser').value = '';
         document.getElementById('loginPass').value = '';
-        switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
+        switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
     }
 
     function toggleMenu() {
@@ -453,6 +508,14 @@
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(mode).style.display = 'block';
         btn.classList.add('active');
+    }
+
+    // ÚJ: Versenyek fülek váltása
+    function switchVersenyekTab(tabId, btn) {
+        document.querySelectorAll('.verseny-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('#versenyek .tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        if(btn) btn.classList.add('active');
     }
 
     function updateStatusLabel() {
@@ -544,7 +607,7 @@
         editingBib = comp.bib; 
         document.getElementById('addCompBtn').innerText = "Mentés";
         document.getElementById('cancelEditBtn').style.display = "block";
-        document.getElementById('deleteCompBtn').style.display = "block"; // TÖRLÉS GOMB MEGJELENIK
+        document.getElementById('deleteCompBtn').style.display = "block";
         document.getElementById('versenyzok').scrollIntoView({ behavior: "smooth" });
     }
 
@@ -555,7 +618,7 @@
         document.getElementById('regInternal').value = '';
         document.getElementById('addCompBtn').innerText = "Hozzáadás";
         document.getElementById('cancelEditBtn').style.display = "none";
-        document.getElementById('deleteCompBtn').style.display = "none"; // TÖRLÉS GOMB ELTŰNIK
+        document.getElementById('deleteCompBtn').style.display = "none";
     }
 
     function saveCompetitor() {
@@ -587,7 +650,6 @@
         cancelEdit();
     }
 
-    // --- ÚJ FUNKCIÓ: TÖRLÉS ---
     function deleteCompetitor() {
         if (!editingBib) return;
         if (confirm("Biztosan törölni szeretnéd ezt a versenyzőt? Ez a művelet nem vonható vissza!")) {
@@ -1042,7 +1104,7 @@
 
     window.onload = function() {
         isAdmin = localStorage.getItem('isAdmin') === 'true';
-        let savedMode = localStorage.getItem('currentMode') || 'terv';
+        let savedMode = localStorage.getItem('currentMode') || 'versenyek';
         
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
         applyAuthUI();
