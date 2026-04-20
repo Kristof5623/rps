@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v40 - Memória & Lemaradás Kártyákon</title>
+    <title>Verseny Kalkulátor v41 - Kategória Szűrés & Profi Adatlapok</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -19,6 +19,7 @@
             --text: #ffffff;
             --text-dim: #8e8e93;
             --sidebar-bg: #111111;
+            --teal: #137A7F;
         }
 
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: row; min-height: 100vh; }
@@ -87,21 +88,33 @@
         
         .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; }
         
-        /* Adatlap Kártyák Új Dizájn */
-        .adatlap-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #444; }
-        .adatlap-card:hover { background: #3a3a3c; }
-        .adatlap-rank { background: #1a1a1a; color: white; width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; border-radius: 8px; font-weight: bold; font-size: 1.1rem; margin-right: 15px; border: 1px solid #555; flex-shrink: 0; }
-        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; border-color: var(--danger); color: white; }
+        /* ADATLAP ÚJ DIZÁJN - STATISZTIKA DOBOZOK */
+        .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; }
+        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
+        .stat-box.large { font-size: 1.1rem; padding: 8px 20px; }
+        .stat-box.small { font-size: 0.75rem; }
+        .stat-val { font-size: 1rem; font-weight: 900; margin-top:2px; }
+        .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; }
+        .stat-btn { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;}
+        .stat-btn:hover { background: #eee; }
+        .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
+
+        /* ADATLAP KÁRTYÁK ÚJ DIZÁJN */
+        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; }
+        .adatlap-card:hover { background: #d5d5d5; }
+        .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; margin-right: 15px; flex-shrink: 0; }
+        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; }
         .adatlap-info { flex: 1; display: flex; flex-direction: column; }
         .adatlap-name-row { display: flex; align-items: center; gap: 10px; }
-        .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; }
-        .adatlap-name { font-weight: bold; font-size: 1.1rem; color: white; }
-        .adatlap-horse { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; font-style: italic; }
-        .adatlap-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
-        .adatlap-arrow { color: var(--text-dim); font-size: 1.2rem; margin-bottom: 2px; }
-        .adatlap-gap { font-size: 0.75rem; color: #FF9F0A; font-weight: bold; background: #222; padding: 3px 6px; border-radius: 6px; border: 1px solid #444; }
+        .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; border: 1px solid #555; }
+        .adatlap-name { font-weight: bold; font-size: 1.1rem; color: #000; }
+        .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic; font-weight: bold; }
+        
+        .adatlap-badges { position: absolute; bottom: 0; right: 0; display: flex; }
+        .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-top-left-radius: 8px; }
+        .adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; }
 
-        /* Switch Stílusok (Kiesett/Versenyben) */
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--danger); transition: .4s; border-radius: 26px; }
@@ -246,7 +259,7 @@
         <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
         
         <div id="adatlapok" class="mode-content">
-            <h3 style="color:var(--primary); margin-bottom: 5px;">📊 Versenyzői Adatlapok</h3>
+            <h3 style="color:var(--primary); margin-bottom: 15px;">📊 Versenyzői Adatlapok</h3>
             <div id="adatlapList"></div>
         </div>
         
@@ -297,6 +310,13 @@
     <div class="modal-content"><span class="close-btn" onclick="closeAdatlap()">&times;</span><div id="modalBody"></div></div>
 </div>
 
+<div id="catSwapModal" class="modal" onclick="if(event.target==this) closeCatSwapModal()">
+    <div class="modal-content" style="background:#fff; color:#000; max-width: 350px; padding: 30px 20px;">
+        <h3 style="text-align:center; color:#000; margin-top:0; margin-bottom:20px;">Cambia categoria</h3>
+        <div id="catSwapModalBody" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+</div>
+
 <script>
     // --- FIREBASE INICIALIZÁLÁS ---
     const firebaseConfig = {
@@ -316,7 +336,7 @@
     let isAdmin = false; 
     const CALC_LIMIT = 15.99;
     let competitors = [];
-    let currentAdatlapFilter = 'all';
+    let currentAdatlapFilter = null; // Kezdetben nincs kiválasztva kategória
     let editingBib = null;
     
     const catNames = {
@@ -347,8 +367,8 @@
             competitors = [];
         }
         updateCompetitorDisplays();
-        if(document.getElementById('adatlapok').classList.contains('active')) {
-            renderAdatlapItems(); 
+        if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) {
+            renderAdatlapList(); 
         }
     });
 
@@ -369,7 +389,7 @@
         const p = document.getElementById('loginPass').value;
         if (u === 'admin' && p === 'endurance.admin') {
             isAdmin = true;
-            localStorage.setItem('isAdmin', 'true'); // Memória
+            localStorage.setItem('isAdmin', 'true');
             applyAuthUI();
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
         } else {
@@ -382,7 +402,7 @@
 
     function doLogout() {
         isAdmin = false;
-        localStorage.removeItem('isAdmin'); // Törlés memóriából
+        localStorage.removeItem('isAdmin');
         applyAuthUI();
         document.getElementById('loginUser').value = '';
         document.getElementById('loginPass').value = '';
@@ -399,7 +419,7 @@
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
         if(btn) btn.classList.add('active');
-        localStorage.setItem('currentMode', targetId); // Menti, melyik fülön vagyunk
+        localStorage.setItem('currentMode', targetId); 
         
         if(window.innerWidth <= 800) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
         if (targetId === 'adatlapok') renderAdatlapList();
@@ -442,7 +462,6 @@
 
     function renderKiiras() {
         const cont = document.getElementById('kiirasContainer'); cont.innerHTML = '';
-        // KÍRÁS JAVÍTÁS: Csak az 5 alaptáv jelenik meg
         const dists = ["100", "80", "60", "40", "20"];
         dists.forEach(d => {
             if(!raceConfig[d]) return;
@@ -581,7 +600,6 @@
         document.getElementById('compStatusToggle').checked = !comp.isEliminated;
         updateStatusLabel();
 
-        // KÍRÁS OLVASÁSA JAVÍTÁS (Junioroknál az alaptáv beállításait vesszük)
         const baseDist = comp.dist.replace('j', '');
         const cfg = raceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
         
@@ -687,13 +705,19 @@
         }
     }
 
+    // --- ÓRA ÉS ÉLŐ KIINDULÁSOK ---
     setInterval(() => {
+        // Óra frissítése
+        const clockEl = document.getElementById('liveClockText');
+        if(clockEl) {
+            clockEl.innerText = new Date().toLocaleTimeString('hu-HU', { hour12: false });
+        }
+
         const live = document.getElementById('liveCountdownContainer');
         if(!document.getElementById('elo-rajtok').classList.contains('active')) return;
         const now = new Date(); const nowS = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
         
         let liveData = [];
-        
         competitors.forEach(c => {
             if(c.isEliminated) return; 
             if(!c.laps) return;
@@ -752,7 +776,7 @@
                     let sameLapComps = catComps.filter(x => x.laps && x.laps[lastLapIndex] && x.laps[lastLapIndex].isComplete);
                     let bestTime = Math.min(...sameLapComps.map(x => x.laps[lastLapIndex].rideTime));
                     let gap = c.laps[lastLapIndex].rideTime - bestTime;
-                    if (gap > 0) gapStr = "+" + toTimeStr(gap);
+                    if (gap > 0) gapStr = toTimeStr(gap);
                 }
 
                 ranksInfo[c.bib] = {
@@ -764,42 +788,101 @@
         return ranksInfo;
     }
 
+    // --- ÚJ KATEGÓRIA VÁLASZTÓ ÉS ADATLAPOK ---
+    function getActiveCategories() {
+        let active = [];
+        ["100", "100j", "80", "80j", "60", "40", "20"].forEach(d => {
+            let hasComp = competitors.some(c => c.dist === d);
+            let baseDist = d.replace('j','');
+            let hasConfig = raceConfig[baseDist] && raceConfig[baseDist].h !== '';
+            if (hasComp || hasConfig) active.push(d);
+        });
+        return active;
+    }
+
     function setAdatlapFilter(filter) {
         currentAdatlapFilter = filter;
         renderAdatlapList();
     }
 
+    function openCatSwapModal() {
+        let activeCats = getActiveCategories();
+        let html = "";
+        activeCats.forEach(cat => {
+            html += `<button class="calc-btn" style="background:var(--teal); color:white; padding:12px; margin-top:0;" onclick="closeCatSwapModal(); setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
+        });
+        html += `<button class="calc-btn" style="background:#e0e0e0; color:#000; margin-top:20px; padding:10px;" onclick="closeCatSwapModal()">Chiudi (Bezárás)</button>`;
+        document.getElementById('catSwapModalBody').innerHTML = html;
+        document.getElementById('catSwapModal').style.display = 'flex';
+    }
+
+    function closeCatSwapModal() {
+        document.getElementById('catSwapModal').style.display = 'none';
+    }
+
     function renderAdatlapList() {
         const cont = document.getElementById('adatlapList'); 
-        cont.innerHTML = `
-            <div class="tabs" style="margin-bottom:15px; justify-content:center;">
-                <button class="tab-btn ${currentAdatlapFilter==='all'?'active':''}" onclick="setAdatlapFilter('all')">Összes</button>
-                <button class="tab-btn ${currentAdatlapFilter==='20'?'active':''}" onclick="setAdatlapFilter('20')">20</button>
-                <button class="tab-btn ${currentAdatlapFilter==='40'?'active':''}" onclick="setAdatlapFilter('40')">40</button>
-                <button class="tab-btn ${currentAdatlapFilter==='60'?'active':''}" onclick="setAdatlapFilter('60')">60</button>
-                <button class="tab-btn ${currentAdatlapFilter==='80'?'active':''}" onclick="setAdatlapFilter('80')">80</button>
-                <button class="tab-btn ${currentAdatlapFilter==='80j'?'active':''}" onclick="setAdatlapFilter('80j')">80J</button>
-                <button class="tab-btn ${currentAdatlapFilter==='100'?'active':''}" onclick="setAdatlapFilter('100')">100</button>
-                <button class="tab-btn ${currentAdatlapFilter==='100j'?'active':''}" onclick="setAdatlapFilter('100j')">100J</button>
-            </div>
-            <div id="adatlapItemsContainer"></div>
-        `;
-        renderAdatlapItems();
+        let activeCats = getActiveCategories();
+
+        if (!currentAdatlapFilter || currentAdatlapFilter === 'all') {
+            let html = `<div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">`;
+            if (activeCats.length === 0) {
+                html += `<p style="text-align:center; color:var(--text-dim);">Még nincs beállított kategória vagy versenyző.</p>`;
+            } else {
+                activeCats.forEach(cat => {
+                    html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
+                });
+            }
+            html += `</div>`;
+            cont.innerHTML = html;
+        } else {
+            let catComps = competitors.filter(c => c.dist === currentAdatlapFilter);
+            let total = catComps.length;
+            let elim = catComps.filter(c => c.isEliminated).length;
+            
+            let qual = 0;
+            catComps.forEach(c => {
+                if (c.isEliminated) return;
+                let expectedLaps = (c.dist === '20' ? 1 : (c.dist === '40' ? 2 : (c.dist === '100' || c.dist === '100j' ? 4 : 3)));
+                let completed = (c.laps || []).filter(l => l.isComplete).length;
+                if (completed >= expectedLaps) qual++;
+            });
+
+            let elimPct = total > 0 ? ((elim/total)*100).toFixed(1) : 0;
+            let qualPct = total > 0 ? ((qual/total)*100).toFixed(1) : 0;
+
+            let html = `
+                <div class="stats-header-container">
+                    <div class="stats-top-row">
+                        <div class="stat-box large">${catNames[currentAdatlapFilter]}</div>
+                        <div class="stat-box small">Qualified:<span class="stat-val">${qual} (${qualPct}%)</span></div>
+                        <div class="stat-box small">Eliminated:<span class="stat-val">${elim} (${elimPct}%)</span></div>
+                    </div>
+                    <div class="stats-ctrl-row">
+                        <button class="stat-btn" onclick="setAdatlapFilter(null)">⮜ Back</button>
+                        <button class="stat-btn" onclick="openCatSwapModal()">⇆</button>
+                        <div class="clock-display" id="liveClockText">--:--:--</div>
+                    </div>
+                </div>
+                <div id="adatlapItemsContainer"></div>
+            `;
+            cont.innerHTML = html;
+            renderAdatlapItems();
+        }
     }
 
     function renderAdatlapItems() {
         const cont = document.getElementById('adatlapItemsContainer');
         if(!cont) return;
         cont.innerHTML = '';
-        let filtered = competitors.filter(c => currentAdatlapFilter === 'all' || c.dist === currentAdatlapFilter);
-        
+        let filtered = competitors.filter(c => c.dist === currentAdatlapFilter);
         let ranksInfo = calculateCurrentRanks();
 
         filtered.sort((a,b) => {
             if (a.isEliminated && !b.isEliminated) return 1;
             if (!a.isEliminated && b.isEliminated) return -1;
             if (!a.isEliminated && !b.isEliminated) {
-                if (a.dist === b.dist) return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999);
+                return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999);
             }
             return parseInt(a.bib) - parseInt(b.bib);
         });
@@ -809,7 +892,15 @@
             let rankStr = info.rank;
             let rankClass = rankStr === "Kiesett" ? "kiesett" : "";
             let rankDisplay = rankStr === "Kiesett" ? "Kiesett" : rankStr + "º";
-            let gapHtml = info.gapStr ? `<div class="adatlap-gap">${info.gapStr}</div>` : '';
+            let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by +${info.gapStr}</div>` : '';
+            
+            let speedStr = "";
+            let completedLaps = (c.laps || []).filter(l => l.isComplete);
+            if (completedLaps.length > 0) {
+                let lastLap = completedLaps[completedLaps.length - 1];
+                speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
+            }
+            let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
 
             cont.innerHTML += `
             <div class="adatlap-card" onclick="openAdatlap('${c.bib}')">
@@ -821,9 +912,9 @@
                     </div>
                     <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                 </div>
-                <div class="adatlap-right">
-                    <div class="adatlap-arrow">❯</div>
+                <div class="adatlap-badges">
                     ${gapHtml}
+                    ${speedHtml}
                 </div>
             </div>`;
         });
@@ -847,7 +938,8 @@
             let leaderTime = phaseComps[0].laps[i].rideTime;
             let gap = l.rideTime - leaderTime; 
             
-            ranksHtml += `<td style="color:#fff; font-weight:bold;">${rank}.</td>`;
+            // JAVÍTÁS: A cellák betűszíne most már nincs sötétre fixálva
+            ranksHtml += `<td style="font-weight:bold;">${rank}.</td>`;
             gapsHtml += `<td style="color:${gap===0?'var(--success)':'#FF9F0A'};">${gap===0 ? '-' : '+'+toTimeStr(gap)}</td>`;
         });
         
@@ -863,7 +955,7 @@
         phases.forEach(l => html += `<td>${l.d}</td>`);
         html += `</tr><tr><th class="row-header">Kapu beérk.</th>`;
         phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
-        html += `</tr><tr><th class="row-header">Kapu átlag</th>`;
+        html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; // JAVÍTÁS
         phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
         html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
         phases.forEach((l, i) => {
@@ -874,11 +966,11 @@
         phases.forEach(l => html += `<td>${l.pulzusSec>0?toTimeStr(l.pulzusSec):"-"}</td>`);
         html += `</tr><tr><th class="row-header">Össz. menetidő</th>`;
         phases.forEach(l => html += `<td>${toTimeStr(l.rideTime)}</td>`);
-        html += `</tr><tr><th class="row-header">Össz. átlag</th>`;
+        html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; // JAVÍTÁS
         phases.forEach(l => html += `<td class="${l.rideSpd>=16?'warning-speed':'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`);
         
-        html += `</tr><tr><th class="row-header" style="color:#555;">Helyezés</th>${ranksHtml}`;
-        html += `</tr><tr><th class="row-header" style="color:#555;">Lemaradás</th>${gapsHtml}`;
+        html += `</tr><tr><th class="row-header">Helyezés</th>${ranksHtml}`; // JAVÍTÁS
+        html += `</tr><tr><th class="row-header">Lemaradás</th>${gapsHtml}`; // JAVÍTÁS
         
         html += `</tr></table></div>`;
         document.getElementById('modalBody').innerHTML = html;
@@ -920,7 +1012,6 @@
     }
 
     window.onload = function() {
-        // MEMÓRIA BEOLVASÁSA
         isAdmin = localStorage.getItem('isAdmin') === 'true';
         let savedMode = localStorage.getItem('currentMode') || 'terv';
         
