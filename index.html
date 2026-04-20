@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v42 - Magyar Kategória Váltó</title>
+    <title>Verseny Kalkulátor v43 - Adatlap Dizájn Fix</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -100,21 +100,26 @@
         .stat-btn:hover { background: #eee; }
         .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
 
-        /* ADATLAP KÁRTYÁK ÚJ DIZÁJN */
-        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; }
+        /* ADATLAP KÁRTYÁK ÚJ DIZÁJN (Egymás melletti jelvények) */
+        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; padding-bottom: 25px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; }
         .adatlap-card:hover { background: #d5d5d5; }
         .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; margin-right: 15px; flex-shrink: 0; }
         .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; }
-        .adatlap-info { flex: 1; display: flex; flex-direction: column; }
+        .adatlap-info { flex: 1; display: flex; flex-direction: column; margin-right: 20px; }
         .adatlap-name-row { display: flex; align-items: center; gap: 10px; }
         .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; border: 1px solid #555; }
         .adatlap-name { font-weight: bold; font-size: 1.1rem; color: #000; }
         .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic; font-weight: bold; }
         
-        .adatlap-badges { position: absolute; bottom: 0; right: 0; display: flex; }
-        .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-top-left-radius: 8px; }
+        .adatlap-right { position: absolute; right: 15px; top: 15px; } /* Feljebb toljuk a nyilat */
+        .adatlap-arrow { color: #555; font-size: 1.2rem; }
+
+        /* Egymás melletti, jobb alsó dobozok */
+        .adatlap-badges { position: absolute; bottom: 0; right: 0; display: flex; flex-direction: row; }
+        .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-top-left-radius: 8px; border-right: 1px solid #555; }
         .adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; }
 
+        /* Switch Stílusok (Kiesett/Versenyben) */
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--danger); transition: .4s; border-radius: 26px; }
@@ -810,7 +815,6 @@
         activeCats.forEach(cat => {
             html += `<button class="calc-btn" style="background:var(--teal); color:white; padding:12px; margin-top:0;" onclick="closeCatSwapModal(); setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
         });
-        // JAVÍTÁS: MAGYAR GOMB FELIRAT
         html += `<button class="calc-btn" style="background:#e0e0e0; color:#000; margin-top:20px; padding:10px;" onclick="closeCatSwapModal()">Bezárás</button>`;
         document.getElementById('catSwapModalBody').innerHTML = html;
         document.getElementById('catSwapModal').style.display = 'flex';
@@ -914,6 +918,8 @@
                 </div>
                 <div class="adatlap-right">
                     <div class="adatlap-arrow">❯</div>
+                </div>
+                <div class="adatlap-badges">
                     ${gapHtml}
                     ${speedHtml}
                 </div>
