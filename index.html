@@ -165,8 +165,8 @@
                     <option value="80">80 km</option>
                     <option value="100">100 km</option>
                 </select>
-                <label>Belső megjegyzés (Rejtett):</label>
-                <input type="text" id="regInternal" placeholder="pl. Chip kód, telefonszám stb.">
+                <label>Ló neve:</label>
+                <input type="text" id="regInternal" placeholder="pl. O'Bajan Pingvin">
                 
                 <button class="calc-btn add-btn" onclick="addCompetitor()">Hozzáadás</button>
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
@@ -204,9 +204,9 @@
         
         <div id="reszido" class="mode-content">
             <h3>⏳ Részidő</h3>
-            <label>Táv (km):</label><input type="number" id="dist1">
-            <label>Indulás:</label><div class="time-group"><input type="number" id="rh1" oninput="jump(this, 'rm1')">:<input type="number" id="rm1" oninput="jump(this, 'rs1')">:<input type="number" id="rs1" oninput="jump(this, 'rh2')"></div>
-            <label>Beérkezés:</label><div class="time-group"><input type="number" id="rh2" oninput="jump(this, 'rm2')">:<input type="number" id="rm2" oninput="jump(this, 'rs2')">:<input type="number" id="rs2"></div>
+            <label>Táv (km):</label><input type="number" id="dist1" placeholder="20">
+            <label>Indulás:</label><div class="time-group"><input type="number" id="rh1" oninput="jump(this, 'rm1')" placeholder="00">:<input type="number" id="rm1" oninput="jump(this, 'rs1')" placeholder="00">:<input type="number" id="rs1" oninput="jump(this, 'rh2')" placeholder="00"></div>
+            <label>Beérkezés:</label><div class="time-group"><input type="number" id="rh2" oninput="jump(this, 'rm2')" placeholder="00">:<input type="number" id="rm2" oninput="jump(this, 'rs2')" placeholder="00">:<input type="number" id="rs2" placeholder="00"></div>
             <button class="calc-btn" onclick="calcReszido()">Számolás</button>
             <div id="res1" class="result-box" style="display:none"></div>
         </div>
@@ -235,8 +235,8 @@
 
         <div id="minosites" class="mode-content">
             <h3>⚖️ Kör Avg</h3>
-            <label>Kör táv (km):</label><input type="number" id="distJ">
-            <label>Rajt:</label><div class="time-group"><input type="number" id="jh1" oninput="jump(this, 'jm1')">:<input type="number" id="jm1" oninput="jump(this, 'js1')">:<input type="number" id="js1"></div>
+            <label>Kör táv (km):</label><input type="number" id="distJ" placeholder="20">
+            <label>Rajt:</label><div class="time-group"><input type="number" id="jh1" oninput="jump(this, 'jm1')" placeholder="00">:<input type="number" id="jm1" oninput="jump(this, 'js1')" placeholder="00">:<input type="number" id="js1" placeholder="00"></div>
             <button class="calc-btn" style="background:var(--warning);" onclick="calcMinosites()">Célidő</button>
             <div id="res3" class="result-box" style="display:none"></div>
         </div>
