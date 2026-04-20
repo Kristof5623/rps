@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v41 - Kategória Szűrés & Profi Adatlapok</title>
+    <title>Verseny Kalkulátor v42 - Magyar Kategória Váltó</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -312,7 +312,7 @@
 
 <div id="catSwapModal" class="modal" onclick="if(event.target==this) closeCatSwapModal()">
     <div class="modal-content" style="background:#fff; color:#000; max-width: 350px; padding: 30px 20px;">
-        <h3 style="text-align:center; color:#000; margin-top:0; margin-bottom:20px;">Cambia categoria</h3>
+        <h3 style="text-align:center; color:#000; margin-top:0; margin-bottom:20px;">Kategória váltás</h3>
         <div id="catSwapModalBody" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 </div>
@@ -336,7 +336,7 @@
     let isAdmin = false; 
     const CALC_LIMIT = 15.99;
     let competitors = [];
-    let currentAdatlapFilter = null; // Kezdetben nincs kiválasztva kategória
+    let currentAdatlapFilter = null; 
     let editingBib = null;
     
     const catNames = {
@@ -707,7 +707,6 @@
 
     // --- ÓRA ÉS ÉLŐ KIINDULÁSOK ---
     setInterval(() => {
-        // Óra frissítése
         const clockEl = document.getElementById('liveClockText');
         if(clockEl) {
             clockEl.innerText = new Date().toLocaleTimeString('hu-HU', { hour12: false });
@@ -776,7 +775,7 @@
                     let sameLapComps = catComps.filter(x => x.laps && x.laps[lastLapIndex] && x.laps[lastLapIndex].isComplete);
                     let bestTime = Math.min(...sameLapComps.map(x => x.laps[lastLapIndex].rideTime));
                     let gap = c.laps[lastLapIndex].rideTime - bestTime;
-                    if (gap > 0) gapStr = toTimeStr(gap);
+                    if (gap > 0) gapStr = "+" + toTimeStr(gap);
                 }
 
                 ranksInfo[c.bib] = {
@@ -811,7 +810,8 @@
         activeCats.forEach(cat => {
             html += `<button class="calc-btn" style="background:var(--teal); color:white; padding:12px; margin-top:0;" onclick="closeCatSwapModal(); setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
         });
-        html += `<button class="calc-btn" style="background:#e0e0e0; color:#000; margin-top:20px; padding:10px;" onclick="closeCatSwapModal()">Chiudi (Bezárás)</button>`;
+        // JAVÍTÁS: MAGYAR GOMB FELIRAT
+        html += `<button class="calc-btn" style="background:#e0e0e0; color:#000; margin-top:20px; padding:10px;" onclick="closeCatSwapModal()">Bezárás</button>`;
         document.getElementById('catSwapModalBody').innerHTML = html;
         document.getElementById('catSwapModal').style.display = 'flex';
     }
@@ -892,7 +892,7 @@
             let rankStr = info.rank;
             let rankClass = rankStr === "Kiesett" ? "kiesett" : "";
             let rankDisplay = rankStr === "Kiesett" ? "Kiesett" : rankStr + "º";
-            let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by +${info.gapStr}</div>` : '';
+            let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by ${info.gapStr}</div>` : '';
             
             let speedStr = "";
             let completedLaps = (c.laps || []).filter(l => l.isComplete);
@@ -912,7 +912,8 @@
                     </div>
                     <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                 </div>
-                <div class="adatlap-badges">
+                <div class="adatlap-right">
+                    <div class="adatlap-arrow">❯</div>
                     ${gapHtml}
                     ${speedHtml}
                 </div>
@@ -938,7 +939,6 @@
             let leaderTime = phaseComps[0].laps[i].rideTime;
             let gap = l.rideTime - leaderTime; 
             
-            // JAVÍTÁS: A cellák betűszíne most már nincs sötétre fixálva
             ranksHtml += `<td style="font-weight:bold;">${rank}.</td>`;
             gapsHtml += `<td style="color:${gap===0?'var(--success)':'#FF9F0A'};">${gap===0 ? '-' : '+'+toTimeStr(gap)}</td>`;
         });
@@ -955,7 +955,7 @@
         phases.forEach(l => html += `<td>${l.d}</td>`);
         html += `</tr><tr><th class="row-header">Kapu beérk.</th>`;
         phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
-        html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; // JAVÍTÁS
+        html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; 
         phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
         html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
         phases.forEach((l, i) => {
@@ -966,11 +966,11 @@
         phases.forEach(l => html += `<td>${l.pulzusSec>0?toTimeStr(l.pulzusSec):"-"}</td>`);
         html += `</tr><tr><th class="row-header">Össz. menetidő</th>`;
         phases.forEach(l => html += `<td>${toTimeStr(l.rideTime)}</td>`);
-        html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; // JAVÍTÁS
+        html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; 
         phases.forEach(l => html += `<td class="${l.rideSpd>=16?'warning-speed':'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`);
         
-        html += `</tr><tr><th class="row-header">Helyezés</th>${ranksHtml}`; // JAVÍTÁS
-        html += `</tr><tr><th class="row-header">Lemaradás</th>${gapsHtml}`; // JAVÍTÁS
+        html += `</tr><tr><th class="row-header">Helyezés</th>${ranksHtml}`; 
+        html += `</tr><tr><th class="row-header">Lemaradás</th>${gapsHtml}`; 
         
         html += `</tr></table></div>`;
         document.getElementById('modalBody').innerHTML = html;
