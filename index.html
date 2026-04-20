@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v34 - Jelszó Mentés Támogatása</title>
+    <title>Verseny Kalkulátor v35 - Vendég Mód & Jelszó Mentés Fix</title>
     <style>
         :root {
             --bg: #000000;
@@ -120,7 +120,7 @@
     <div style="margin-top: 40px;"></div>
     
     <div id="login-section">
-        <form onsubmit="handleLoginSubmit(event)">
+        <form onsubmit="doLogin(); return false;">
             <div class="menu-title">Adminisztráció</div>
             <input type="text" id="loginUser" name="username" class="sidebar-input" placeholder="Felhasználónév" autocomplete="username" required>
             <input type="password" id="loginPass" name="password" class="sidebar-input" placeholder="Jelszó" autocomplete="current-password" required>
@@ -227,8 +227,8 @@
 </div>
 
 <script>
-    // TESZTELÉSHEZ ALAPBÓL IGAZ. Élesítéskor ezt írjuk át false-ra!
-    let isAdmin = true; 
+    // AZ ALAPÁLLAPOT MOST MÁR SZIGORÚAN FALSE (VENDÉG MÓD)
+    let isAdmin = false; 
 
     const CALC_LIMIT = 15.99;
     let competitors = [];
@@ -253,12 +253,6 @@
         }
     }
 
-    // ÚJ FUNKCIÓ A FORM BEKÜLDÉSÉNEK KEZELÉSÉRE
-    function handleLoginSubmit(event) {
-        event.preventDefault(); // Ez gátolja meg, hogy az oldal teljesen újratöltsön (marad a gyors működés)
-        doLogin();
-    }
-
     function doLogin() {
         const u = document.getElementById('loginUser').value;
         const p = document.getElementById('loginPass').value;
@@ -267,19 +261,20 @@
             isAdmin = true;
             applyAuthUI();
             switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+            // A jelszót direkt NEM töröljük ki azonnal, hogy a böngésző biztonsággal menthesse!
         } else {
             const err = document.getElementById('loginError');
             err.style.display = 'block';
             setTimeout(() => { err.style.display = 'none'; }, 3000);
+            document.getElementById('loginPass').value = '';
         }
-        // Csak sikeres belépés után töröljük a jelszót a mezőből
-        if(isAdmin) document.getElementById('loginPass').value = '';
     }
 
     function doLogout() {
         isAdmin = false;
         applyAuthUI();
         document.getElementById('loginUser').value = '';
+        document.getElementById('loginPass').value = ''; // Csak kijelentkezéskor töröljük
         switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     }
 
@@ -352,10 +347,7 @@
             const index = elements.indexOf(e.target);
 
             if (e.key === 'Enter') {
-                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') { 
-                    // A form submit most már megoldja ezt!
-                    return; 
-                }
+                if (e.target.id === 'loginUser' || e.target.id === 'loginPass') return; 
                 e.preventDefault();
                 if (index > -1 && index < elements.length - 1) elements[index + 1].focus();
             }
@@ -585,11 +577,7 @@
         autoSetLaps('lapCountT', 'lapInputsContainerT', false);
         
         applyAuthUI();
-        if(isAdmin) {
-            switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
-        } else {
-            switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
-        }
+        switchSidebarMode('terv', document.getElementById('btn-menu-terv'));
     };
     
     function calcReszido() {
