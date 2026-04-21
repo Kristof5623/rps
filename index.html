@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v47 - Hibátlan Szekciók & Lista Kezelés</title>
+    <title>Verseny Kalkulátor v48 - Biztonságos Admin Nézet</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -24,6 +24,11 @@
 
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: row; min-height: 100vh; }
         
+        /* ADMIN JOGOSULTSÁG ELREJTÉS (CSS alapú, golyóálló) */
+        body:not(.is-admin) .admin-only {
+            display: none !important;
+        }
+
         .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; box-sizing: border-box; border-right: 1px solid #333; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
         .main-wrapper { flex: 1; padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; }
         .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; box-sizing: border-box; border: 1px solid #333; }
@@ -69,7 +74,7 @@
         .race-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
         .race-card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; color: white; }
         .race-card-date { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px; }
-        .race-admin-controls { margin-top: 10px; padding-top: 10px; display: none; gap: 5px; }
+        .race-admin-controls { margin-top: 10px; padding-top: 10px; display: flex; gap: 5px; }
 
         .result-box { margin-top: 20px; padding: 15px; background: #2c2c2e; border-radius: 14px; border-left: 6px solid var(--primary); line-height: 1.6; }
         .lap-card { background: #3a3a3c; padding: 12px; border-radius: 14px; margin-top: 15px; border: 1px solid #48484a; }
@@ -152,7 +157,7 @@
 <div class="sidebar" id="sidebar">
     <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: white;">⏱️ Verseny Kalkulátor</div>
     
-    <div id="admin-menu" style="display: none;">
+    <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Fő funkciók</div>
         <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 Verseny Kezelés</button>
     </div>
@@ -181,7 +186,7 @@
         </form>
     </div>
 
-    <div id="logout-section" style="display: none;">
+    <div id="logout-section" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Adminisztráció</div>
         <div style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Adminisztrátor</div>
         <button class="sidebar-submit" style="background:#440000; border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
@@ -200,7 +205,7 @@
             </div>
 
             <div id="v-mult" class="verseny-tab-content" style="display:block;">
-                <div class="race-admin-controls" style="margin-bottom: 15px;">
+                <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
                 
@@ -208,7 +213,7 @@
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:none;">
-                <div class="race-admin-controls" style="margin-bottom: 15px;">
+                <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
 
@@ -216,7 +221,7 @@
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
-                <div class="race-admin-controls" style="margin-bottom: 15px;">
+                <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="alert('Hamarosan érkezik a funkció!')">+ Új jelenlegi verseny</button>
                 </div>
                 <div style="text-align:center; padding: 20px; color: var(--text-dim);">Jelenleg nincsenek aktív versenyek.</div>
@@ -255,7 +260,7 @@
                 
                 <button id="addCompBtn" class="calc-btn add-btn" onclick="saveCompetitor()">Hozzáadás</button>
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
-                <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
+                <button id="deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
                 <div id="competitorList"></div>
@@ -511,16 +516,17 @@
 
     function applyAuthUI() {
         if (isAdmin) {
+            document.body.classList.add('is-admin');
             document.getElementById('login-section').style.display = 'none';
-            document.getElementById('logout-section').style.display = 'block';
-            document.getElementById('admin-menu').style.display = 'block';
         } else {
+            document.body.classList.remove('is-admin');
             document.getElementById('login-section').style.display = 'block';
-            document.getElementById('logout-section').style.display = 'none';
-            document.getElementById('admin-menu').style.display = 'none';
         }
+        // A menüket CSS nem tudja közvetlenül jól kezelni a flex miatt, azt meghagyjuk így:
+        document.getElementById('admin-menu').style.display = isAdmin ? 'flex' : 'none';
+        document.getElementById('logout-section').style.display = isAdmin ? 'flex' : 'none';
         
-        // Verseny szerkesztő gombok elrejtése/megjelenítése a listákon
+        // Verseny lista újra renderelése, hogy a gombok jó class-szal jelenjenek meg
         renderLocalRaces();
     }
 
@@ -595,12 +601,13 @@
         jovoCont.innerHTML = '';
 
         localRaces.mult.forEach(r => {
+            // Itt a "Verseny megnyitása" mindenki számára látható és biztonságos! (Nem engedi be a szerkesztőbe)
             multCont.innerHTML += `
             <div class="race-card" style="border-left-color: #666;">
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openRaceModal('mult', '${r.id}')">Verseny megnyitása</button>
-                <div class="race-admin-controls" style="display:${isAdmin ? 'flex' : 'none'}; margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="alert('Verseny eredményeinek betöltése (Hamarosan...)')">Eredmények megtekintése</button>
+                <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
                     <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Adatok szerkesztése</button>
                     <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('mult', '${r.id}')">Törlés</button>
                 </div>
@@ -612,7 +619,7 @@
             <div class="race-card" style="border-left-color: var(--warning);">
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <div class="race-admin-controls" style="display:${isAdmin ? 'flex' : 'none'}; margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+                <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
                     <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Adatok szerkesztése</button>
                     <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>
                 </div>
@@ -626,13 +633,12 @@
         
         if(type === 'mult') {
             document.getElementById('raceModalTitle').innerText = id ? "Múltbeli verseny szerkesztése" : "Új múltbéli verseny felvitele";
-            document.getElementById('rm-tab-bar').style.display = 'flex'; // Itt jelenik meg a 4 fül!
+            document.getElementById('rm-tab-bar').style.display = 'flex'; 
         } else {
             document.getElementById('raceModalTitle').innerText = id ? "Jövőbeli verseny szerkesztése" : "Új jövőbeli verseny felvitele";
-            document.getElementById('rm-tab-bar').style.display = 'none'; // Jövőbelinél nincsenek fülek
+            document.getElementById('rm-tab-bar').style.display = 'none'; 
         }
 
-        // Visszaállás az Alap adatok fülre nyitáskor
         switchRmTab('rm-alap', document.querySelector('#rm-tab-bar .tab-btn'));
 
         if (id) {
@@ -644,7 +650,6 @@
                 document.getElementById('rm-desc').value = race.desc;
             }
         } else {
-            // Reset
             document.getElementById('rm-name').value = '';
             document.getElementById('rm-loc').value = '';
             document.getElementById('rm-date').value = '';
