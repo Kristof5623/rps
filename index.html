@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v46 - Javított Szekciók & Élő Számolás</title>
+    <title>Verseny Kalkulátor v47 - Hibátlan Szekciók & Lista Kezelés</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -204,15 +204,7 @@
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
                 
-                <div class="race-card" style="border-left-color: #666;">
-                    <div class="race-card-title">Országos Bajnokság Döntője 2023</div>
-                    <div class="race-card-date">2023. október 12. | Helyszín: Solt</div>
-                    <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="alert('Eredmények betöltése...')">Eredmények megtekintése</button>
-                    <div class="race-admin-controls" style="display:flex; margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
-                        <button class="edit-btn" onclick="openRaceModal('mult')">Adatok szerkesztése</button>
-                        <button class="edit-btn" style="background:var(--danger);">Törlés</button>
-                    </div>
-                </div>
+                <div id="v-mult-list"></div>
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:none;">
@@ -220,14 +212,7 @@
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
 
-                <div class="race-card" style="border-left-color:var(--warning);">
-                    <div class="race-card-title">Tavaszi Távlovas Bajnokság 2024</div>
-                    <div class="race-card-date">2024. május 20. | Helyszín: Bábolna</div>
-                    <div class="race-admin-controls" style="display:flex; margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
-                        <button class="edit-btn" onclick="openRaceModal('jovo')">Adatok szerkesztése</button>
-                        <button class="edit-btn" style="background:var(--danger);">Törlés</button>
-                    </div>
-                </div>
+                <div id="v-jovo-list"></div>
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
@@ -309,7 +294,7 @@
                     <input type="number" id="vsR" placeholder="00" oninput="jump(this, 'vh1')">
                 </div>
                 <div id="lapInputsContainer"></div>
-                <button class="calc-btn" onclick="calcVerseny()">Kiértékelés / Mentés</button>
+                <button class="calc-btn" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
                 <div id="res2" style="display:none"></div>
             </div>
         </div>
@@ -365,28 +350,75 @@
 </div>
 
 <div id="raceModal" class="modal" onclick="if(event.target==this) closeRaceModal()">
-    <div class="modal-content">
+    <div class="modal-content" style="max-height: 85vh;">
         <span class="close-btn" onclick="closeRaceModal()">&times;</span>
         <h3 id="raceModalTitle" style="margin-top:0;">Új verseny felvitele</h3>
         
-        <label>Verseny neve:</label>
-        <input type="text" id="rm-name" placeholder="pl. Országos Bajnokság">
-        
-        <label>Helyszín:</label>
-        <input type="text" id="rm-loc" placeholder="pl. Solt">
-        
-        <label>Időpont:</label>
-        <input type="date" id="rm-date" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px;">
-        
-        <label>Leírás:</label>
-        <textarea id="rm-desc" rows="4" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
-
-        <div id="rm-mult-extra" style="display:none; margin-top:15px; border-top: 1px dashed #555; padding-top: 15px;">
-            <p style="font-size:0.85rem; color:var(--success); margin-bottom:10px; font-weight:bold;">Tipp: Ha letudtad az alap adatokat, az eredményeket a Verseny Kezelőben tudod villámgyorsan bepötyögni!</p>
-            <button class="calc-btn" style="background:var(--warning); color:black; padding:10px; margin-top:0;" onclick="closeRaceModal(); switchSidebarMode('fo-mod', document.getElementById('btn-menu-fomod'));">Ugrás az eredmények bepötyögéséhez</button>
+        <div class="tabs" id="rm-tab-bar" style="display:none; margin-bottom: 15px;">
+            <button class="tab-btn active" onclick="switchRmTab('rm-alap', this)">Alap adatok</button>
+            <button class="tab-btn" onclick="switchRmTab('rm-kiiras', this)">Verseny Kiírás</button>
+            <button class="tab-btn" onclick="switchRmTab('rm-versenyzok', this)">Versenyzők</button>
+            <button class="tab-btn" onclick="switchRmTab('rm-verseny', this)">Teljes verseny</button>
         </div>
 
-        <button class="calc-btn" onclick="closeRaceModal(); alert('Verseny adatai sikeresen mentve (demó)!');">Mentés</button>
+        <div id="rm-alap" class="rm-tab-content" style="display:block;">
+            <input type="hidden" id="rm-id">
+            <input type="hidden" id="rm-type">
+            
+            <label>Verseny neve:</label>
+            <input type="text" id="rm-name" placeholder="pl. Országos Bajnokság">
+            
+            <label>Helyszín:</label>
+            <input type="text" id="rm-loc" placeholder="pl. Solt">
+            
+            <label>Időpont:</label>
+            <input type="date" id="rm-date" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px;">
+            
+            <label>Leírás:</label>
+            <textarea id="rm-desc" rows="3" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
+
+            <button class="calc-btn" onclick="saveRaceData()">Mentés a listába</button>
+        </div>
+
+        <div id="rm-kiiras" class="rm-tab-content" style="display:none;">
+            <h4 style="color:var(--warning); margin-bottom:5px;">Hivatalos adatok beállítása</h4>
+            <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt adhatod meg a távok rajtidejét és a köröket a múltbéli versenyhez.</p>
+            <div style="background:#222; padding:20px; border-radius:10px; text-align:center; color:var(--text-dim); border: 1px dashed #555;">
+                * Üres Kiírás modul * <br><small>(A konkrét kategóriák felvitele ide kerül.)</small>
+            </div>
+            <button class="calc-btn" style="background:var(--primary); color:white;" onclick="alert('Múltbéli verseny kiírása mentve!')">Beállítások Mentése</button>
+        </div>
+
+        <div id="rm-versenyzok" class="rm-tab-content" style="display:none;">
+            <h4 style="margin-bottom: 15px; color: white;">Új versenyző regisztrálása</h4>
+            <label>Rajtszám:</label> <input type="number" placeholder="pl. 23">
+            <label>Versenyző neve:</label> <input type="text" placeholder="pl. Kovács János">
+            <label>Ló neve:</label> <input type="text" placeholder="pl. O'Bajan Pingvin">
+            <label>Versenytáv:</label>
+            <select>
+                <option value="20">20 km</option>
+                <option value="40">40 km</option>
+                <option value="60">60 km</option>
+                <option value="100">100 km</option>
+            </select>
+            <button class="calc-btn add-btn" onclick="alert('Versenyző hozzáadva ehhez a múltbéli versenyhez!')">Hozzáadás</button>
+        </div>
+
+        <div id="rm-verseny" class="rm-tab-content" style="display:none;">
+            <h4 style="color:white; margin-bottom:15px;">Eredmények kezelése</h4>
+            <label style="color: var(--primary);">Versenyző kiválasztása:</label>
+            <select style="border-color: var(--primary);">
+                <option value="">-- Válassz a regisztráltak közül --</option>
+            </select>
+            <label>Össztáv & Körök:</label>
+            <select><option>40 km</option></select>
+            <select style="margin-top:10px;"><option>2 kör</option></select>
+            <div style="background:#222; padding:20px; border-radius:10px; text-align:center; color:var(--text-dim); border: 1px dashed #555; margin-top:15px;">
+                * Üres Eredmény modul * <br><small>(Ide jönnek a köridők beviteléhez a mezők.)</small>
+            </div>
+            <button class="calc-btn" onclick="alert('Múltbéli verseny eredményei sikeresen kiértékelve!')">Kiértékelés / Mentés</button>
+        </div>
+
     </div>
 </div>
 
@@ -437,6 +469,16 @@
         "20":  { h:'', m:'', s:'', laps: [''] }
     };
 
+    // --- LOKÁLIS VERSENY LISTÁK (Jövőbeli / Múltbeli kezelése) ---
+    let localRaces = {
+        mult: [
+            { id: 'm1', name: 'Országos Bajnokság Döntője 2023', loc: 'Solt', date: '2023-10-12', desc: 'Szezonzáró nagyverseny.' }
+        ],
+        jovo: [
+            { id: 'j1', name: 'Tavaszi Távlovas Bajnokság 2024', loc: 'Bábolna', date: '2024-05-20', desc: 'A tavaszi szezon nyitánya.' }
+        ]
+    };
+
     // --- FIREBASE FIGYELŐK ÉS ÉLŐ SZINKRON ---
     db.ref('raceConfig').on('value', (snapshot) => {
         if(snapshot.exists()) { raceConfig = snapshot.val(); }
@@ -478,10 +520,8 @@
             document.getElementById('admin-menu').style.display = 'none';
         }
         
-        // Verseny szerkesztő gombok elrejtése/megjelenítése
-        document.querySelectorAll('.race-admin-controls').forEach(el => {
-            el.style.display = isAdmin ? 'flex' : 'none';
-        });
+        // Verseny szerkesztő gombok elrejtése/megjelenítése a listákon
+        renderLocalRaces();
     }
 
     function doLogin() {
@@ -544,21 +584,117 @@
         if(btn) btn.classList.add('active');
     }
 
-    // Új Verseny felvitele Modal logikája
-    function openRaceModal(type) {
-        document.getElementById('rm-name').value = '';
-        document.getElementById('rm-loc').value = '';
-        document.getElementById('rm-date').value = '';
-        document.getElementById('rm-desc').value = '';
+    // --- ÚJ LOKÁLIS LISTA RENDERELÉS ÉS KEZELÉS ---
+    function renderLocalRaces() {
+        const multCont = document.getElementById('v-mult-list');
+        const jovoCont = document.getElementById('v-jovo-list');
+        
+        if(!multCont || !jovoCont) return;
+
+        multCont.innerHTML = '';
+        jovoCont.innerHTML = '';
+
+        localRaces.mult.forEach(r => {
+            multCont.innerHTML += `
+            <div class="race-card" style="border-left-color: #666;">
+                <div class="race-card-title">${r.name}</div>
+                <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
+                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openRaceModal('mult', '${r.id}')">Verseny megnyitása</button>
+                <div class="race-admin-controls" style="display:${isAdmin ? 'flex' : 'none'}; margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+                    <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Adatok szerkesztése</button>
+                    <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('mult', '${r.id}')">Törlés</button>
+                </div>
+            </div>`;
+        });
+
+        localRaces.jovo.forEach(r => {
+            jovoCont.innerHTML += `
+            <div class="race-card" style="border-left-color: var(--warning);">
+                <div class="race-card-title">${r.name}</div>
+                <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
+                <div class="race-admin-controls" style="display:${isAdmin ? 'flex' : 'none'}; margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+                    <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Adatok szerkesztése</button>
+                    <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>
+                </div>
+            </div>`;
+        });
+    }
+
+    function openRaceModal(type, id = null) {
+        document.getElementById('rm-id').value = id || '';
+        document.getElementById('rm-type').value = type;
         
         if(type === 'mult') {
-            document.getElementById('raceModalTitle').innerText = "Múltbeli verseny felvitele / szerkesztése";
-            document.getElementById('rm-mult-extra').style.display = 'block';
+            document.getElementById('raceModalTitle').innerText = id ? "Múltbeli verseny szerkesztése" : "Új múltbéli verseny felvitele";
+            document.getElementById('rm-tab-bar').style.display = 'flex'; // Itt jelenik meg a 4 fül!
         } else {
-            document.getElementById('raceModalTitle').innerText = "Jövőbeli verseny felvitele / szerkesztése";
-            document.getElementById('rm-mult-extra').style.display = 'none';
+            document.getElementById('raceModalTitle').innerText = id ? "Jövőbeli verseny szerkesztése" : "Új jövőbeli verseny felvitele";
+            document.getElementById('rm-tab-bar').style.display = 'none'; // Jövőbelinél nincsenek fülek
         }
+
+        // Visszaállás az Alap adatok fülre nyitáskor
+        switchRmTab('rm-alap', document.querySelector('#rm-tab-bar .tab-btn'));
+
+        if (id) {
+            const race = localRaces[type].find(r => r.id === id);
+            if (race) {
+                document.getElementById('rm-name').value = race.name;
+                document.getElementById('rm-loc').value = race.loc;
+                document.getElementById('rm-date').value = race.date;
+                document.getElementById('rm-desc').value = race.desc;
+            }
+        } else {
+            // Reset
+            document.getElementById('rm-name').value = '';
+            document.getElementById('rm-loc').value = '';
+            document.getElementById('rm-date').value = '';
+            document.getElementById('rm-desc').value = '';
+        }
+
         document.getElementById('raceModal').style.display = 'flex';
+    }
+
+    function switchRmTab(tabId, btn) {
+        document.querySelectorAll('.rm-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('#rm-tab-bar .tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        if(btn) btn.classList.add('active');
+    }
+
+    function saveRaceData() {
+        const type = document.getElementById('rm-type').value;
+        const id = document.getElementById('rm-id').value;
+        const name = document.getElementById('rm-name').value;
+        
+        if(!name) { alert("A verseny nevének megadása kötelező!"); return; }
+
+        if (id) {
+            const race = localRaces[type].find(r => r.id === id);
+            if (race) {
+                race.name = name;
+                race.loc = document.getElementById('rm-loc').value;
+                race.date = document.getElementById('rm-date').value;
+                race.desc = document.getElementById('rm-desc').value;
+            }
+        } else {
+            localRaces[type].push({
+                id: Date.now().toString(),
+                name: name,
+                loc: document.getElementById('rm-loc').value,
+                date: document.getElementById('rm-date').value,
+                desc: document.getElementById('rm-desc').value
+            });
+        }
+        
+        renderLocalRaces();
+        closeRaceModal();
+    }
+
+    function deleteRace(type, id) {
+        if(confirm('Biztosan törölni akarod ezt a versenyt? Ez a művelet nem vonható vissza!')) {
+            localRaces[type] = localRaces[type].filter(r => r.id !== id);
+            renderLocalRaces();
+        }
     }
 
     function closeRaceModal() {
@@ -842,6 +978,19 @@
             const cleanComp = JSON.parse(JSON.stringify(comp)); 
             db.ref('competitors/' + comp.bib).set(cleanComp);
         }
+
+        // --- ÚJ ANIMÁCIÓ HOZZÁADÁSA ---
+        const btn = document.getElementById('btn-kiertel-mentes');
+        if (btn) {
+            const origText = btn.innerText;
+            const origBg = btn.style.background;
+            btn.innerText = 'Sikeresen mentve! ✅';
+            btn.style.background = '#28a745'; // zöldebb árnyalat
+            setTimeout(() => {
+                btn.innerText = origText;
+                btn.style.background = origBg;
+            }, 2000);
+        }
     }
 
     setInterval(() => {
@@ -864,8 +1013,6 @@
             if(c.laps.filter(l=>l.isComplete).length >= expected) return;
 
             let diff = last.nextStart - nowS; if(diff < -43200) diff += 86400;
-            
-            // JAVÍTÁS: Itt adtuk meg, hogy -30 mp-ig is mutassa
             if(diff >= -30) {
                 liveData.push({ comp: c, diff: diff, nextStart: last.nextStart });
             }
@@ -878,7 +1025,6 @@
             return b.diff - a.diff; 
         });
 
-        // JAVÍTÁS: Külön formázó ami kiírja a mínuszt a visszaszámlálóhoz
         let formatLiveTime = (d) => {
             let isNeg = d < 0;
             let absD = Math.abs(d);
