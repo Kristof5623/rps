@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v58 - PRÉMIUM VENDÉG ÉS TOAST NOTIFICATIONS</title>
+    <title>Verseny Kalkulátor v59 - ÉLES RAJTOLÁS ÉS OKOS ÓRA</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -539,7 +539,6 @@
         };
     }
     
-    // BIZTONSÁGI ADATMOSÓ (Ha a Firebase törli az üres elemeket, ez visszapótolja)
     function mergeRaceConfig(dbConfig) {
         let safeCfg = getEmptyRaceConfig();
         if(!dbConfig) return safeCfg;
@@ -561,7 +560,6 @@
         return safeCfg;
     }
 
-    // ÚJ: SZÉP MAPPANÉV GENERÁTOR (Slug)
     function generateSlug(name, date) {
         let str = (name + '-' + (date || "verseny")).toLowerCase();
         str = str.replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ö/g, 'o').replace(/ő/g, 'o').replace(/ú/g, 'u').replace(/ü/g, 'u').replace(/ű/g, 'u');
@@ -578,7 +576,6 @@
         setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
 
-    // --- SAJÁT CONFIRM (TÖRLÉS/MIGRÁLÁS MEGERŐSÍTŐ) ---
     let confirmCallback = null;
     function showConfirm(title, msg, callback) {
         document.getElementById('confirmTitle').innerText = title;
@@ -744,7 +741,7 @@
         db.ref('raceConfig').on('value', (snapshot) => {
             raceConfig = mergeRaceConfig(snapshot.val());
             renderKiiras();
-            if (document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            if (!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
         });
 
         db.ref('competitors').on('value', (snapshot) => {
@@ -756,7 +753,7 @@
             }
             updateCompetitorDisplays();
             
-            if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            if(!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
             
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
                 const selectedBib = document.getElementById('selectCompetitor').value;
@@ -769,7 +766,6 @@
         });
     }
 
-    // Azonnali indítás minden látogatónak!
     startDatabaseListeners();
 
     // --- AUTENTIKÁCIÓ ÉS JOGOSULTSÁGOK ---
@@ -833,6 +829,9 @@
     }
 
     function switchSidebarMode(targetId, btn) {
+        if(btn && btn.id === 'btn-menu-adatlapok') {
+            viewingPastRaceData = null; // Menüből kattintva mindig az ÉLŐ-t hozza be
+        }
         document.querySelectorAll('.mode-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
@@ -1052,7 +1051,7 @@
     function openRaceModal(type, id = null) {
         document.getElementById('rm-id').value = id || '';
         document.getElementById('rm-type').value = type;
-        modalRaceId = id; // Beállítjuk a memóriában!
+        modalRaceId = id; 
         
         let prefixTitle = type === 'mult' ? "Múltbéli" : "Jövőbeli";
         document.getElementById('raceModalTitle').innerText = id ? `${prefixTitle} verseny szerkesztése` : `Új ${prefixTitle.toLowerCase()} verseny felvitele`;
@@ -1102,7 +1101,6 @@
         
         if(!name) { showToast("A verseny nevének megadása kötelező!", true); return; }
         
-        // Ha még nincs ID-ja, akkor generálunk egy szép olvashatót
         if (!id) { id = generateSlug(name, document.getElementById('rm-date').value); }
 
         const raceData = {
@@ -1111,7 +1109,7 @@
         
         db.ref('races/' + type + '/' + id).update(raceData).then(() => {
             document.getElementById('rm-id').value = id;
-            modalRaceId = id; // MEMÓRIÁBA VÉSSÜK A MENTÉSEKHEZ
+            modalRaceId = id; 
             document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
             document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
@@ -1129,7 +1127,7 @@
     function closeRaceModal() {
         document.getElementById('raceModal').style.display = 'none';
         detachModalFirebaseListeners();
-        modalRaceId = null; // CSAK A TELJES BEZÁRÁSKOR TÖRLÖK AZ ID-T!
+        modalRaceId = null; 
     }
 
     function showAnimatedBtn(btnId) {
@@ -1145,7 +1143,6 @@
 
     // --- MODAL TARTALOM FIREBASE SZINKRON ---
     function attachModalFirebaseListeners(id, type) {
-        // Leválasztjuk az előző figyelőket anélkül, hogy törölnénk a modalRaceId-t!
         if(modalRaceId && modalRaceId !== id) {
             const oldType = document.getElementById('rm-type').value || 'mult';
             db.ref('races/' + oldType + '/' + modalRaceId + '/raceConfig').off();
@@ -1767,17 +1764,39 @@
         let liveData = [];
         competitors.forEach(c => {
             if(c.isEliminated) return; 
-            if(!c.laps) return;
-            let last = c.laps.filter(l => l.isComplete).pop();
-            if(!last || !last.nextStart) return;
             
             let baseDist = c.dist.replace('j', '');
             let expected = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 3;
-            if(c.laps.filter(l=>l.isComplete).length >= expected) return;
+            
+            let completedLaps = (c.laps || []).filter(l => l.isComplete);
+            let completedCount = completedLaps.length;
+            
+            if(completedCount >= expected) return; 
+            
+            let nextStartSec = 0;
+            let label = "";
 
-            let diff = last.nextStart - nowS; if(diff < -43200) diff += 86400;
-            if(diff >= -30) {
-                liveData.push({ comp: c, diff: diff, nextStart: last.nextStart });
+            if (completedCount === 0) {
+                let startH = c.startTime && c.startTime.h !== "" ? c.startTime.h : (raceConfig[baseDist] ? raceConfig[baseDist].h : 0);
+                let startM = c.startTime && c.startTime.m !== "" ? c.startTime.m : (raceConfig[baseDist] ? raceConfig[baseDist].m : 0);
+                let startS = c.startTime && c.startTime.s !== "" ? c.startTime.s : (raceConfig[baseDist] ? raceConfig[baseDist].s : 0);
+                
+                nextStartSec = toSec(startH, startM, startS);
+                label = "Rajt";
+            } else {
+                let last = completedLaps[completedLaps.length - 1];
+                if(!last || !last.nextStart) return;
+                nextStartSec = last.nextStart;
+                label = "Kimenetel";
+            }
+
+            if (nextStartSec > 0) {
+                let diff = nextStartSec - nowS; 
+                if(diff < -43200) diff += 86400; 
+                
+                if(diff >= -30) {
+                    liveData.push({ comp: c, diff: diff, nextStart: nextStartSec, label: label });
+                }
             }
         });
 
@@ -1791,7 +1810,12 @@
         let formatLiveTime = (d) => {
             let isNeg = d < 0; let absD = Math.abs(d);
             const h = Math.floor(absD / 3600); const m = Math.floor((absD % 3600) / 60); const sc = absD % 60;
-            let str = (h>0 ? h+":" : "0:") + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
+            let str = "";
+            if (h > 0) {
+                str = h + ":" + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
+            } else {
+                str = String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
+            }
             return isNeg ? "-" + str : str;
         };
 
@@ -1800,7 +1824,7 @@
             const d = item.diff;
             let blinkClass = "";
             if ( (d <= 120 && d > 115) || (d <= 60 && d > 55) || (d <= 15 && d > 10) || d < 0 ) { blinkClass = "warning"; }
-            html += `<div class="live-item"><div><b>#${item.comp.bib} ${item.comp.name}</b><br><small>Cél: ${toTimeStr(item.nextStart)}</small></div><div class="live-time ${blinkClass}">${formatLiveTime(d)}</div></div>`;
+            html += `<div class="live-item"><div><b>#${item.comp.bib} ${item.comp.name}</b><br><small>${item.label}: ${toTimeStr(item.nextStart)}</small></div><div class="live-time ${blinkClass}">${formatLiveTime(d)}</div></div>`;
         });
         live.innerHTML = html || '<div style="text-align:center; padding:20px;">Nincs várakozó.</div>';
     }, 1000);
@@ -1827,10 +1851,24 @@
         let validLaps = laps.filter(l => l.arrSec > 0);
         let completed = validLaps.length;
         
-        if (completed === 0) return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
+        let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
+        
+        if (completed === 0) {
+            let startH = c.startTime && c.startTime.h !== "" ? c.startTime.h : (config[baseDist] ? config[baseDist].h : 0);
+            let startM = c.startTime && c.startTime.m !== "" ? c.startTime.m : (config[baseDist] ? config[baseDist].m : 0);
+            let startS = c.startTime && c.startTime.s !== "" ? c.startTime.s : (config[baseDist] ? config[baseDist].s : 0);
+            let startSec = toSec(startH, startM, startS);
+            
+            let diff = startSec - nowSec;
+            if (diff < -43200) diff += 86400;
+
+            if (startSec > 0 && diff > -60) {
+                return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
+            }
+            return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
+        }
         
         let last = validLaps[completed - 1];
-        let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
         
         if (completed >= expected) {
             if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)", textCol: "#000" };
