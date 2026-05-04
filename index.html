@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v52 - ÉLES AUTOMATIZÁLT (Szerepkörökkel)</title>
+    <title>Verseny Kalkulátor v53 - ÉLES AUTOMATIZÁLT BIZTONSÁGOS</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -50,13 +50,8 @@
         .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; box-sizing: border-box; border-right: 1px solid #333; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
         .main-wrapper { flex: 1; padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; width: 100%; }
         
-        /* RESZPONZÍV KONTÉNER (Szélesebb nagy képernyőn) */
-        .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; box-sizing: border-box; border: 1px solid #333; transition: max-width 0.3s ease; }
-        @media (min-width: 1024px) {
-            .container { max-width: 950px; } /* Laptopon kiszélesedik */
-            #adatlapItemsContainer { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; } /* Grid elrendezés adatlapoknak */
-            .adatlap-card { margin-top: 0 !important; } /* A grid kezeli a margót */
-        }
+        /* Eredeti keskeny konténer visszaállítva mobil/desktop azonosságra */
+        .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; box-sizing: border-box; border: 1px solid #333; }
         
         .mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; width: 100%; box-sizing: border-box; }
         .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; }
@@ -210,7 +205,6 @@
 
     <div class="menu-title">Eszközök</div>
     <button id="btn-menu-reszido" class="sidebar-btn" onclick="switchSidebarMode('reszido', this)">⏳ Részidő</button>
-    <button id="btn-menu-terv" class="sidebar-btn" onclick="switchSidebarMode('terv', this)">📋 Verseny Terv</button>
     <button id="btn-menu-minosites" class="sidebar-btn" onclick="switchSidebarMode('minosites', this)">⚖️ Kör Avg</button>
 
     <div style="margin-top: 40px;"></div>
@@ -356,30 +350,6 @@
             <div id="res1" class="result-box" style="display:none"></div>
         </div>
 
-        <div id="terv" class="mode-content">
-            <h3>📋 Verseny Terv</h3>
-            <label>Távolság:</label>
-            <select id="totalDistT" onchange="autoSetLaps('lapCountT', 'totalDistT', 'lapInputsContainerT', 't')">
-                <option value="20">20 km</option>
-                <option value="40">40 km</option>
-                <option value="60">60 km</option>
-                <option value="80">80 km</option>
-                <option value="80j">80 km Junior</option>
-                <option value="100">100 km</option>
-                <option value="100j">100 km Junior</option>
-            </select>
-            <select id="lapCountT" onchange="genLaps('lapCountT', 'lapInputsContainerT', 't')" style="margin-top:10px;"></select>
-            <label>Rajt ideje:</label>
-            <div class="time-group">
-                <input type="number" id="thR" placeholder="00" oninput="jump(this, 'tmR')"> :
-                <input type="number" id="tmR" placeholder="00" oninput="jump(this, 'tsR')"> :
-                <input type="number" id="tsR" placeholder="00">
-            </div>
-            <div id="lapInputsContainerT"></div>
-            <button class="calc-btn" style="background:var(--primary); color:white;" onclick="calcTerv()">Generálás</button>
-            <div id="res4" class="result-box" style="display:none"></div>
-        </div>
-
         <div id="minosites" class="mode-content">
             <h3>⚖️ Kör Avg</h3>
             <label>Kör táv (km):</label><input type="number" id="distJ" placeholder="20">
@@ -464,7 +434,7 @@
             </div>
 
             <label>Össztáv & Körök:</label>
-            <select id="rm-totalDist" onchange="autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v')">
+            <select id="rm-totalDist" onchange="autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true)">
                 <option value="20">20 km</option>
                 <option value="40">40 km</option>
                 <option value="60">60 km</option>
@@ -650,12 +620,18 @@
                 competitors = [];
             }
             updateCompetitorDisplays();
-            if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            
+            // Adatlapok frissítése, ha meg van nyitva
+            if(document.getElementById('adatlapok').classList.contains('active')) { renderAdatlapList(); }
+            
+            // Teljes verseny form frissítése (de csak akkor, ha nem épp aktívan mentünk/szerkesztünk)
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
                 const selectedBib = document.getElementById('selectCompetitor').value;
                 const activeEl = document.activeElement;
-                const isInputFocused = activeEl && activeEl.tagName === 'INPUT' && document.getElementById('verseny').contains(activeEl);
-                if (selectedBib && !isInputFocused) { loadCompetitorData(); }
+                const formContainsFocus = activeEl && document.getElementById('verseny').contains(activeEl);
+                if (selectedBib && !formContainsFocus) { 
+                    loadCompetitorData(); 
+                }
             }
         });
     }
@@ -947,14 +923,32 @@
         modalRaceId = null;
     }
 
-    // --- MODAL: KIÍRÁS FUNKCIÓK ---
+    // --- MODAL: KIÍRÁS FUNKCIÓK ÉS DINAMIKUS KÖRÖK ---
+    function changeRmLapCount(dist, count) {
+        let currentLaps = modalRaceConfig[dist].laps || [];
+        let newCount = parseInt(count);
+        if (newCount > currentLaps.length) {
+            for(let i = currentLaps.length; i < newCount; i++) currentLaps.push('');
+        } else if (newCount < currentLaps.length) {
+            currentLaps = currentLaps.slice(0, newCount);
+        }
+        modalRaceConfig[dist].laps = currentLaps;
+        renderRmKiiras();
+    }
+
     function renderRmKiiras() {
         const cont = document.getElementById('rm-kiirasContainer'); cont.innerHTML = '';
         const dists = ["100", "80", "60", "40", "20"];
         dists.forEach(d => {
             if(!modalRaceConfig[d]) return;
+            let currentLapCount = (modalRaceConfig[d].laps || []).length;
             let html = `<div class="kiiras-card">
-                <h3 style="margin:0; color:white;">${catNames[d]} Kategória</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; color:white;">${catNames[d]} Kategória</h3>
+                    <select style="width:auto; padding:6px; background:#444; border:none; color:white; border-radius:6px; margin:0;" onchange="changeRmLapCount('${d}', this.value)">
+                        ${[1,2,3,4,5,6,7,8].map(num => `<option value="${num}" ${currentLapCount === num ? 'selected' : ''}>${num} kör</option>`).join('')}
+                    </select>
+                </div>
                 <label>Hivatalos Rajt:</label>
                 <div class="time-group">
                     <input type="number" placeholder="00" value="${modalRaceConfig[d].h}" onchange="updateRmRaceConfig('${d}', 'h', this.value)" oninput="jump(this, 'rm-kr_${d}_m')"> :
@@ -962,9 +956,9 @@
                     <input type="number" id="rm-kr_${d}_s" placeholder="00" value="${modalRaceConfig[d].s}" onchange="updateRmRaceConfig('${d}', 's', this.value)">
                 </div>
                 <label>Körök távolságai (km):</label>
-                <div style="display:flex; gap:5px; margin-top:5px;">`;
+                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
             modalRaceConfig[d].laps.forEach((lapDist, idx) => {
-                html += `<input type="number" step="0.1" placeholder="20" value="${lapDist}" style="width:60px;" onchange="updateRmRaceLap('${d}', ${idx}, this.value)">`;
+                html += `<input type="number" step="0.1" placeholder="${idx+1}. kör" value="${lapDist}" style="width:65px;" onchange="updateRmRaceLap('${d}', ${idx}, this.value)">`;
             });
             html += `</div></div>`;
             cont.innerHTML += html;
@@ -1065,7 +1059,7 @@
         if(!comp) return;
 
         document.getElementById('rm-totalDist').value = comp.dist;
-        autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v');
+        autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true);
 
         document.getElementById('rm-compStatusToggle').checked = !comp.isEliminated;
         updateStatusLabel('rm-compStatusToggle', 'rm-compStatusLabel');
@@ -1187,8 +1181,16 @@
         }
     }
 
-    function saveKiiras() {
-        db.ref('raceConfig').set(raceConfig).then(() => { showAnimatedBtn('saveKiirasBtn'); });
+    function changeLapCount(dist, count) {
+        let currentLaps = raceConfig[dist].laps || [];
+        let newCount = parseInt(count);
+        if (newCount > currentLaps.length) {
+            for(let i = currentLaps.length; i < newCount; i++) currentLaps.push('');
+        } else if (newCount < currentLaps.length) {
+            currentLaps = currentLaps.slice(0, newCount);
+        }
+        raceConfig[dist].laps = currentLaps;
+        renderKiiras();
     }
 
     function renderKiiras() {
@@ -1196,8 +1198,14 @@
         const dists = ["100", "80", "60", "40", "20"];
         dists.forEach(d => {
             if(!raceConfig[d]) return;
+            let currentLapCount = (raceConfig[d].laps || []).length;
             let html = `<div class="kiiras-card">
-                <h3 style="margin:0; color:white;">${catNames[d]} Kategória</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; color:white;">${catNames[d]} Kategória</h3>
+                    <select style="width:auto; padding:6px; background:#444; border:none; color:white; border-radius:6px; margin:0;" onchange="changeLapCount('${d}', this.value)">
+                        ${[1,2,3,4,5,6,7,8].map(num => `<option value="${num}" ${currentLapCount === num ? 'selected' : ''}>${num} kör</option>`).join('')}
+                    </select>
+                </div>
                 <label>Hivatalos Rajt:</label>
                 <div class="time-group">
                     <input type="number" placeholder="00" value="${raceConfig[d].h}" onchange="updateRaceConfig('${d}', 'h', this.value)" oninput="jump(this, 'kr_${d}_m')"> :
@@ -1205,9 +1213,9 @@
                     <input type="number" id="kr_${d}_s" placeholder="00" value="${raceConfig[d].s}" onchange="updateRaceConfig('${d}', 's', this.value)">
                 </div>
                 <label>Körök távolságai (km):</label>
-                <div style="display:flex; gap:5px; margin-top:5px;">`;
+                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">`;
             raceConfig[d].laps.forEach((lapDist, idx) => {
-                html += `<input type="number" step="0.1" placeholder="20" value="${lapDist}" style="width:60px;" onchange="updateRaceLap('${d}', ${idx}, this.value)">`;
+                html += `<input type="number" step="0.1" placeholder="${idx+1}. kör" value="${lapDist}" style="width:65px;" onchange="updateRaceLap('${d}', ${idx}, this.value)">`;
             });
             html += `</div></div>`;
             cont.innerHTML += html;
@@ -1301,7 +1309,7 @@
         if(!comp) return;
 
         document.getElementById('totalDist').value = comp.dist;
-        autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v');
+        autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v', false);
 
         document.getElementById('compStatusToggle').checked = !comp.isEliminated;
         updateStatusLabel('compStatusToggle', 'compStatusLabel');
@@ -1440,11 +1448,17 @@
         return (h>0 ? h+":" : "0:") + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
     }
 
-    function autoSetLaps(countId, distId, contId, prefix) {
+    function autoSetLaps(countId, distId, contId, prefix, isModal = false) {
         const d = document.getElementById(distId).value;
+        const baseDist = d.replace('j', '');
+        let config = isModal ? modalRaceConfig : raceConfig;
+        let expectedLaps = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 3;
+
         const s = document.getElementById(countId);
-        s.innerHTML = '<option value="1">1 kör</option><option value="2">2 kör</option><option value="3">3 kör</option><option value="4">4 kör</option>';
-        if (d == "20") s.value = "1"; else if (d == "40") s.value = "2"; else if (d == "60" || d == "80" || d == "80j") s.value = "3"; else if (d == "100" || d == "100j") s.value = "4";
+        let opts = '';
+        for(let i=1; i<=10; i++) opts += `<option value="${i}">${i} kör</option>`;
+        s.innerHTML = opts;
+        s.value = expectedLaps;
         genLaps(countId, contId, prefix);
     }
 
@@ -1486,7 +1500,9 @@
             if(!c.laps) return;
             let last = c.laps.filter(l => l.isComplete).pop();
             if(!last || !last.nextStart) return;
-            const expected = c.dist == 20 ? 1 : (c.dist == 40 ? 2 : (c.dist == 100 || c.dist == '100j' ? 4 : 3));
+            
+            let baseDist = c.dist.replace('j', '');
+            let expected = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 3;
             if(c.laps.filter(l=>l.isComplete).length >= expected) return;
 
             let diff = last.nextStart - nowS; if(diff < -43200) diff += 86400;
@@ -1522,27 +1538,34 @@
     // --- ADATLAPOK, RANGSOROLÁS ÉS ÁLLAPOTKÖVETÉS ---
     function getCompLiveStatus(c) {
         if (c.isEliminated) return { text: "Kiesett", color: "var(--danger)" };
-        let expected = (c.dist === '20' ? 1 : (c.dist === '40' ? 2 : (c.dist === '100' || c.dist === '100j' ? 4 : 3)));
-        let laps = c.laps || [];
-        let completed = laps.filter(l => l.isComplete).length;
         
+        let baseDist = c.dist ? c.dist.replace('j', '') : '20';
+        let expected = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 1;
+        let laps = c.laps || [];
+        
+        let validLaps = laps.filter(l => l.arrSec > 0);
+        let completed = validLaps.length;
+        
+        if (completed === 0) return { text: "Körön van", color: "var(--primary)" };
+        
+        let last = validLaps[completed - 1];
+        let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
+        
+        // Befejezett verseny
         if (completed >= expected) {
+            if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)" };
             return { text: "Finished", color: "var(--success)" };
         }
         
-        if (laps.length > 0) {
-            let last = laps[laps.length - 1];
-            let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
-            
-            // Ha van beérkezési idő, de orvosi nincs, és még nem "isComplete"
-            if (last.arrSec > 0 && (!last.vetSec || last.vetSec === 0) && !last.isComplete) {
-                return { text: "Megérkezett", color: "var(--warning)" };
-            }
-            // Ha pihenőidejét tölti (várakozik a következő startra)
-            if (last.nextStart && last.nextStart > nowSec) {
-                return { text: "Várakozik", color: "var(--warning)" };
-            }
+        // Még nem az utolsó körben van
+        if (last.arrSec > 0 && (!last.vetSec || last.vetSec === 0)) {
+            return { text: "Megérkezett", color: "var(--warning)" };
         }
+        
+        if (last.nextStart && last.nextStart > nowSec) {
+            return { text: "Várakozik", color: "var(--warning)" };
+        }
+        
         return { text: "Körön van", color: "var(--primary)" };
     }
 
@@ -1617,7 +1640,8 @@
             let qual = 0;
             catComps.forEach(c => {
                 if (c.isEliminated) return;
-                let expectedLaps = (c.dist === '20' ? 1 : (c.dist === '40' ? 2 : (c.dist === '100' || c.dist === '100j' ? 4 : 3)));
+                let baseDist = c.dist.replace('j', '');
+                let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 3;
                 let completed = (c.laps || []).filter(l => l.isComplete).length;
                 if (completed >= expectedLaps) qual++;
             });
@@ -1707,8 +1731,9 @@
         html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
         html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
         phases.forEach((l, i) => {
-            const count = c.dist == 20 ? 1 : (c.dist == 40 ? 2 : (c.dist == 100 || c.dist == '100j' ? 4 : 3));
-            if(i+1 === count) { html += `<td>-</td>`; } else { html += `<td>${l.vetSec>0?toTimeStr(l.vetSec):"-"}</td>`; }
+            let baseDist = c.dist.replace('j', '');
+            let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 3;
+            if(i+1 === expectedLaps) { html += `<td>-</td>`; } else { html += `<td>${l.vetSec>0?toTimeStr(l.vetSec):"-"}</td>`; }
         });
         html += `</tr><tr><th class="row-header">Pulzus idő</th>`; phases.forEach(l => html += `<td>${l.pulzusSec>0?toTimeStr(l.pulzusSec):"-"}</td>`);
         html += `</tr><tr><th class="row-header">Össz. menetidő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.rideTime)}</td>`);
@@ -1731,20 +1756,6 @@
         document.getElementById('res1').innerHTML = `Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
     }
 
-    function calcTerv() {
-        const count = parseInt(document.getElementById('lapCountT').value);
-        let currentStart = toSec(document.getElementById('thR').value, document.getElementById('tmR').value, document.getElementById('tsR').value);
-        if (currentStart === 0) return;
-        let html = "<strong style='color:var(--text);'>Terv 16 km/h alatti átlaghoz:</strong><br>";
-        for(let i = 1; i <= count; i++) {
-            const d = parseFloat(document.getElementById(`td${i}`).value) || 0; if(d <= 0) continue;
-            const minArrival = currentStart + Math.ceil(d / (CALC_LIMIT / 3600)); const nextStart = minArrival + 2400;
-            html += `<div class="plan-box"><span class="plan-header">${i}. KÖR</span>Rajt: ${toTimeStr(currentStart)}<br>Beérkezés legkorábban: <strong style="color:var(--success)">${toTimeStr(minArrival)}</strong>${i < count ? `<br><span style="color:var(--text-dim)">Kimenetel pihenő (40p) után: <b style="color:white;">${toTimeStr(nextStart)}</b></span>` : ''}</div>`;
-            currentStart = nextStart;
-        }
-        document.getElementById('res4').style.display = 'block'; document.getElementById('res4').innerHTML = html;
-    }
-
     function calcMinosites() {
         const d = parseFloat(document.getElementById('distJ').value);
         const t1 = toSec(document.getElementById('jh1').value, document.getElementById('jm1').value, document.getElementById('js1').value);
@@ -1755,7 +1766,7 @@
 
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
-        autoSetLaps('lapCountT', 'totalDistT', 'lapInputsContainerT', 't');
+        if (savedMode === 'terv') savedMode = 'versenyek'; // fallback if they had the deleted tab saved
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
     };
 </script>
