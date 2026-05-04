@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v54 - ÉLES AUTOMATIZÁLT BIZTONSÁGOS</title>
+    <title>Verseny Kalkulátor v55 - KÉZI MIGRÁLÁS ÉS JAVÍTÁSOK</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -184,7 +184,7 @@
         <p id="confirmDesc" style="color:var(--text-dim); margin-bottom:20px;">Ez a művelet nem vonható vissza!</p>
         <div style="display:flex; gap:10px; justify-content:center;">
             <button class="calc-btn" style="background:#444; color:white; margin-top:0;" onclick="closeConfirm()">Mégse</button>
-            <button class="calc-btn" id="confirmOkBtn" style="background:var(--danger); color:white; margin-top:0;">Igen, törlés</button>
+            <button class="calc-btn" id="confirmOkBtn" style="background:var(--danger); color:white; margin-top:0;">Igen</button>
         </div>
     </div>
 </div>
@@ -549,7 +549,7 @@
         return safeCfg;
     }
 
-    // --- SAJÁT CONFIRM (TÖRLÉS MEGERŐSÍTŐ) ---
+    // --- SAJÁT CONFIRM (TÖRLÉS/MIGRÁLÁS MEGERŐSÍTŐ) ---
     let confirmCallback = null;
     function showConfirm(title, msg, callback) {
         document.getElementById('confirmTitle').innerText = title;
@@ -566,7 +566,66 @@
         closeConfirm();
     });
 
-    // --- AUTOMATIKUS MIGRÁLÓ MOTOR (Dátum alapján) ---
+    // --- MANUÁLIS ÉS AUTOMATIKUS MIGRÁCIÓS MOTOR ---
+    function forceMoveToLive(sourceType, id) {
+        showConfirm("Verseny Élesítése", "Biztosan ÉLŐ-be teszed ezt a versenyt?\n(A jelenlegi élő futam automatikusan lezárul és átkerül a múltba!)", () => {
+            db.ref('/').once('value').then(snap => {
+                let data = snap.val() || {};
+                let updates = {};
+                
+                // Ha van aktív élő verseny, azt előbb eldobjuk a múltba
+                if (data.liveRaceMeta) {
+                    let oldId = data.liveRaceMeta.id || Date.now().toString();
+                    updates['races/mult/' + oldId] = {
+                        id: oldId, name: data.liveRaceMeta.name, loc: data.liveRaceMeta.loc, date: data.liveRaceMeta.date, desc: data.liveRaceMeta.desc || "",
+                        raceConfig: data.raceConfig || getEmptyRaceConfig(),
+                        competitors: data.competitors || null
+                    };
+                }
+                
+                let sourceRace = data.races && data.races[sourceType] && data.races[sourceType][id];
+                if (sourceRace) {
+                    updates['liveRaceMeta'] = { id: sourceRace.id, name: sourceRace.name, loc: sourceRace.loc, date: sourceRace.date, desc: sourceRace.desc || "" };
+                    updates['raceConfig'] = sourceRace.raceConfig || getEmptyRaceConfig();
+                    updates['competitors'] = sourceRace.competitors || null;
+                    updates['races/' + sourceType + '/' + id] = null; // Törlés a régi helyéről
+                }
+                
+                db.ref('/').update(updates).then(() => { 
+                    alert("🚀 Verseny sikeresen ÉLŐ-be mozgatva!");
+                    switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
+                });
+            });
+        });
+    }
+
+    function forceMoveToPastFromLive() {
+        showConfirm("Verseny Lezárása", "Biztosan a Múltbéli versenyek közé rakod a jelenlegi ÉLŐ versenyt?", () => {
+            db.ref('/').once('value').then(snap => {
+                let data = snap.val() || {};
+                if (!data.liveRaceMeta) return;
+                
+                let oldId = data.liveRaceMeta.id || Date.now().toString();
+                let updates = {};
+                
+                updates['races/mult/' + oldId] = {
+                    id: oldId, name: data.liveRaceMeta.name, loc: data.liveRaceMeta.loc, date: data.liveRaceMeta.date, desc: data.liveRaceMeta.desc || "",
+                    raceConfig: data.raceConfig || getEmptyRaceConfig(),
+                    competitors: data.competitors || null
+                };
+                
+                updates['liveRaceMeta'] = null;
+                updates['raceConfig'] = getEmptyRaceConfig();
+                updates['competitors'] = null;
+                
+                db.ref('/').update(updates).then(() => { 
+                    alert("✅ Verseny sikeresen lezárva és átmozgatva a Múltba!"); 
+                    switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
+                });
+            });
+        });
+    }
+
     function runAutoMigration() {
         db.ref('/').once('value').then(snap => {
             let data = snap.val() || {};
@@ -763,7 +822,10 @@
             <div class="race-card" style="border-left-color: var(--success); background:#202820;">
                 <div class="race-card-title">${liveRaceMeta.name} <span style="color:var(--success); font-size:0.8rem;">(ÉLŐ FUTAM)</span></div>
                 <div class="race-card-date">${liveRaceMeta.date} | Helyszín: ${liveRaceMeta.loc}</div>
-                <button class="calc-btn admin-only" style="padding:10px; margin-top:10px; font-size:0.9rem;" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                    <button class="calc-btn admin-only" style="padding:10px; margin-top:0; font-size:0.9rem;" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>
+                    <button class="calc-btn admin-only" style="padding:10px; margin-top:0; font-size:0.9rem; background:var(--danger); color:white;" onclick="forceMoveToPastFromLive()">🛑 Lezárás (Múltbélivé tétel)</button>
+                </div>
             </div>`;
         } else {
             jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>';
@@ -774,9 +836,9 @@
             <div class="race-card" style="border-left-color: #666;">
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openRaceModal('mult', '${r.id}'); switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny'));">Eredmények megtekintése</button>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
-                    <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Adatok szerkesztése</button>
+                    <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Szerkesztés</button>
+                    <button class="edit-btn" style="background:var(--success); color:black;" onclick="forceMoveToLive('mult', '${r.id}')">▶️ Újra ÉLŐ-be</button>
                     <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('mult', '${r.id}')">Törlés</button>
                 </div>
             </div>`;
@@ -788,7 +850,8 @@
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
-                    <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Adatok szerkesztése</button>
+                    <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Szerkesztés</button>
+                    <button class="edit-btn" style="background:var(--success); color:black;" onclick="forceMoveToLive('jovo', '${r.id}')">▶️ Élesítés (ÉLŐ)</button>
                     <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>
                 </div>
             </div>`;
@@ -811,7 +874,7 @@
         } else {
             document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
-            document.getElementById('rm-tab-btn-verseny').style.display = 'block';
+            document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
             attachModalFirebaseListeners(id, type);
         }
 
@@ -862,7 +925,7 @@
             modalRaceId = id;
             document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
-            document.getElementById('rm-tab-btn-verseny').style.display = 'block';
+            document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
             attachModalFirebaseListeners(id, type);
             showAnimatedBtn('btn-rm-alap-mentes');
         });
@@ -996,8 +1059,10 @@
         }
 
         const newComp = { bib: bib, name: name, dist: dist, internal: internal, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
-        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp);
-        cancelRmEdit();
+        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp).then(() => {
+            showAnimatedBtn('rm-addCompBtn');
+            cancelRmEdit();
+        });
     }
     function editRmCompetitor(bib) {
         const comp = modalCompetitors.find(c => c.bib == bib);
@@ -1025,8 +1090,9 @@
         if (!modalEditingBib || !modalRaceId) return;
         const type = document.getElementById('rm-type').value;
         showConfirm("Versenyző törlése", "Biztosan törölni akarod ezt a versenyzőt ebből a listából?", () => {
-            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove();
-            cancelRmEdit();
+            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove().then(() => {
+                cancelRmEdit();
+            });
         });
     }
     function updateRmCompetitorDisplays() {
@@ -1271,15 +1337,18 @@
         }
 
         const newComp = { bib: bib, name: name, dist: dist, internal: internal, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
-        db.ref('competitors/' + bib).set(newComp);
-        cancelEdit();
+        db.ref('competitors/' + bib).set(newComp).then(() => {
+            showAnimatedBtn('addCompBtn');
+            cancelEdit();
+        });
     }
 
     function deleteCompetitor() {
         if (!editingBib) return;
         showConfirm("Élő versenyző törlése", "Biztosan törölni szeretnéd az élő versenyből?", () => {
-            db.ref('competitors/' + editingBib).remove();
-            cancelEdit();
+            db.ref('competitors/' + editingBib).remove().then(() => {
+                cancelEdit();
+            });
         });
     }
 
@@ -1769,7 +1838,7 @@
 
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
-        if (savedMode === 'terv') savedMode = 'versenyek'; // Biztosíték, ha valaki ezen a menün ragadt volna
+        if (savedMode === 'terv') savedMode = 'versenyek'; 
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
     };
 </script>
