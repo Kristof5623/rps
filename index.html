@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v53 - ÉLES AUTOMATIZÁLT BIZTONSÁGOS</title>
+    <title>Verseny Kalkulátor v54 - ÉLES AUTOMATIZÁLT (Vendég nézettel)</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
     <style>
+        /* CSS FIX: Megakadályozza a jobbra-balra mozgást mobilon */
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { max-width: 100vw; overflow-x: hidden; }
+
         :root {
             --bg: #000000;
             --card: #1c1c1e;
@@ -47,14 +51,13 @@
         .role-printer .printer-only { display: block !important; }
         /* ---------------------------------- */
 
-        .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; box-sizing: border-box; border-right: 1px solid #333; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-        .main-wrapper { flex: 1; padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; width: 100%; }
+        .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; border-right: 1px solid #333; position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+        .main-wrapper { flex: 1; padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; overflow-x: hidden; width: 100%; }
         
-        /* Eredeti keskeny konténer visszaállítva mobil/desktop azonosságra */
-        .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; box-sizing: border-box; border: 1px solid #333; }
+        .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #333; }
         
-        .mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; width: 100%; box-sizing: border-box; }
-        .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        .mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; width: 100%; }
+        .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; padding: 0; }
         .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 998; }
 
         .menu-title { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 15px; margin-top: 20px; letter-spacing: 1px; }
@@ -62,7 +65,7 @@
         .sidebar-btn:hover { background: #222; }
         .sidebar-btn.active { background: #2c2c2e; color: var(--primary); border-left: 4px solid var(--primary); }
 
-        .sidebar-input { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 6px; background: #222; border: 1px solid #444; color: white; box-sizing: border-box; font-size: 0.9rem; }
+        .sidebar-input { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 6px; background: #222; border: 1px solid #444; color: white; font-size: 0.9rem; }
         .sidebar-submit { width: 100%; padding: 10px; border-radius: 6px; background: #333; color: white; border: 1px solid #444; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .sidebar-submit:hover { background: var(--primary); border-color: var(--primary); }
 
@@ -76,12 +79,12 @@
 
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="number"] { -moz-appearance: textfield; }
+        input[type="number"] { -moz-appearance: textfield; min-width: 0; }
 
         label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
-        select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; box-sizing: border-box; font-size: 1rem; width: 100%; margin-top: 5px; }
-        .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
-        .time-group input { text-align: center; }
+        select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; font-size: 1rem; width: 100%; margin-top: 5px; }
+        .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; width: 100%; }
+        .time-group input { text-align: center; flex: 1; }
 
         button.calc-btn { width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.1rem; text-transform: uppercase; transition: 0.2s; }
         button.add-btn { background: var(--primary); color: white; }
@@ -93,7 +96,7 @@
         .race-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
         .race-card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; color: white; }
         .race-card-date { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px; }
-        .race-admin-controls { margin-top: 10px; padding-top: 10px; display: flex; gap: 5px; }
+        .race-admin-controls { margin-top: 10px; padding-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;}
 
         .result-box { margin-top: 20px; padding: 15px; background: #2c2c2e; border-radius: 14px; border-left: 6px solid var(--primary); line-height: 1.6; }
         .lap-card { background: #3a3a3c; padding: 12px; border-radius: 14px; margin-top: 15px; border: 1px solid #48484a; }
@@ -113,34 +116,34 @@
         .confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; padding: 15px; }
         .confirm-box { background: #1c1c1e; padding: 25px; border-radius: 12px; border: 1px solid #444; width: 100%; max-width: 350px; text-align: center; }
 
-        .table-responsive { overflow-x: auto; margin-top: 20px; }
+        .table-responsive { overflow-x: auto; margin-top: 20px; width: 100%; }
         .ttrack-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
         .ttrack-table th, .ttrack-table td { border: 1px solid #444; padding: 10px 6px; white-space: nowrap; }
         .ttrack-table th.row-header { background: #222; color: var(--text-dim); text-align: left; font-weight: 600; width: 30%; }
         .ttrack-table th.col-header { background: #2c2c2e; color: var(--primary); font-weight: bold; }
         
-        .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; }
+        .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; flex-wrap: wrap; gap: 10px;}
         
-        .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; }
-        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
+        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; width: 100%; }
         .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
         .stat-box.large { font-size: 1.1rem; padding: 8px 20px; }
         .stat-box.small { font-size: 0.75rem; }
         .stat-val { font-size: 1rem; font-weight: 900; margin-top:2px; }
-        .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; }
+        .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-wrap: wrap;}
         .stat-btn { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;}
         .stat-btn:hover { background: #eee; }
         .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
 
-        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; padding-bottom: 25px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; }
+        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; padding-bottom: 25px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; width: 100%; }
         .adatlap-card:hover { background: #d5d5d5; }
         .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; margin-right: 15px; flex-shrink: 0; }
         .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; }
-        .adatlap-info { flex: 1; display: flex; flex-direction: column; margin-right: 20px; }
+        .adatlap-info { flex: 1; display: flex; flex-direction: column; margin-right: 20px; overflow: hidden; }
         .adatlap-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-        .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; border: 1px solid #555; }
-        .adatlap-name { font-weight: bold; font-size: 1.1rem; color: #000; }
-        .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic; font-weight: bold; }
+        .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; border: 1px solid #555; flex-shrink:0;}
+        .adatlap-name { font-weight: bold; font-size: 1.1rem; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         
         .adatlap-right { position: absolute; right: 15px; top: 15px; }
         .adatlap-arrow { color: #555; font-size: 1.2rem; }
@@ -158,13 +161,14 @@
         input:checked + .slider:before { transform: translateX(24px); }
         .status-label { font-size: 0.95rem; font-weight: bold; margin-left: 10px; }
 
-        .live-item { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .live-item { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; width: 100%;}
         .live-time { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
         .live-time.warning { color: var(--danger); animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
         @media (max-width: 800px) {
             body { flex-direction: column; }
+            .main-wrapper { padding: 10px; }
             .mobile-header { display: block; }
             .sidebar { position: fixed; left: -280px; top: 0; bottom: 0; width: 280px; z-index: 999; transition: left 0.3s ease; }
             .sidebar.open { left: 0; }
@@ -241,18 +245,18 @@
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
-                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div></div>
+                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:none;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
-                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div></div>
+                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
-                <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div></div>
+                <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
         </div>
 
@@ -543,14 +547,13 @@
     function runAutoMigration() {
         db.ref('/').once('value').then(snap => {
             let data = snap.val() || {};
-            let today = new Date().toISOString().split('T')[0]; // Mai nap (YYYY-MM-DD)
+            let today = new Date().toISOString().split('T')[0];
             let meta = data.liveRaceMeta || null;
             let jovo = (data.races && data.races.jovo) ? data.races.jovo : {};
             
             let updates = {};
             let needsUpdate = false;
 
-            // 1. LÉPÉS: Régi ÉLŐ verseny Múltbélivé alakítása
             if (meta && meta.date < today) {
                 let id = meta.id || Date.now().toString();
                 updates['races/mult/' + id] = {
@@ -561,11 +564,10 @@
                 updates['raceConfig'] = getEmptyRaceConfig();
                 updates['competitors'] = {};
                 updates['liveRaceMeta'] = null;
-                meta = null; // Élő adat letörölve
+                meta = null;
                 needsUpdate = true;
             }
 
-            // 2. LÉPÉS: Mai Jövőbeli verseny ÉLŐvé alakítása
             if (!meta) {
                 let toMoveId = Object.keys(jovo).find(key => jovo[key].date === today);
                 if (toMoveId) {
@@ -573,7 +575,7 @@
                     updates['liveRaceMeta'] = { id: r.id, name: r.name, loc: r.loc, date: r.date, desc: r.desc || "" };
                     updates['raceConfig'] = r.raceConfig || getEmptyRaceConfig();
                     updates['competitors'] = r.competitors || {};
-                    updates['races/jovo/' + toMoveId] = null; // Törlés a jövőből
+                    updates['races/jovo/' + toMoveId] = null;
                     needsUpdate = true;
                 }
             }
@@ -591,7 +593,7 @@
 
         db.ref('liveRaceMeta').on('value', snap => {
             liveRaceMeta = snap.val();
-            renderLocalRaces(); // Jelenlegi fül frissítése
+            renderLocalRaces();
         });
 
         db.ref('races').on('value', (snapshot) => {
@@ -621,10 +623,8 @@
             }
             updateCompetitorDisplays();
             
-            // Adatlapok frissítése, ha meg van nyitva
-            if(document.getElementById('adatlapok').classList.contains('active')) { renderAdatlapList(); }
+            if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
             
-            // Teljes verseny form frissítése (de csak akkor, ha nem épp aktívan mentünk/szerkesztünk)
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
                 const selectedBib = document.getElementById('selectCompetitor').value;
                 const activeEl = document.activeElement;
@@ -636,23 +636,8 @@
         });
     }
 
-    function stopDatabaseListeners() {
-        if(!dbListenersActive) return;
-        db.ref('liveRaceMeta').off();
-        db.ref('races').off();
-        db.ref('raceConfig').off();
-        db.ref('competitors').off();
-        dbListenersActive = false;
-        
-        liveRaceMeta = null;
-        localRaces = { mult: [], jovo: [] };
-        raceConfig = getEmptyRaceConfig();
-        competitors = [];
-        renderLocalRaces();
-        renderKiiras();
-        updateCompetitorDisplays();
-    }
-
+    // INDÍTSUK EL AZ ADATBÁZIS OLVASÁST LÁTOGATÓKNAK IS AZONNAL!
+    startDatabaseListeners();
 
     // --- AUTENTIKÁCIÓ ÉS JOGOSULTSÁGOK ---
     auth.onAuthStateChanged((user) => {
@@ -660,15 +645,12 @@
             db.ref('users/' + user.uid + '/role').once('value').then((snapshot) => {
                 const role = snapshot.val() || 'guest';
                 applyAuthUI(true, role);
-                if(role === 'admin') runAutoMigration(); // Csak adminnál fut le a háttér ellenőrzés
-                startDatabaseListeners();
+                if(role === 'admin') runAutoMigration();
             }).catch(e => {
-                console.error("Nem sikerült lekérni a szerepkört!", e);
                 applyAuthUI(true, 'guest');
             });
         } else {
             applyAuthUI(false, null);
-            stopDatabaseListeners();
         }
     });
 
@@ -750,13 +732,6 @@
         const jelenCont = document.getElementById('v-jelen-list');
         if(!multCont || !jovoCont || !jelenCont) return;
 
-        if(!dbListenersActive) {
-            multCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div>';
-            jovoCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div>';
-            jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div>';
-            return;
-        }
-
         multCont.innerHTML = localRaces.mult.length > 0 ? '' : '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs múltbéli verseny rögzítve.</div>';
         jovoCont.innerHTML = localRaces.jovo.length > 0 ? '' : '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs jövőbeli verseny rögzítve.</div>';
 
@@ -765,7 +740,7 @@
             <div class="race-card" style="border-left-color: var(--success); background:#202820;">
                 <div class="race-card-title">${liveRaceMeta.name} <span style="color:var(--success); font-size:0.8rem;">(ÉLŐ FUTAM)</span></div>
                 <div class="race-card-date">${liveRaceMeta.date} | Helyszín: ${liveRaceMeta.loc}</div>
-                <button class="calc-btn" style="padding:10px; margin-top:10px; font-size:0.9rem;" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>
+                <button class="calc-btn admin-only" style="padding:10px; margin-top:10px; font-size:0.9rem;" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>
             </div>`;
         } else {
             jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>';
@@ -776,7 +751,7 @@
             <div class="race-card" style="border-left-color: #666;">
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <button class="calc-btn admin-only" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openRaceModal('mult', '${r.id}'); switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny'));">Eredmények megtekintése</button>
+                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openRaceModal('mult', '${r.id}'); switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny'));">Eredmények megtekintése</button>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
                     <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Adatok szerkesztése</button>
                     <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('mult', '${r.id}')">Törlés</button>
@@ -859,7 +834,6 @@
             desc: document.getElementById('rm-desc').value
         };
         
-        // Ha új, egyből adjunk neki üres konfigot, hogy ne legyen gond a listenerekkel
         db.ref('races/' + type + '/' + id).update(raceData).then(() => {
             document.getElementById('rm-id').value = id;
             modalRaceId = id;
@@ -945,7 +919,7 @@
             let html = `<div class="kiiras-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 style="margin:0; color:white;">${catNames[d]} Kategória</h3>
-                    <select style="width:auto; padding:6px; background:#444; border:none; color:white; border-radius:6px; margin:0;" onchange="changeRmLapCount('${d}', this.value)">
+                    <select class="admin-only" style="width:auto; padding:6px; background:#444; border:none; color:white; border-radius:6px; margin:0;" onchange="changeRmLapCount('${d}', this.value)">
                         ${[1,2,3,4,5,6,7,8].map(num => `<option value="${num}" ${currentLapCount === num ? 'selected' : ''}>${num} kör</option>`).join('')}
                     </select>
                 </div>
@@ -1202,7 +1176,7 @@
             let html = `<div class="kiiras-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 style="margin:0; color:white;">${catNames[d]} Kategória</h3>
-                    <select style="width:auto; padding:6px; background:#444; border:none; color:white; border-radius:6px; margin:0;" onchange="changeLapCount('${d}', this.value)">
+                    <select class="admin-only" style="width:auto; padding:6px; background:#444; border:none; color:white; border-radius:6px; margin:0;" onchange="changeLapCount('${d}', this.value)">
                         ${[1,2,3,4,5,6,7,8].map(num => `<option value="${num}" ${currentLapCount === num ? 'selected' : ''}>${num} kör</option>`).join('')}
                     </select>
                 </div>
@@ -1766,7 +1740,7 @@
 
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
-        if (savedMode === 'terv') savedMode = 'versenyek'; // fallback if they had the deleted tab saved
+        if (savedMode === 'terv') savedMode = 'versenyek'; // Biztosíték, ha valaki ezen a menün ragadt volna
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
     };
 </script>
