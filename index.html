@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v50 - Teljes Múltbéli Kezelés & Custom Confirm</title>
+    <title>Verseny Kalkulátor v51 - ÉLES BIZTONSÁGOS (Szerepkörökkel)</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
     <style>
         :root {
@@ -24,8 +25,27 @@
 
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: row; min-height: 100vh; }
         
-        /* ADMIN JOGOSULTSÁG ELREJTÉS */
-        body:not(.is-admin) .admin-only { display: none !important; }
+        /* --- JOGOSULTSÁG ALAPÚ ELREJTÉS --- */
+        .admin-only, .doctor-only, .checkin-only, .judge-only, .printer-only { display: none !important; }
+        
+        /* Admin mindent lát */
+        .role-admin .admin-only,
+        .role-admin .doctor-only,
+        .role-admin .checkin-only,
+        .role-admin .judge-only,
+        .role-admin .printer-only { display: block !important; } 
+        /* Flex kivételek, hogy a flexbox layoutok ne essenek szét */
+        .role-admin #admin-menu,
+        .role-admin #logout-section,
+        .role-judge #admin-menu,
+        .role-judge #logout-section { display: flex !important; }
+
+        /* Egyedi jogosultságok, ha nem admin lép be */
+        .role-doctor .doctor-only { display: block !important; }
+        .role-checkin .checkin-only { display: block !important; }
+        .role-judge .judge-only { display: block !important; }
+        .role-printer .printer-only { display: block !important; }
+        /* ---------------------------------- */
 
         .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; box-sizing: border-box; border-right: 1px solid #333; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
         .main-wrapper { flex: 1; padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; }
@@ -198,9 +218,9 @@
         </form>
     </div>
 
-    <div id="logout-section" class="admin-only" style="display: none; flex-direction: column;">
+    <div id="logout-section" style="display: none; flex-direction: column;">
         <div class="menu-title">Adminisztráció</div>
-        <div style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Adminisztrátor</div>
+        <div id="logged-in-role-text" style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Szerepkör</div>
         <button class="sidebar-submit" style="background:#440000; border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
     </div>
 </div>
@@ -220,14 +240,14 @@
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
-                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div></div>
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:none;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
-                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div></div>
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
@@ -250,7 +270,7 @@
                 <h4 style="color:var(--warning); margin-bottom:5px;">ÉLŐ: Hivatalos adatok beállítása</h4>
                 <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt add meg a távok rajtidejét és a köröket a futó versenyhez.</p>
                 <div id="kiirasContainer"></div>
-                <button id="saveKiirasBtn" class="calc-btn" style="background:var(--primary); color:white;" onclick="saveKiiras()">Beállítások Mentése</button>
+                <button id="saveKiirasBtn" class="calc-btn admin-only" style="background:var(--primary); color:white;" onclick="saveKiiras()">Beállítások Mentése</button>
             </div>
 
             <div id="versenyzok" class="sub-mode-content" style="display:none;">
@@ -269,7 +289,7 @@
                     <option value="100j">100 km Junior</option>
                 </select>
                 
-                <button id="addCompBtn" class="calc-btn add-btn" onclick="saveCompetitor()">Hozzáadás</button>
+                <button id="addCompBtn" class="calc-btn add-btn admin-only" onclick="saveCompetitor()">Hozzáadás</button>
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
                 <button id="deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
@@ -311,7 +331,7 @@
                     <input type="number" id="vsR" placeholder="00" oninput="jump(this, 'vh1')">
                 </div>
                 <div id="lapInputsContainer"></div>
-                <button class="calc-btn" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
+                <button class="calc-btn admin-only" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
                 <div id="res2" style="display:none"></div>
             </div>
         </div>
@@ -391,14 +411,14 @@
             <label>Leírás:</label>
             <textarea id="rm-desc" rows="3" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
 
-            <button class="calc-btn" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
+            <button class="calc-btn admin-only" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
         </div>
 
         <div id="rm-kiiras" class="rm-tab-content" style="display:none;">
             <h4 style="color:var(--warning); margin-bottom:5px;">Múltbéli adatok beállítása</h4>
             <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt adhatod meg a távok rajtidejét és a köröket ehhez a konkrét versenyhez.</p>
             <div id="rm-kiirasContainer"></div>
-            <button id="saveRmKiirasBtn" class="calc-btn" style="background:var(--primary); color:white;" onclick="saveRmKiiras()">Beállítások Mentése</button>
+            <button id="saveRmKiirasBtn" class="calc-btn admin-only" style="background:var(--primary); color:white;" onclick="saveRmKiiras()">Beállítások Mentése</button>
         </div>
 
         <div id="rm-versenyzok" class="rm-tab-content" style="display:none;">
@@ -416,7 +436,7 @@
                 <option value="100">100 km</option>
                 <option value="100j">100 km Junior</option>
             </select>
-            <button id="rm-addCompBtn" class="calc-btn add-btn" onclick="saveRmCompetitor()">Hozzáadás</button>
+            <button id="rm-addCompBtn" class="calc-btn add-btn admin-only" onclick="saveRmCompetitor()">Hozzáadás</button>
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
             <button id="rm-deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
 
@@ -457,7 +477,7 @@
                 <input type="number" id="rm-vsR" placeholder="00" oninput="jump(this, 'rm-vh1')">
             </div>
             <div id="rm-lapInputsContainer"></div>
-            <button class="calc-btn" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés (Múltbéli)</button>
+            <button class="calc-btn admin-only" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés (Múltbéli)</button>
             <div id="rm-res2" style="display:none"></div>
         </div>
 
@@ -489,12 +509,13 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const auth = firebase.auth(); // BEKAPCSOLJUK AZ AUTH-T
     // ------------------------------
 
     // --- GLOBÁLIS VÁLTOZÓK ---
-    let isAdmin = false; 
     const CALC_LIMIT = 15.99;
     let currentAdatlapFilter = null; 
+    let dbListenersActive = false; // ÚJ: hogy tudjuk, figyeljük-e már az adatbázist
     
     // FŐ ÉLŐ VERSENY ADATOK
     let competitors = [];
@@ -543,79 +564,124 @@
         closeConfirm();
     });
 
-    // --- FIREBASE FIGYELŐK ---
-    db.ref('races').on('value', (snapshot) => {
-        if(snapshot.exists()) {
-            const data = snapshot.val();
-            localRaces = {
-                mult: data.mult ? Object.values(data.mult) : [],
-                jovo: data.jovo ? Object.values(data.jovo) : []
-            };
-        } else {
-            localRaces = { mult: [], jovo: [] };
-        }
-        renderLocalRaces();
-    });
+    // --- BIZTONSÁGOS FIREBASE FIGYELŐK BE/KI KAPCSOLÁSA ---
+    function startDatabaseListeners() {
+        if(dbListenersActive) return;
+        dbListenersActive = true;
 
-    db.ref('raceConfig').on('value', (snapshot) => {
-        if(snapshot.exists()) { raceConfig = snapshot.val(); }
+        db.ref('races').on('value', (snapshot) => {
+            if(snapshot.exists()) {
+                const data = snapshot.val();
+                localRaces = {
+                    mult: data.mult ? Object.values(data.mult) : [],
+                    jovo: data.jovo ? Object.values(data.jovo) : []
+                };
+            } else {
+                localRaces = { mult: [], jovo: [] };
+            }
+            renderLocalRaces();
+        });
+
+        db.ref('raceConfig').on('value', (snapshot) => {
+            if(snapshot.exists()) { raceConfig = snapshot.val(); }
+            renderKiiras();
+        });
+
+        db.ref('competitors').on('value', (snapshot) => {
+            if(snapshot.exists()) {
+                const data = snapshot.val();
+                competitors = Object.values(data);
+            } else {
+                competitors = [];
+            }
+            updateCompetitorDisplays();
+            if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
+                const selectedBib = document.getElementById('selectCompetitor').value;
+                const activeEl = document.activeElement;
+                const isInputFocused = activeEl && activeEl.tagName === 'INPUT' && document.getElementById('verseny').contains(activeEl);
+                if (selectedBib && !isInputFocused) { loadCompetitorData(); }
+            }
+        });
+    }
+
+    function stopDatabaseListeners() {
+        if(!dbListenersActive) return;
+        db.ref('races').off();
+        db.ref('raceConfig').off();
+        db.ref('competitors').off();
+        dbListenersActive = false;
+        
+        // Memória törlése
+        localRaces = { mult: [], jovo: [] };
+        raceConfig = getEmptyRaceConfig();
+        competitors = [];
+        renderLocalRaces();
         renderKiiras();
-    });
-
-    db.ref('competitors').on('value', (snapshot) => {
-        if(snapshot.exists()) {
-            const data = snapshot.val();
-            competitors = Object.values(data);
-        } else {
-            competitors = [];
-        }
         updateCompetitorDisplays();
-        if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
-        if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
-            const selectedBib = document.getElementById('selectCompetitor').value;
-            const activeEl = document.activeElement;
-            const isInputFocused = activeEl && activeEl.tagName === 'INPUT' && document.getElementById('verseny').contains(activeEl);
-            if (selectedBib && !isInputFocused) { loadCompetitorData(); }
+    }
+
+
+    // --- AUTENTIKÁCIÓ ÉS JOGOSULTSÁGOK ---
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            // Felhasználó belépett, lekérjük a szerepkörét
+            db.ref('users/' + user.uid + '/role').once('value').then((snapshot) => {
+                const role = snapshot.val() || 'guest';
+                applyAuthUI(true, role);
+                startDatabaseListeners();
+            }).catch(e => {
+                console.error("Nem sikerült lekérni a szerepkört!", e);
+                applyAuthUI(true, 'guest');
+            });
+        } else {
+            // Nincs belépve
+            applyAuthUI(false, null);
+            stopDatabaseListeners();
         }
     });
 
-    // --- AUTENTIKÁCIÓ ÉS MENÜK ---
-    function applyAuthUI() {
-        if (isAdmin) {
-            document.body.classList.add('is-admin');
+    function applyAuthUI(isLoggedIn, role) {
+        // Törlünk minden korábbi jogosultság osztályt
+        document.body.classList.remove('role-admin', 'role-doctor', 'role-checkin', 'role-judge', 'role-printer');
+        
+        if (isLoggedIn) {
+            document.body.classList.add('role-' + role);
             document.getElementById('login-section').style.display = 'none';
+            document.getElementById('logout-section').style.display = 'flex';
+            document.getElementById('logged-in-role-text').innerText = "✅ " + role.toUpperCase() + " mód aktív";
         } else {
-            document.body.classList.remove('is-admin');
             document.getElementById('login-section').style.display = 'block';
+            document.getElementById('logout-section').style.display = 'none';
         }
-        document.getElementById('admin-menu').style.display = isAdmin ? 'flex' : 'none';
-        document.getElementById('logout-section').style.display = isAdmin ? 'flex' : 'none';
-        renderLocalRaces();
     }
 
     function doLogin() {
-        const u = document.getElementById('loginUser').value;
+        const u = document.getElementById('loginUser').value.trim();
         const p = document.getElementById('loginPass').value;
-        if (u === 'admin' && p === 'endurance.admin') {
-            isAdmin = true;
-            localStorage.setItem('isAdmin', 'true');
-            applyAuthUI();
-            switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
-        } else {
-            const err = document.getElementById('loginError');
-            err.style.display = 'block';
-            setTimeout(() => { err.style.display = 'none'; }, 3000);
-            document.getElementById('loginPass').value = '';
-        }
+        const err = document.getElementById('loginError');
+        
+        // Hozzácsapjuk a fiktív email végződést a Firebase Auth miatt
+        const fullEmail = u + "@verseny.hu";
+
+        auth.signInWithEmailAndPassword(fullEmail, p)
+            .then((userCredential) => {
+                err.style.display = 'none';
+                document.getElementById('loginPass').value = '';
+                switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
+            })
+            .catch((error) => {
+                err.style.display = 'block';
+                setTimeout(() => { err.style.display = 'none'; }, 3000);
+                document.getElementById('loginPass').value = '';
+            });
     }
 
     function doLogout() {
-        isAdmin = false;
-        localStorage.removeItem('isAdmin');
-        applyAuthUI();
-        document.getElementById('loginUser').value = '';
-        document.getElementById('loginPass').value = '';
-        switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
+        auth.signOut().then(() => {
+            document.getElementById('loginUser').value = '';
+            switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
+        });
     }
 
     function toggleMenu() {
@@ -655,6 +721,12 @@
         const jovoCont = document.getElementById('v-jovo-list');
         if(!multCont || !jovoCont) return;
 
+        if(!dbListenersActive) {
+            multCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div>';
+            jovoCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Lépj be az adatok megtekintéséhez!</div>';
+            return;
+        }
+
         multCont.innerHTML = localRaces.mult.length > 0 ? '' : '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs még múltbéli verseny rögzítve.</div>';
         jovoCont.innerHTML = localRaces.jovo.length > 0 ? '' : '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs még jövőbeli verseny rögzítve.</div>';
 
@@ -663,7 +735,7 @@
             <div class="race-card" style="border-left-color: #666;">
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="alert('Verseny eredményeinek betöltése (Hamarosan...)')">Eredmények megtekintése</button>
+                <button class="calc-btn admin-only" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="alert('Verseny eredményeinek betöltése (Hamarosan...)')">Eredmények megtekintése</button>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
                     <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Adatok szerkesztése</button>
                     <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('mult', '${r.id}')">Törlés</button>
@@ -695,7 +767,6 @@
             document.getElementById('rm-tab-bar').style.display = 'flex'; 
             
             if(!id) {
-                // Új verseny esetén a többi fül rejtve marad a mentésig
                 document.getElementById('rm-tab-btn-kiiras').style.display = 'none';
                 document.getElementById('rm-tab-btn-versenyzok').style.display = 'none';
                 document.getElementById('rm-tab-btn-verseny').style.display = 'none';
@@ -756,7 +827,6 @@
             if (type === 'mult') {
                 document.getElementById('rm-id').value = id;
                 modalRaceId = id;
-                // Feloldjuk a többi fület
                 document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
                 document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
                 document.getElementById('rm-tab-btn-verseny').style.display = 'block';
@@ -914,7 +984,7 @@
                 <div style="flex:1;" onclick="switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny')); document.getElementById('rm-selectCompetitor').value='${c.bib}'; loadRmCompetitorData();">
                     <span class="competitor-bib">#${c.bib}</span>${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
-                <button class="edit-btn" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
+                <button class="edit-btn admin-only" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
             </div>`;
             sel.innerHTML += `<option value="${c.bib}">#${c.bib} - ${c.name}</option>`;
         });
@@ -1150,7 +1220,7 @@
                 <div style="flex:1;" onclick="switchSubMode('verseny', document.getElementById('btn-verseny')); document.getElementById('selectCompetitor').value='${c.bib}'; loadCompetitorData();">
                     <span class="competitor-bib">#${c.bib}</span>${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
-                <button class="edit-btn" onclick="editCompetitor('${c.bib}')">Módosítás</button>
+                <button class="edit-btn admin-only" onclick="editCompetitor('${c.bib}')">Módosítás</button>
             </div>`;
             sel.innerHTML += `<option value="${c.bib}">#${c.bib} - ${c.name}</option>`;
         });
@@ -1591,10 +1661,8 @@
     }
 
     window.onload = function() {
-        isAdmin = localStorage.getItem('isAdmin') === 'true';
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
         autoSetLaps('lapCountT', 'totalDistT', 'lapInputsContainerT', 't');
-        applyAuthUI();
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
     };
 </script>
