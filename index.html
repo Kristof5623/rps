@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v57 - ÉLES PUBLIKUS NÉZET ÉS SLUG</title>
+    <title>Verseny Kalkulátor v58 - PRÉMIUM VENDÉG ÉS TOAST NOTIFICATIONS</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -32,19 +32,8 @@
         /* --- JOGOSULTSÁG ALAPÚ ELREJTÉS --- */
         .admin-only, .doctor-only, .checkin-only, .judge-only, .printer-only { display: none !important; }
         
-        /* Admin mindent lát */
-        .role-admin .admin-only,
-        .role-admin .doctor-only,
-        .role-admin .checkin-only,
-        .role-admin .judge-only,
-        .role-admin .printer-only { display: block !important; } 
-        /* Flex kivételek */
-        .role-admin #admin-menu,
-        .role-admin #logout-section,
-        .role-judge #admin-menu,
-        .role-judge #logout-section { display: flex !important; }
-
-        /* Egyedi jogosultságok */
+        .role-admin .admin-only, .role-admin .doctor-only, .role-admin .checkin-only, .role-admin .judge-only, .role-admin .printer-only { display: block !important; } 
+        .role-admin #admin-menu, .role-admin #logout-section, .role-judge #admin-menu, .role-judge #logout-section { display: flex !important; }
         .role-doctor .doctor-only { display: block !important; }
         .role-checkin .checkin-only { display: block !important; }
         .role-judge .judge-only { display: block !important; }
@@ -77,8 +66,7 @@
         .mode-content.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        input[type="number"]::-webkit-outer-spin-button,
-        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; min-width: 0; }
 
         label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
@@ -90,7 +78,7 @@
         button.add-btn { background: var(--primary); color: white; }
         
         .edit-btn { background: #444; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
-        .edit-btn:hover { background: var(--primary); }
+        .edit-btn:hover { background: var(--primary); color: white !important; }
         .cancel-btn { background: #444; color: white; padding: 15px; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 10px; width: 100%; text-transform: uppercase; display: none; }
 
         .race-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
@@ -116,6 +104,9 @@
         .confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; padding: 15px; }
         .confirm-box { background: #1c1c1e; padding: 25px; border-radius: 12px; border: 1px solid #444; width: 100%; max-width: 350px; text-align: center; }
 
+        /* TOAST NOTIFICATION STÍLUS */
+        #toastMessage { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: bold; z-index: 9999; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; font-size: 0.95rem; }
+
         .table-responsive { overflow-x: auto; margin-top: 20px; width: 100%; }
         .ttrack-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
         .ttrack-table th, .ttrack-table td { border: 1px solid #444; padding: 10px 6px; white-space: nowrap; }
@@ -127,7 +118,7 @@
         .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
         .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; width: 100%; }
         .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
-        .stat-box.large { font-size: 1.1rem; padding: 8px 20px; }
+        .stat-box.large { font-size: 1.1rem; padding: 8px 20px; display: flex; flex-direction: row; align-items: center;}
         .stat-box.small { font-size: 0.75rem; }
         .stat-val { font-size: 1rem; font-weight: 900; margin-top:2px; }
         .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-wrap: wrap;}
@@ -147,11 +138,10 @@
         
         .adatlap-right { position: absolute; right: 15px; top: 15px; }
         .adatlap-arrow { color: #555; font-size: 1.2rem; }
-
         .adatlap-badges { position: absolute; bottom: 0; right: 0; display: flex; flex-direction: row; }
         .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-top-left-radius: 8px; }
         .adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; }
-        .adatlap-live-status { padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; color: white; margin-left: auto; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .adatlap-live-status { padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; margin-left: auto; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -178,14 +168,24 @@
 </head>
 <body>
 
+<div id="toastMessage">Sikeres művelet!</div>
+
 <div id="customConfirm" class="confirm-modal">
     <div class="confirm-box">
-        <h3 id="confirmTitle" style="margin-top:0; color:white;">Biztosan törlöd?</h3>
+        <h3 id="confirmTitle" style="margin-top:0; color:white;">Biztosan?</h3>
         <p id="confirmDesc" style="color:var(--text-dim); margin-bottom:20px;">Ez a művelet nem vonható vissza!</p>
         <div style="display:flex; gap:10px; justify-content:center;">
             <button class="calc-btn" style="background:#444; color:white; margin-top:0;" onclick="closeConfirm()">Mégse</button>
             <button class="calc-btn" id="confirmOkBtn" style="background:var(--danger); color:white; margin-top:0;">Igen, mehet</button>
         </div>
+    </div>
+</div>
+
+<div id="infoModal" class="modal" onclick="if(event.target==this) this.style.display='none'">
+    <div class="modal-content" style="max-width: 450px; text-align:center;">
+        <h3 id="infoModalTitle" style="color:var(--primary); margin-top:0;"></h3>
+        <div id="infoModalBody" style="margin-top:15px; color:var(--text-dim); line-height: 1.6; font-size: 0.95rem; text-align: left;"></div>
+        <button class="calc-btn" style="background:#444; color:white;" onclick="document.getElementById('infoModal').style.display='none'">Bezárás</button>
     </div>
 </div>
 
@@ -293,7 +293,7 @@
                 
                 <button id="addCompBtn" class="calc-btn add-btn admin-only" onclick="saveCompetitor()">Hozzáadás</button>
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
-                <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
+                <button id="deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
                 <div id="competitorList"></div>
@@ -364,6 +364,16 @@
     </div>
 </div>
 
+<div id="pastRaceModal" class="modal" style="background:var(--bg);">
+    <div class="modal-content" style="max-width: 600px; height: 100vh; max-height:100vh; border-radius:0; border:none; padding:20px; display:flex; flex-direction:column; overflow-y:auto; background:var(--bg);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 id="pastRaceModalTitle" style="color:var(--primary); margin:0; font-size:1.3rem;">Eredmények</h2>
+            <span style="font-size:2.5rem; cursor:pointer; color:var(--text-dim); line-height: 1;" onclick="closePastRaceModal()">&times;</span>
+        </div>
+        <div id="pastRaceAdatlapList" style="flex:1;"></div>
+    </div>
+</div>
+
 <div id="raceModal" class="modal" onclick="if(event.target==this) closeRaceModal()">
     <div class="modal-content" style="max-height: 85vh;">
         <span class="close-btn" onclick="closeRaceModal()">&times;</span>
@@ -416,7 +426,7 @@
             </select>
             <button id="rm-addCompBtn" class="calc-btn add-btn admin-only" onclick="saveRmCompetitor()">Hozzáadás</button>
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
-            <button id="rm-deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
+            <button id="rm-deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
 
             <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
             <div id="rm-competitorList"></div>
@@ -458,6 +468,7 @@
             <button class="calc-btn admin-only" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés</button>
             <div id="rm-res2" style="display:none"></div>
         </div>
+
     </div>
 </div>
 
@@ -493,7 +504,9 @@
     const CALC_LIMIT = 15.99;
     let currentAdatlapFilter = null; 
     let dbListenersActive = false; 
-    let viewingPastRaceId = null; // ÚJ: Nyomon követi, ha egy vendég a múltbéli eredményeket nézi
+    
+    let viewingPastRaceData = null; 
+    let pastAdatlapFilter = null; 
     
     // FŐ ÉLŐ VERSENY ADATOK
     let liveRaceMeta = null;
@@ -556,6 +569,15 @@
         return str || Date.now().toString();
     }
 
+    // --- TOAST NOTIFICATIONS ---
+    function showToast(msg, isError = false) {
+        const t = document.getElementById('toastMessage');
+        t.innerText = msg;
+        t.style.background = isError ? 'var(--danger)' : 'var(--success)';
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
     // --- SAJÁT CONFIRM (TÖRLÉS/MIGRÁLÁS MEGERŐSÍTŐ) ---
     let confirmCallback = null;
     function showConfirm(title, msg, callback) {
@@ -585,8 +607,8 @@
                     updates['races/' + toType + '/' + id] = sourceRace;
                     updates['races/' + fromType + '/' + id] = null;
                     db.ref('/').update(updates).then(() => {
-                        alert("✅ Verseny sikeresen áthelyezve!");
-                    }).catch(e => alert("Hiba az áthelyezéskor: " + e.message));
+                        showToast("Verseny sikeresen áthelyezve!");
+                    }).catch(e => showToast("Hiba az áthelyezéskor: " + e.message, true));
                 }
             });
         });
@@ -616,9 +638,9 @@
                 }
                 
                 db.ref('/').update(updates).then(() => { 
-                    alert("🚀 Verseny sikeresen ÉLŐ-be mozgatva!");
+                    showToast("🚀 Verseny sikeresen ÉLŐ-be mozgatva!");
                     switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
-                }).catch(e => alert("Hiba a mozgatáskor: " + e.message));
+                }).catch(e => showToast("Hiba a mozgatáskor: " + e.message, true));
             });
         });
     }
@@ -643,9 +665,9 @@
                 updates['competitors'] = null;
                 
                 db.ref('/').update(updates).then(() => { 
-                    alert("✅ Verseny sikeresen lezárva és átmozgatva a Múltba!"); 
+                    showToast("Verseny sikeresen lezárva és átmozgatva a Múltba!"); 
                     switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
-                }).catch(e => alert("Hiba a lezáráskor: " + e.message));
+                }).catch(e => showToast("Hiba a lezáráskor: " + e.message, true));
             });
         });
     }
@@ -713,16 +735,16 @@
                 localRaces = { mult: [], jovo: [] };
             }
             renderLocalRaces();
-            // Ha épp egy múltbéli versenyt néz a vendég, és frissül az adatbázis
-            if (viewingPastRaceId && document.getElementById('adatlapok').classList.contains('active')) {
-                renderAdatlapList();
+            if (viewingPastRaceData && document.getElementById('pastRaceModal').style.display === 'flex') {
+                const updatedRace = localRaces.mult.find(x => x.id === viewingPastRaceData.id);
+                if(updatedRace) { viewingPastRaceData = updatedRace; renderPastAdatlapList(); }
             }
         });
 
         db.ref('raceConfig').on('value', (snapshot) => {
             raceConfig = mergeRaceConfig(snapshot.val());
             renderKiiras();
-            if (!viewingPastRaceId && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            if (document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
         });
 
         db.ref('competitors').on('value', (snapshot) => {
@@ -734,7 +756,7 @@
             }
             updateCompetitorDisplays();
             
-            if(!viewingPastRaceId && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            if(document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
             
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
                 const selectedBib = document.getElementById('selectCompetitor').value;
@@ -811,9 +833,6 @@
     }
 
     function switchSidebarMode(targetId, btn) {
-        if(btn && btn.id === 'btn-menu-adatlapok') {
-            viewingPastRaceId = null; // Menüből kattintva mindig az ÉLŐ-t hozza be
-        }
         document.querySelectorAll('.mode-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
@@ -837,6 +856,45 @@
         document.querySelectorAll('#versenyek .tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).style.display = 'block';
         if(btn) btn.classList.add('active');
+    }
+
+    // --- INFÓ MODAL (Körök / Részletek) ---
+    function showCatInfo(dist, isPast = false) {
+        const config = isPast ? mergeRaceConfig(viewingPastRaceData.raceConfig) : raceConfig;
+        const baseDist = dist.replace('j', '');
+        const catConf = config[baseDist];
+        if(!catConf) return;
+        
+        document.getElementById('infoModalTitle').innerText = catNames[dist] + " Információk";
+        let html = `<strong>Kategória rajtja:</strong><br><span style="font-size:1.5rem; color:white; font-family:monospace;">${toTimeStr(toSec(catConf.h, catConf.m, catConf.s))}</span><br><br><strong>Körök távolságai:</strong><br><div style="display:inline-block; text-align:left; margin-top:5px;">`;
+        if(catConf.laps && catConf.laps.length > 0) {
+            catConf.laps.forEach((l, i) => { html += `<b>${i+1}. kör:</b> &nbsp;&nbsp;${l || '0'} km<br>`; });
+        } else {
+            html += `Nincsenek körök beállítva.`;
+        }
+        html += `</div>`;
+        document.getElementById('infoModalBody').innerHTML = html;
+        document.getElementById('infoModal').style.display = 'flex';
+    }
+
+    function showFutureInfo(id) {
+        const r = localRaces.jovo.find(x => x.id === id);
+        if(!r) return;
+        document.getElementById('infoModalTitle').innerText = r.name;
+        let html = `<strong>Dátum:</strong> <span style="color:white;">${r.date}</span><br><strong>Helyszín:</strong> <span style="color:white;">${r.loc}</span><br><br><strong>Leírás:</strong><br><span style="color:white;">${r.desc || 'Nincs leírás megadva.'}</span><br><br><strong>Kategóriák és Rajtidők:</strong><br><div style="text-align:left; display:inline-block; margin-top:5px;">`;
+        
+        const cfg = mergeRaceConfig(r.raceConfig);
+        let hasCats = false;
+        ["100", "80", "60", "40", "20"].forEach(d => {
+            if(cfg[d] && cfg[d].h !== "") {
+                html += `• ${catNames[d]}: <b style="color:white;">${toTimeStr(toSec(cfg[d].h, cfg[d].m, cfg[d].s))}</b> <small>(${(cfg[d].laps||[]).length} kör)</small><br>`;
+                hasCats = true;
+            }
+        });
+        if(!hasCats) html += `<span style="color:var(--danger)">Még nincsenek távok kiírva.</span>`;
+        html += `</div>`;
+        document.getElementById('infoModalBody').innerHTML = html;
+        document.getElementById('infoModal').style.display = 'flex';
     }
 
     // --- LISTÁK (Múlt / Jövő / Jelenlegi) ---
@@ -883,6 +941,7 @@
             <div class="race-card" style="border-left-color: var(--warning);">
                 <div class="race-card-title">${r.name}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
+                <button class="calc-btn" style="padding:10px; margin-top:10px; background: var(--teal); color: white;" onclick="showFutureInfo('${r.id}')">ℹ️ Részletek megtekintése</button>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
                     <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Szerkesztés</button>
                     <button class="edit-btn" style="background:var(--success); color:black;" onclick="forceMoveToLive('jovo', '${r.id}')">▶️ Élesítés (ÉLŐ)</button>
@@ -892,34 +951,108 @@
         });
     }
     
-    // ÚJ FUNKCIÓ: VENDÉG NÉZET MÚLTBÉLI VERSENYHEZ
+    // --- VENDÉG NÉZET MÚLTBÉLI VERSENYEKHEZ ---
     function openPublicPastRace(id) {
-        viewingPastRaceId = id;
-        currentAdatlapFilter = null; // Filter törlése
-        switchSidebarMode('adatlapok', document.getElementById('btn-menu-adatlapok'));
-        // (A renderAdatlapList majd megoldja a címet és az adatok betöltését)
+        const r = localRaces.mult.find(x => x.id === id);
+        if(!r) return;
+        viewingPastRaceData = r;
+        pastAdatlapFilter = null;
+        document.getElementById('pastRaceModalTitle').innerText = r.name + " - Eredmények";
+        document.getElementById('pastRaceModal').style.display = 'flex';
+        renderPastAdatlapList();
     }
 
-    // ADATLAP CONTEXT HELPER (Hogy tudja a kód, épp az ÉLŐT vagy egy MÚLTBÉLIT kell-e mutatni)
-    function getAdatlapContext() {
-        if (viewingPastRaceId) {
-            let pastRace = localRaces.mult.find(r => r.id === viewingPastRaceId);
-            if (pastRace) {
-                return {
-                    comps: pastRace.competitors ? Object.values(pastRace.competitors) : [],
-                    config: mergeRaceConfig(pastRace.raceConfig),
-                    name: pastRace.name
-                };
-            }
-        }
-        return { comps: competitors, config: raceConfig, name: liveRaceMeta ? liveRaceMeta.name : 'ÉLŐ' };
+    function closePastRaceModal() {
+        document.getElementById('pastRaceModal').style.display = 'none';
+        viewingPastRaceData = null;
     }
+
+    function setPastAdatlapFilter(cat) { pastAdatlapFilter = cat; renderPastAdatlapList(); }
+
+    function renderPastAdatlapList() {
+        const cont = document.getElementById('pastRaceAdatlapList');
+        if(!viewingPastRaceData) return;
+        const comps = viewingPastRaceData.competitors ? Object.values(viewingPastRaceData.competitors) : [];
+        const config = mergeRaceConfig(viewingPastRaceData.raceConfig);
+        let activeCats = getActiveCategories(comps, config);
+
+        if (!pastAdatlapFilter || pastAdatlapFilter === 'all') {
+            let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
+            if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Nincsenek adatok ebben a versenyben.</p>`; } 
+            else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setPastAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
+            cont.innerHTML = html + `</div>`;
+        } else {
+            let catComps = comps.filter(c => c.dist === pastAdatlapFilter);
+            let total = catComps.length;
+            let elim = catComps.filter(c => c.isEliminated).length;
+            let qual = 0;
+            catComps.forEach(c => {
+                if (c.isEliminated) return;
+                let baseDist = c.dist.replace('j', '');
+                let expectedLaps = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 3;
+                let completed = (c.laps || []).filter(l => l.isComplete).length;
+                if (completed >= expectedLaps) qual++;
+            });
+
+            let elimPct = total > 0 ? ((elim/total)*100).toFixed(1) : 0;
+            let qualPct = total > 0 ? ((qual/total)*100).toFixed(1) : 0;
+
+            let html = `
+                <div class="stats-header-container">
+                    <div class="stats-top-row">
+                        <div class="stat-box large">${catNames[pastAdatlapFilter]} <span style="cursor:pointer; margin-left:8px;" onclick="showCatInfo('${pastAdatlapFilter}', true)">ℹ️</span></div>
+                        <div class="stat-box small">Qualified:<span class="stat-val">${qual} (${qualPct}%)</span></div>
+                        <div class="stat-box small">Eliminated:<span class="stat-val">${elim} (${elimPct}%)</span></div>
+                    </div>
+                    <div class="stats-ctrl-row">
+                        <button class="stat-btn" onclick="setPastAdatlapFilter(null)">⮜ Vissza a kategóriákhoz</button>
+                    </div>
+                </div>
+                <div id="pastAdatlapItemsContainer"></div>
+            `;
+            cont.innerHTML = html;
+            
+            const itemsCont = document.getElementById('pastAdatlapItemsContainer');
+            let ranksInfo = calculateCurrentRanks(comps, config);
+
+            catComps.sort((a,b) => {
+                if (a.isEliminated && !b.isEliminated) return 1;
+                if (!a.isEliminated && b.isEliminated) return -1;
+                if (!a.isEliminated && !b.isEliminated) { return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999); }
+                return parseInt(a.bib) - parseInt(b.bib);
+            });
+
+            catComps.forEach(c => {
+                let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
+                let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; let rankDisplay = rankStr === "Kiesett" ? "Kiesett" : rankStr + "º";
+                let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by ${info.gapStr}</div>` : '';
+                let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
+                if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
+                let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
+                
+                let statusObj = getCompLiveStatus(c, config);
+                let liveStatusHtml = `<span class="adatlap-live-status" style="background:${statusObj.color}; color:${statusObj.textCol||'#fff'};">${statusObj.text}</span>`;
+
+                itemsCont.innerHTML += `
+                <div class="adatlap-card" onclick="openAdatlap('${c.bib}', true)">
+                    <div class="adatlap-rank ${rankClass}">${rankDisplay}</div>
+                    <div class="adatlap-info">
+                        <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span><span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
+                        <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
+                    </div>
+                    <div class="adatlap-right"><div class="adatlap-arrow">❯</div></div>
+                    <div class="adatlap-badges">${gapHtml}${speedHtml}</div>
+                </div>`;
+            });
+        }
+    }
+
 
     // --- MODAL (Új / Múlt / Jövő) Logika ---
     function openRaceModal(type, id = null) {
         document.getElementById('rm-id').value = id || '';
         document.getElementById('rm-type').value = type;
-        modalRaceId = id; // FIX: Beállítjuk a memóriában!
+        modalRaceId = id; // Beállítjuk a memóriában!
         
         let prefixTitle = type === 'mult' ? "Múltbéli" : "Jövőbeli";
         document.getElementById('raceModalTitle').innerText = id ? `${prefixTitle} verseny szerkesztése` : `Új ${prefixTitle.toLowerCase()} verseny felvitele`;
@@ -967,19 +1100,13 @@
         const name = document.getElementById('rm-name').value;
         let id = document.getElementById('rm-id').value;
         
-        if(!name) { alert("A verseny nevének megadása kötelező!"); return; }
+        if(!name) { showToast("A verseny nevének megadása kötelező!", true); return; }
         
         // Ha még nincs ID-ja, akkor generálunk egy szép olvashatót
-        if (!id) {
-            id = generateSlug(name, document.getElementById('rm-date').value);
-        }
+        if (!id) { id = generateSlug(name, document.getElementById('rm-date').value); }
 
         const raceData = {
-            id: id,
-            name: name,
-            loc: document.getElementById('rm-loc').value,
-            date: document.getElementById('rm-date').value,
-            desc: document.getElementById('rm-desc').value
+            id: id, name: name, loc: document.getElementById('rm-loc').value, date: document.getElementById('rm-date').value, desc: document.getElementById('rm-desc').value
         };
         
         db.ref('races/' + type + '/' + id).update(raceData).then(() => {
@@ -990,7 +1117,7 @@
             document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
             attachModalFirebaseListeners(id, type);
             showAnimatedBtn('btn-rm-alap-mentes');
-        }).catch(e => alert("Hiba az alap adatok mentésekor: " + e.message));
+        }).catch(e => showToast("Hiba az adatok mentésekor: " + e.message, true));
     }
 
     function deleteRace(type, id) {
@@ -1019,7 +1146,7 @@
     // --- MODAL TARTALOM FIREBASE SZINKRON ---
     function attachModalFirebaseListeners(id, type) {
         // Leválasztjuk az előző figyelőket anélkül, hogy törölnénk a modalRaceId-t!
-        if(modalRaceId) {
+        if(modalRaceId && modalRaceId !== id) {
             const oldType = document.getElementById('rm-type').value || 'mult';
             db.ref('races/' + oldType + '/' + modalRaceId + '/raceConfig').off();
             db.ref('races/' + oldType + '/' + modalRaceId + '/competitors').off();
@@ -1097,22 +1224,22 @@
         modalRaceConfig[dist].laps[idx] = val; 
     }
     function saveRmKiiras() {
-        if(!modalRaceId) { alert("Hiba: Előbb mentsd el a verseny alapadatait!"); return; }
+        if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
         const type = document.getElementById('rm-type').value;
         db.ref('races/' + type + '/' + modalRaceId + '/raceConfig').set(modalRaceConfig).then(() => {
             showAnimatedBtn('saveRmKiirasBtn');
-        }).catch(e => alert("Hiba a mentéskor: " + e.message));
+        }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
     }
 
     // --- MODAL: VERSENYZŐ FUNKCIÓK ---
     function saveRmCompetitor() {
-        if(!modalRaceId) { alert("Hiba: Előbb mentsd el a verseny alapadatait!"); return; }
+        if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
         const type = document.getElementById('rm-type').value;
         const bib = document.getElementById('rm-regBib').value;
         const name = document.getElementById('rm-regName').value;
         const dist = document.getElementById('rm-regDist').value;
         const internal = document.getElementById('rm-regInternal').value; 
-        if (!bib || !name) { alert("Név és rajtszám kötelező!"); return; }
+        if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
         
         if (modalEditingBib && modalEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove(); }
 
@@ -1129,7 +1256,7 @@
         db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('rm-addCompBtn');
             cancelRmEdit();
-        }).catch(e => alert("Hiba a mentéskor: " + e.message));
+        }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
     }
     
     function editRmCompetitor(bib) {
@@ -1162,7 +1289,7 @@
         showConfirm("Versenyző törlése", "Biztosan törölni akarod ezt a versenyzőt ebből a listából?", () => {
             db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove().then(() => {
                 cancelRmEdit();
-            }).catch(e => alert("Hiba a törléskor: " + e.message));
+            }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
         });
     }
     
@@ -1394,7 +1521,7 @@
         const name = document.getElementById('regName').value;
         const dist = document.getElementById('regDist').value;
         const internal = document.getElementById('regInternal').value; 
-        if (!bib || !name) { alert("Név és rajtszám kötelező!"); return; }
+        if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
         
         if (editingBib && editingBib !== bib) { db.ref('competitors/' + editingBib).remove(); }
 
@@ -1411,7 +1538,7 @@
         db.ref('competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('addCompBtn');
             cancelEdit();
-        }).catch(e => alert("Hiba a mentéskor: " + e.message));
+        }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
     }
 
     function deleteCompetitor() {
@@ -1419,7 +1546,7 @@
         showConfirm("Élő versenyző törlése", "Biztosan törölni szeretnéd az élő versenyből?", () => {
             db.ref('competitors/' + editingBib).remove().then(() => {
                 cancelEdit();
-            }).catch(e => alert("Hiba a törléskor: " + e.message));
+            }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
         });
     }
 
@@ -1679,8 +1806,19 @@
     }, 1000);
 
     // --- ADATLAPOK, RANGSOROLÁS ÉS ÁLLAPOTKÖVETÉS ---
+    function getAdatlapContext() {
+        if (viewingPastRaceData) {
+            return {
+                comps: viewingPastRaceData.competitors ? Object.values(viewingPastRaceData.competitors) : [],
+                config: mergeRaceConfig(viewingPastRaceData.raceConfig),
+                name: viewingPastRaceData.name
+            };
+        }
+        return { comps: competitors, config: raceConfig, name: liveRaceMeta ? liveRaceMeta.name : 'ÉLŐ' };
+    }
+
     function getCompLiveStatus(c, config) {
-        if (c.isEliminated) return { text: "Kiesett", color: "var(--danger)" };
+        if (c.isEliminated) return { text: "Kiesett", color: "var(--danger)", textCol: "#fff" };
         
         let baseDist = c.dist ? c.dist.replace('j', '') : '20';
         let expected = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 1;
@@ -1689,25 +1827,25 @@
         let validLaps = laps.filter(l => l.arrSec > 0);
         let completed = validLaps.length;
         
-        if (completed === 0) return { text: "Körön van", color: "var(--primary)" };
+        if (completed === 0) return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
         
         let last = validLaps[completed - 1];
         let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
         
         if (completed >= expected) {
-            if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)" };
-            return { text: "Finished", color: "var(--success)" };
+            if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)", textCol: "#000" };
+            return { text: "Finished", color: "var(--success)", textCol: "#000" };
         }
         
         if (last.arrSec > 0 && (!last.vetSec || last.vetSec === 0)) {
-            return { text: "Megérkezett", color: "var(--warning)" };
+            return { text: "Megérkezett", color: "var(--warning)", textCol: "#000" };
         }
         
         if (last.nextStart && last.nextStart > nowSec) {
-            return { text: "Várakozik", color: "var(--warning)" };
+            return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
         }
         
-        return { text: "Körön van", color: "var(--primary)" };
+        return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
     }
 
     function calculateCurrentRanks(comps, config) {
@@ -1771,17 +1909,12 @@
         const cont = document.getElementById('adatlapList'); 
         
         let titleEl = document.getElementById('adatlapok-title');
-        titleEl.innerText = "📊 " + (viewingPastRaceId ? ctx.name + " Eredmények" : "Versenyzői Adatlapok");
+        titleEl.innerText = "📊 " + (viewingPastRaceData ? ctx.name + " Eredményei" : "Versenyzői Adatlapok");
 
         let activeCats = getActiveCategories(ctx.comps, ctx.config);
 
-        let topButtonsHtml = '';
-        if (viewingPastRaceId) {
-            topButtonsHtml = `<button class="calc-btn" style="background:#444; color:white; margin-top:0; margin-bottom:15px; font-size:0.9rem; padding:10px;" onclick="viewingPastRaceId=null; switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'))">🔙 Vissza a versenyekhez</button>`;
-        }
-
         if (!currentAdatlapFilter || currentAdatlapFilter === 'all') {
-            let html = `<div style="display:flex; flex-direction:column; gap:10px;">${topButtonsHtml}`;
+            let html = `<div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">`;
             if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Még nincs beállított kategória vagy versenyző.</p>`; } 
             else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
             cont.innerHTML = html + `</div>`;
@@ -1801,15 +1934,15 @@
             let elimPct = total > 0 ? ((elim/total)*100).toFixed(1) : 0;
             let qualPct = total > 0 ? ((qual/total)*100).toFixed(1) : 0;
 
-            cont.innerHTML = topButtonsHtml + `
+            cont.innerHTML = `
                 <div class="stats-header-container">
                     <div class="stats-top-row">
-                        <div class="stat-box large">${catNames[currentAdatlapFilter]}</div>
+                        <div class="stat-box large">${catNames[currentAdatlapFilter]} <span style="cursor:pointer; margin-left:12px; font-size:1.4rem;" onclick="showCatInfo('${currentAdatlapFilter}', ${viewingPastRaceData !== null})">ℹ️</span></div>
                         <div class="stat-box small">Qualified:<span class="stat-val">${qual} (${qualPct}%)</span></div>
                         <div class="stat-box small">Eliminated:<span class="stat-val">${elim} (${elimPct}%)</span></div>
                     </div>
                     <div class="stats-ctrl-row">
-                        <button class="stat-btn" onclick="setAdatlapFilter(null)">⮜ Back</button>
+                        <button class="stat-btn" onclick="setAdatlapFilter(null)">⮜ Kategóriák</button>
                         <button class="stat-btn" onclick="openCatSwapModal()">⇆</button>
                         <div class="clock-display" id="liveClockText">--:--:--</div>
                     </div>
@@ -1842,7 +1975,7 @@
             
             // --- ÁLLAPOTKÖVETÉS MEGJELENÍTÉSE ---
             let statusObj = getCompLiveStatus(c, ctx.config);
-            let liveStatusHtml = `<span class="adatlap-live-status" style="background:${statusObj.color};">${statusObj.text}</span>`;
+            let liveStatusHtml = `<span class="adatlap-live-status" style="background:${statusObj.color}; color:${statusObj.textCol||'#fff'};">${statusObj.text}</span>`;
 
             cont.innerHTML += `
             <div class="adatlap-card" onclick="openAdatlap('${c.bib}')">
@@ -1919,7 +2052,7 @@
 
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
-        if (savedMode === 'terv') savedMode = 'versenyek'; // Biztosíték, ha valaki ezen a menün ragadt volna
+        if (savedMode === 'terv') savedMode = 'versenyek'; 
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
     };
 </script>
