@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v54 - ÉLES AUTOMATIZÁLT (Vendég nézettel)</title>
+    <title>Verseny Kalkulátor v54 - ÉLES AUTOMATIZÁLT BIZTONSÁGOS</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -525,6 +525,29 @@
             "20":  { h:'', m:'', s:'', laps: [''] }
         };
     }
+    
+    // BIZTONSÁGI ADATMOSÓ (Ha a Firebase törli az üres elemeket, ez visszapótolja)
+    function mergeRaceConfig(dbConfig) {
+        let safeCfg = getEmptyRaceConfig();
+        if(!dbConfig) return safeCfg;
+        for(let k in safeCfg) {
+            if(dbConfig[k]) {
+                safeCfg[k].h = dbConfig[k].h || '';
+                safeCfg[k].m = dbConfig[k].m || '';
+                safeCfg[k].s = dbConfig[k].s || '';
+                if(dbConfig[k].laps && Array.isArray(dbConfig[k].laps)) {
+                    safeCfg[k].laps = [...dbConfig[k].laps];
+                } else if(dbConfig[k].laps) {
+                    safeCfg[k].laps = Object.values(dbConfig[k].laps); 
+                }
+                // Fix missing indices
+                for(let i=0; i<safeCfg[k].laps.length; i++) {
+                    if(safeCfg[k].laps[i] === undefined) safeCfg[k].laps[i] = '';
+                }
+            }
+        }
+        return safeCfg;
+    }
 
     // --- SAJÁT CONFIRM (TÖRLÉS MEGERŐSÍTŐ) ---
     let confirmCallback = null;
@@ -586,7 +609,7 @@
         });
     }
 
-    // --- BIZTONSÁGOS FIREBASE FIGYELŐK BE/KI KAPCSOLÁSA ---
+    // --- BIZTONSÁGOS FIREBASE FIGYELŐK (AZONNAL INDULNAK MINDENKINEK) ---
     function startDatabaseListeners() {
         if(dbListenersActive) return;
         dbListenersActive = true;
@@ -610,7 +633,7 @@
         });
 
         db.ref('raceConfig').on('value', (snapshot) => {
-            if(snapshot.exists()) { raceConfig = snapshot.val(); }
+            raceConfig = mergeRaceConfig(snapshot.val());
             renderKiiras();
         });
 
@@ -636,7 +659,7 @@
         });
     }
 
-    // INDÍTSUK EL AZ ADATBÁZIS OLVASÁST LÁTOGATÓKNAK IS AZONNAL!
+    // Azonnali indítás minden látogatónak!
     startDatabaseListeners();
 
     // --- AUTENTIKÁCIÓ ÉS JOGOSULTSÁGOK ---
@@ -867,12 +890,12 @@
         }
     }
 
-    // --- MODAL TARTALOM FIREBASE SZINKRON (Dinamikus útvonal) ---
+    // --- MODAL TARTALOM FIREBASE SZINKRON ---
     function attachModalFirebaseListeners(id, type) {
         detachModalFirebaseListeners(); 
         
         db.ref('races/' + type + '/' + id + '/raceConfig').on('value', snap => {
-            modalRaceConfig = snap.exists() ? snap.val() : getEmptyRaceConfig();
+            modalRaceConfig = mergeRaceConfig(snap.val());
             renderRmKiiras();
         });
         db.ref('races/' + type + '/' + id + '/competitors').on('value', snap => {
@@ -939,7 +962,10 @@
         });
     }
     function updateRmRaceConfig(dist, field, val) { modalRaceConfig[dist][field] = val; }
-    function updateRmRaceLap(dist, idx, val) { modalRaceConfig[dist].laps[idx] = val; }
+    function updateRmRaceLap(dist, idx, val) { 
+        if(!modalRaceConfig[dist].laps) modalRaceConfig[dist].laps = [];
+        modalRaceConfig[dist].laps[idx] = val; 
+    }
     function saveRmKiiras() {
         if(!modalRaceId) return;
         const type = document.getElementById('rm-type').value;
@@ -1197,7 +1223,10 @@
     }
 
     function updateRaceConfig(dist, field, val) { raceConfig[dist][field] = val; }
-    function updateRaceLap(dist, idx, val) { raceConfig[dist].laps[idx] = val; } 
+    function updateRaceLap(dist, idx, val) { 
+        if(!raceConfig[dist].laps) raceConfig[dist].laps = [];
+        raceConfig[dist].laps[idx] = val; 
+    } 
 
     function editCompetitor(bib) {
         const comp = competitors.find(c => c.bib == bib);
