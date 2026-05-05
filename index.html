@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v59 - ÉLES RAJTOLÁS ÉS OKOS ÓRA</title>
+    <title>Verseny Kalkulátor v60 - ÉLES (Javított Űrlap és Köridő)</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -245,18 +245,18 @@
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
-                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs megjeleníthető adat.</div></div>
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:none;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
-                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs megjeleníthető adat.</div></div>
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
-                <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+                <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs megjeleníthető adat.</div></div>
             </div>
         </div>
 
@@ -306,35 +306,37 @@
                     <option value="">-- Manuális bevitel --</option>
                 </select>
                 
-                <label>Versenyző státusza:</label>
-                <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
-                    <label class="switch">
-                        <input type="checkbox" id="compStatusToggle" checked onchange="updateStatusLabel('compStatusToggle', 'compStatusLabel')">
-                        <span class="slider"></span>
-                    </label>
-                    <span id="compStatusLabel" class="status-label" style="color: var(--success);">Versenyben</span>
-                </div>
+                <div id="verseny-form-container" style="display:none;">
+                    <label>Versenyző státusza:</label>
+                    <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
+                        <label class="switch">
+                            <input type="checkbox" id="compStatusToggle" checked onchange="updateStatusLabel('compStatusToggle', 'compStatusLabel')">
+                            <span class="slider"></span>
+                        </label>
+                        <span id="compStatusLabel" class="status-label" style="color: var(--success);">Versenyben</span>
+                    </div>
 
-                <label>Össztáv & Körök:</label>
-                <select id="totalDist" onchange="autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v')">
-                    <option value="20">20 km</option>
-                    <option value="40">40 km</option>
-                    <option value="60">60 km</option>
-                    <option value="80">80 km</option>
-                    <option value="80j">80 km Junior</option>
-                    <option value="100">100 km</option>
-                    <option value="100j">100 km Junior</option>
-                </select>
-                <select id="lapCount" onchange="genLaps('lapCount', 'lapInputsContainer', 'v')" style="margin-top:10px;"></select>
-                <label>Rajt ideje:</label>
-                <div class="time-group">
-                    <input type="number" id="vhR" placeholder="00" oninput="jump(this, 'vmR')"> :
-                    <input type="number" id="vmR" placeholder="00" oninput="jump(this, 'vsR')"> :
-                    <input type="number" id="vsR" placeholder="00" oninput="jump(this, 'vh1')">
+                    <label>Össztáv & Körök:</label>
+                    <select id="totalDist" onchange="autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v')">
+                        <option value="20">20 km</option>
+                        <option value="40">40 km</option>
+                        <option value="60">60 km</option>
+                        <option value="80">80 km</option>
+                        <option value="80j">80 km Junior</option>
+                        <option value="100">100 km</option>
+                        <option value="100j">100 km Junior</option>
+                    </select>
+                    <select id="lapCount" onchange="genLaps('lapCount', 'lapInputsContainer', 'v')" style="margin-top:10px;"></select>
+                    <label>Rajt ideje:</label>
+                    <div class="time-group">
+                        <input type="number" id="vhR" placeholder="00" oninput="jump(this, 'vmR')"> :
+                        <input type="number" id="vmR" placeholder="00" oninput="jump(this, 'vsR')"> :
+                        <input type="number" id="vsR" placeholder="00" oninput="jump(this, 'vh1')">
+                    </div>
+                    <div id="lapInputsContainer"></div>
+                    <button class="calc-btn admin-only" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
+                    <div id="res2" style="display:none"></div>
                 </div>
-                <div id="lapInputsContainer"></div>
-                <button class="calc-btn admin-only" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
-                <div id="res2" style="display:none"></div>
             </div>
         </div>
 
@@ -438,35 +440,38 @@
             <select id="rm-selectCompetitor" onchange="loadRmCompetitorData()" style="border-color: var(--primary);">
                 <option value="">-- Válassz a regisztráltak közül --</option>
             </select>
-            <label>Versenyző státusza:</label>
-            <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
-                <label class="switch">
-                    <input type="checkbox" id="rm-compStatusToggle" checked onchange="updateStatusLabel('rm-compStatusToggle', 'rm-compStatusLabel')">
-                    <span class="slider"></span>
-                </label>
-                <span id="rm-compStatusLabel" class="status-label" style="color: var(--success);">Versenyben</span>
-            </div>
+            
+            <div id="rm-verseny-form-container" style="display:none;">
+                <label>Versenyző státusza:</label>
+                <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
+                    <label class="switch">
+                        <input type="checkbox" id="rm-compStatusToggle" checked onchange="updateStatusLabel('rm-compStatusToggle', 'rm-compStatusLabel')">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="rm-compStatusLabel" class="status-label" style="color: var(--success);">Versenyben</span>
+                </div>
 
-            <label>Össztáv & Körök:</label>
-            <select id="rm-totalDist" onchange="autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true)">
-                <option value="20">20 km</option>
-                <option value="40">40 km</option>
-                <option value="60">60 km</option>
-                <option value="80">80 km</option>
-                <option value="80j">80 km Junior</option>
-                <option value="100">100 km</option>
-                <option value="100j">100 km Junior</option>
-            </select>
-            <select id="rm-lapCount" onchange="genLaps('rm-lapCount', 'rm-lapInputsContainer', 'rm-v')" style="margin-top:10px;"></select>
-            <label>Rajt ideje:</label>
-            <div class="time-group">
-                <input type="number" id="rm-vhR" placeholder="00" oninput="jump(this, 'rm-vmR')"> :
-                <input type="number" id="rm-vmR" placeholder="00" oninput="jump(this, 'rm-vsR')"> :
-                <input type="number" id="rm-vsR" placeholder="00" oninput="jump(this, 'rm-vh1')">
+                <label>Össztáv & Körök:</label>
+                <select id="rm-totalDist" onchange="autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true)">
+                    <option value="20">20 km</option>
+                    <option value="40">40 km</option>
+                    <option value="60">60 km</option>
+                    <option value="80">80 km</option>
+                    <option value="80j">80 km Junior</option>
+                    <option value="100">100 km</option>
+                    <option value="100j">100 km Junior</option>
+                </select>
+                <select id="rm-lapCount" onchange="genLaps('rm-lapCount', 'rm-lapInputsContainer', 'rm-v')" style="margin-top:10px;"></select>
+                <label>Rajt ideje:</label>
+                <div class="time-group">
+                    <input type="number" id="rm-vhR" placeholder="00" oninput="jump(this, 'rm-vmR')"> :
+                    <input type="number" id="rm-vmR" placeholder="00" oninput="jump(this, 'rm-vsR')"> :
+                    <input type="number" id="rm-vsR" placeholder="00" oninput="jump(this, 'rm-vh1')">
+                </div>
+                <div id="rm-lapInputsContainer"></div>
+                <button class="calc-btn admin-only" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés</button>
+                <div id="rm-res2" style="display:none"></div>
             </div>
-            <div id="rm-lapInputsContainer"></div>
-            <button class="calc-btn admin-only" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés</button>
-            <div id="rm-res2" style="display:none"></div>
         </div>
 
     </div>
@@ -539,6 +544,7 @@
         };
     }
     
+    // BIZTONSÁGI ADATMOSÓ 
     function mergeRaceConfig(dbConfig) {
         let safeCfg = getEmptyRaceConfig();
         if(!dbConfig) return safeCfg;
@@ -830,7 +836,7 @@
 
     function switchSidebarMode(targetId, btn) {
         if(btn && btn.id === 'btn-menu-adatlapok') {
-            viewingPastRaceData = null; // Menüből kattintva mindig az ÉLŐ-t hozza be
+            viewingPastRaceData = null; 
         }
         document.querySelectorAll('.mode-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
@@ -1311,11 +1317,15 @@
     // --- MODAL: TELJES VERSENY (EREDMÉNYEK) ---
     function loadRmCompetitorData() {
         const bib = document.getElementById('rm-selectCompetitor').value;
+        const formCont = document.getElementById('rm-verseny-form-container');
         if (!bib) {
-            document.querySelectorAll('#rm-verseny input').forEach(i => i.value = '');
+            formCont.style.display = 'none';
+            document.querySelectorAll('#rm-verseny-form-container input').forEach(i => i.value = '');
             document.getElementById('rm-res2').style.display = 'none';
             return;
         }
+        formCont.style.display = 'block';
+        
         const comp = modalCompetitors.find(c => c.bib == bib);
         if(!comp) return;
 
@@ -1567,11 +1577,15 @@
 
     function loadCompetitorData() {
         const bib = document.getElementById('selectCompetitor').value;
+        const formCont = document.getElementById('verseny-form-container');
         if (!bib) {
-            document.querySelectorAll('#verseny input').forEach(i => i.value = '');
+            formCont.style.display = 'none';
+            document.querySelectorAll('#verseny-form-container input').forEach(i => i.value = '');
             document.getElementById('res2').style.display = 'none';
             return;
         }
+        formCont.style.display = 'block';
+        
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
@@ -1829,7 +1843,7 @@
         live.innerHTML = html || '<div style="text-align:center; padding:20px;">Nincs várakozó.</div>';
     }, 1000);
 
-    // --- ADATLAPOK, RANGSOROLÁS ÉS ÁLLAPOTKÖVETÉS ---
+    // --- ADATLAPOK ÉS RANGSOROLÁS ---
     function getAdatlapContext() {
         if (viewingPastRaceData) {
             return {
@@ -1839,51 +1853,6 @@
             };
         }
         return { comps: competitors, config: raceConfig, name: liveRaceMeta ? liveRaceMeta.name : 'ÉLŐ' };
-    }
-
-    function getCompLiveStatus(c, config) {
-        if (c.isEliminated) return { text: "Kiesett", color: "var(--danger)", textCol: "#fff" };
-        
-        let baseDist = c.dist ? c.dist.replace('j', '') : '20';
-        let expected = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 1;
-        let laps = c.laps || [];
-        
-        let validLaps = laps.filter(l => l.arrSec > 0);
-        let completed = validLaps.length;
-        
-        let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
-        
-        if (completed === 0) {
-            let startH = c.startTime && c.startTime.h !== "" ? c.startTime.h : (config[baseDist] ? config[baseDist].h : 0);
-            let startM = c.startTime && c.startTime.m !== "" ? c.startTime.m : (config[baseDist] ? config[baseDist].m : 0);
-            let startS = c.startTime && c.startTime.s !== "" ? c.startTime.s : (config[baseDist] ? config[baseDist].s : 0);
-            let startSec = toSec(startH, startM, startS);
-            
-            let diff = startSec - nowSec;
-            if (diff < -43200) diff += 86400;
-
-            if (startSec > 0 && diff > -60) {
-                return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
-            }
-            return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
-        }
-        
-        let last = validLaps[completed - 1];
-        
-        if (completed >= expected) {
-            if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)", textCol: "#000" };
-            return { text: "Finished", color: "var(--success)", textCol: "#000" };
-        }
-        
-        if (last.arrSec > 0 && (!last.vetSec || last.vetSec === 0)) {
-            return { text: "Megérkezett", color: "var(--warning)", textCol: "#000" };
-        }
-        
-        if (last.nextStart && last.nextStart > nowSec) {
-            return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
-        }
-        
-        return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
     }
 
     function calculateCurrentRanks(comps, config) {
@@ -2011,7 +1980,6 @@
             if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
             let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
             
-            // --- ÁLLAPOTKÖVETÉS MEGJELENÍTÉSE ---
             let statusObj = getCompLiveStatus(c, ctx.config);
             let liveStatusHtml = `<span class="adatlap-live-status" style="background:${statusObj.color}; color:${statusObj.textCol||'#fff'};">${statusObj.text}</span>`;
 
@@ -2050,15 +2018,21 @@
 
         let html = `<h3>#${c.bib} ${c.name} (${catNames[c.dist]})</h3><div class="table-responsive"><table class="ttrack-table"><tr><th class="row-header">Szakasz</th>`;
         phases.forEach((_,i) => html += `<th class="col-header">${i+1}.</th>`);
+        
         html += `</tr><tr><th class="row-header">Táv (km)</th>`; phases.forEach(l => html += `<td>${l.d}</td>`);
         html += `</tr><tr><th class="row-header">Kapu beérk.</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
+        
+        // JAVÍTÁS 3: KÖR IDŐ
+        html += `</tr><tr><th class="row-header">Kör idő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.loopSec || 0)}</td>`);
+        
         html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
+        
+        // JAVÍTÁS 2: UTOLSÓ ORVOSI IDŐ LÁTHATÓSÁGA
         html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
-        phases.forEach((l, i) => {
-            let baseDist = c.dist.replace('j', '');
-            let expectedLaps = (ctx.config[baseDist] && ctx.config[baseDist].laps) ? ctx.config[baseDist].laps.length : 3;
-            if(i+1 === expectedLaps) { html += `<td>-</td>`; } else { html += `<td>${l.vetSec>0?toTimeStr(l.vetSec):"-"}</td>`; }
+        phases.forEach((l) => {
+            html += `<td>${l.vetSec>0 ? toTimeStr(l.vetSec) : "-"}</td>`;
         });
+        
         html += `</tr><tr><th class="row-header">Pulzus idő</th>`; phases.forEach(l => html += `<td>${l.pulzusSec>0?toTimeStr(l.pulzusSec):"-"}</td>`);
         html += `</tr><tr><th class="row-header">Össz. menetidő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.rideTime)}</td>`);
         html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.rideSpd>=16?'warning-speed':'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`);
