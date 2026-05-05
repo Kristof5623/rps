@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v61 - STABIL VERSENYZŐ LISTÁK</title>
+    <title>Verseny Kalkulátor v62 - BEÉPÍTETT MÚLTBÉLI NÉZET</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -181,7 +181,7 @@
     </div>
 </div>
 
-<div id="infoModal" class="modal" onclick="if(event.target==this) this.style.display='none'">
+<div id="infoModal" class="modal" style="z-index: 2500;" onclick="if(event.target==this) this.style.display='none'">
     <div class="modal-content" style="max-width: 450px; text-align:center;">
         <h3 id="infoModalTitle" style="color:var(--primary); margin-top:0;"></h3>
         <div id="infoModalBody" style="margin-top:15px; color:var(--text-dim); line-height: 1.6; font-size: 0.95rem; text-align: left;"></div>
@@ -258,6 +258,14 @@
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
                 <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
+        </div>
+
+        <div id="past-race-view" class="mode-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 id="pastRaceModalTitle" style="color:var(--primary); margin:0;">Eredmények</h3>
+                <button class="calc-btn" style="width:auto; padding:8px 15px; margin:0; background:#444; color:white;" onclick="closePastRaceModal()">Bezárás</button>
+            </div>
+            <div id="pastRaceAdatlapList"></div>
         </div>
 
         <div id="fo-mod" class="mode-content">
@@ -363,16 +371,6 @@
             <button class="calc-btn" style="background:var(--warning);" onclick="calcMinosites()">Célidő</button>
             <div id="res3" class="result-box" style="display:none"></div>
         </div>
-    </div>
-</div>
-
-<div id="pastRaceModal" class="modal" style="background:var(--bg);">
-    <div class="modal-content" style="max-width: 600px; height: 100vh; max-height:100vh; border-radius:0; border:none; padding:20px; display:flex; flex-direction:column; overflow-y:auto; background:var(--bg);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 id="pastRaceModalTitle" style="color:var(--primary); margin:0; font-size:1.3rem;">Eredmények</h2>
-            <span style="font-size:2.5rem; cursor:pointer; color:var(--text-dim); line-height: 1;" onclick="closePastRaceModal()">&times;</span>
-        </div>
-        <div id="pastRaceAdatlapList" style="flex:1;"></div>
     </div>
 </div>
 
@@ -544,13 +542,11 @@
         };
     }
 
-    // ÚJ: Biztonságos parser, ami kiszűri a fantom (null) elemeket
     function parseCompetitors(data) {
         if (!data) return [];
         return Object.values(data).filter(c => c && c.bib !== undefined);
     }
     
-    // BIZTONSÁGI ADATMOSÓ 
     function mergeRaceConfig(dbConfig) {
         let safeCfg = getEmptyRaceConfig();
         if(!dbConfig) return safeCfg;
@@ -744,7 +740,7 @@
                 localRaces = { mult: [], jovo: [] };
             }
             renderLocalRaces();
-            if (viewingPastRaceData && document.getElementById('pastRaceModal').style.display === 'flex') {
+            if (viewingPastRaceData && document.getElementById('past-race-view').classList.contains('active')) {
                 const updatedRace = localRaces.mult.find(x => x.id === viewingPastRaceData.id);
                 if(updatedRace) { viewingPastRaceData = updatedRace; renderPastAdatlapList(); }
             }
@@ -957,20 +953,20 @@
         });
     }
     
-    // --- VENDÉG NÉZET MÚLTBÉLI VERSENYEKHEZ ---
+    // --- VENDÉG NÉZET MÚLTBÉLI VERSENYEKHEZ BEÉPÍTVE ---
     function openPublicPastRace(id) {
         const r = localRaces.mult.find(x => x.id === id);
         if(!r) return;
         viewingPastRaceData = r;
         pastAdatlapFilter = null;
         document.getElementById('pastRaceModalTitle').innerText = r.name + " - Eredmények";
-        document.getElementById('pastRaceModal').style.display = 'flex';
+        switchSidebarMode('past-race-view', null);
         renderPastAdatlapList();
     }
 
     function closePastRaceModal() {
-        document.getElementById('pastRaceModal').style.display = 'none';
         viewingPastRaceData = null;
+        switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
     }
 
     function setPastAdatlapFilter(cat) { pastAdatlapFilter = cat; renderPastAdatlapList(); }
@@ -986,7 +982,7 @@
             let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
             if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Nincsenek adatok ebben a versenyben.</p>`; } 
             else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setPastAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
-            cont.innerHTML = html + `</div>`;
+            cont.innerHTML = html + `<button class="calc-btn" style="background:#444; color:white; margin-top:20px; font-size:0.9rem; padding:10px;" onclick="closePastRaceModal()">🔙 Vissza a versenyekhez</button></div>`;
         } else {
             let catComps = comps.filter(c => c.dist === pastAdatlapFilter);
             let total = catComps.length;
@@ -1040,7 +1036,7 @@
                 let liveStatusHtml = `<span class="adatlap-live-status" style="background:${statusObj.color}; color:${statusObj.textCol||'#fff'};">${statusObj.text}</span>`;
 
                 itemsCont.innerHTML += `
-                <div class="adatlap-card" onclick="openAdatlap('${c.bib}', true)">
+                <div class="adatlap-card" onclick="openAdatlap('${c.bib}')">
                     <div class="adatlap-rank ${rankClass}">${rankDisplay}</div>
                     <div class="adatlap-info">
                         <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
@@ -2069,7 +2065,6 @@
         
         html += `</tr><tr><th class="row-header">Táv (km)</th>`; phases.forEach(l => html += `<td>${l.d}</td>`);
         
-        // ÚJ: KÖR IDŐ
         html += `</tr><tr><th class="row-header">Kör idő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.loopSec || 0)}</td>`);
         
         html += `</tr><tr><th class="row-header">Kapu beérk.</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
