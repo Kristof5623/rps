@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v60 - ÉLES (Javított Űrlap és Köridő)</title>
+    <title>Verseny Kalkulátor v61 - STABIL VERSENYZŐ LISTÁK</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -245,18 +245,18 @@
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
-                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs megjeleníthető adat.</div></div>
+                <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:none;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
-                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs megjeleníthető adat.</div></div>
+                <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
-                <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs megjeleníthető adat.</div></div>
+                <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
         </div>
 
@@ -543,6 +543,12 @@
             "20":  { h:'', m:'', s:'', laps: [''] }
         };
     }
+
+    // ÚJ: Biztonságos parser, ami kiszűri a fantom (null) elemeket
+    function parseCompetitors(data) {
+        if (!data) return [];
+        return Object.values(data).filter(c => c && c.bib !== undefined);
+    }
     
     // BIZTONSÁGI ADATMOSÓ 
     function mergeRaceConfig(dbConfig) {
@@ -751,12 +757,7 @@
         });
 
         db.ref('competitors').on('value', (snapshot) => {
-            if(snapshot.exists()) {
-                const data = snapshot.val();
-                competitors = Object.values(data);
-            } else {
-                competitors = [];
-            }
+            competitors = parseCompetitors(snapshot.val());
             updateCompetitorDisplays();
             
             if(!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
@@ -977,7 +978,7 @@
     function renderPastAdatlapList() {
         const cont = document.getElementById('pastRaceAdatlapList');
         if(!viewingPastRaceData) return;
-        const comps = viewingPastRaceData.competitors ? Object.values(viewingPastRaceData.competitors) : [];
+        const comps = parseCompetitors(viewingPastRaceData.competitors);
         const config = mergeRaceConfig(viewingPastRaceData.raceConfig);
         let activeCats = getActiveCategories(comps, config);
 
@@ -1042,7 +1043,7 @@
                 <div class="adatlap-card" onclick="openAdatlap('${c.bib}', true)">
                     <div class="adatlap-rank ${rankClass}">${rankDisplay}</div>
                     <div class="adatlap-info">
-                        <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span><span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
+                        <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
                         <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                     </div>
                     <div class="adatlap-right"><div class="adatlap-arrow">❯</div></div>
@@ -1160,7 +1161,7 @@
             renderRmKiiras();
         });
         db.ref('races/' + type + '/' + id + '/competitors').on('value', snap => {
-            modalCompetitors = snap.exists() ? Object.values(snap.val()) : [];
+            modalCompetitors = parseCompetitors(snap.val());
             updateRmCompetitorDisplays();
             const selectedBib = document.getElementById('rm-selectCompetitor').value;
             const activeEl = document.activeElement;
@@ -1305,7 +1306,7 @@
         modalCompetitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             list.innerHTML += `<div class="competitor-item">
                 <div style="flex:1;" onclick="switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny')); document.getElementById('rm-selectCompetitor').value='${c.bib}'; loadRmCompetitorData();">
-                    <span class="competitor-bib">#${c.bib}</span>${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
+                    <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
                 <button class="edit-btn admin-only" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
             </div>`;
@@ -1410,6 +1411,7 @@
 
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i}. KÖR</span>
+                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(lapData.loopSec)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(loopTime)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${lapData.loopSpd.toFixed(2)} km/h</b></div>
                 ${vet > 0 ? `
@@ -1566,7 +1568,7 @@
         competitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             list.innerHTML += `<div class="competitor-item">
                 <div style="flex:1;" onclick="switchSubMode('verseny', document.getElementById('btn-verseny')); document.getElementById('selectCompetitor').value='${c.bib}'; loadCompetitorData();">
-                    <span class="competitor-bib">#${c.bib}</span>${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
+                    <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
                 <button class="edit-btn admin-only" onclick="editCompetitor('${c.bib}')">Módosítás</button>
             </div>`;
@@ -1670,6 +1672,7 @@
 
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i}. KÖR</span>
+                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(lapData.loopSec)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(loopTime)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${lapData.loopSpd.toFixed(2)} km/h</b></div>
                 ${vet > 0 ? `
@@ -1843,16 +1846,61 @@
         live.innerHTML = html || '<div style="text-align:center; padding:20px;">Nincs várakozó.</div>';
     }, 1000);
 
-    // --- ADATLAPOK ÉS RANGSOROLÁS ---
+    // --- ADATLAPOK, RANGSOROLÁS ÉS ÁLLAPOTKÖVETÉS ---
     function getAdatlapContext() {
         if (viewingPastRaceData) {
             return {
-                comps: viewingPastRaceData.competitors ? Object.values(viewingPastRaceData.competitors) : [],
+                comps: viewingPastRaceData.competitors ? parseCompetitors(viewingPastRaceData.competitors) : [],
                 config: mergeRaceConfig(viewingPastRaceData.raceConfig),
                 name: viewingPastRaceData.name
             };
         }
         return { comps: competitors, config: raceConfig, name: liveRaceMeta ? liveRaceMeta.name : 'ÉLŐ' };
+    }
+
+    function getCompLiveStatus(c, config) {
+        if (c.isEliminated) return { text: "Kiesett", color: "var(--danger)", textCol: "#fff" };
+        
+        let baseDist = c.dist ? c.dist.replace('j', '') : '20';
+        let expected = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 1;
+        let laps = c.laps || [];
+        
+        let validLaps = laps.filter(l => l.arrSec > 0);
+        let completed = validLaps.length;
+        
+        let nowSec = new Date().getHours()*3600 + new Date().getMinutes()*60 + new Date().getSeconds();
+        
+        if (completed === 0) {
+            let startH = c.startTime && c.startTime.h !== "" ? c.startTime.h : (config[baseDist] ? config[baseDist].h : 0);
+            let startM = c.startTime && c.startTime.m !== "" ? c.startTime.m : (config[baseDist] ? config[baseDist].m : 0);
+            let startS = c.startTime && c.startTime.s !== "" ? c.startTime.s : (config[baseDist] ? config[baseDist].s : 0);
+            let startSec = toSec(startH, startM, startS);
+            
+            let diff = startSec - nowSec;
+            if (diff < -43200) diff += 86400;
+
+            if (startSec > 0 && diff > -60) {
+                return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
+            }
+            return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
+        }
+        
+        let last = validLaps[completed - 1];
+        
+        if (completed >= expected) {
+            if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)", textCol: "#000" };
+            return { text: "Finished", color: "var(--success)", textCol: "#000" };
+        }
+        
+        if (last.arrSec > 0 && (!last.vetSec || last.vetSec === 0)) {
+            return { text: "Megérkezett", color: "var(--warning)", textCol: "#000" };
+        }
+        
+        if (last.nextStart && last.nextStart > nowSec) {
+            return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
+        }
+        
+        return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
     }
 
     function calculateCurrentRanks(comps, config) {
@@ -1987,7 +2035,7 @@
             <div class="adatlap-card" onclick="openAdatlap('${c.bib}')">
                 <div class="adatlap-rank ${rankClass}">${rankDisplay}</div>
                 <div class="adatlap-info">
-                    <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span><span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
+                    <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
                     <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                 </div>
                 <div class="adatlap-right"><div class="adatlap-arrow">❯</div></div>
@@ -2020,14 +2068,13 @@
         phases.forEach((_,i) => html += `<th class="col-header">${i+1}.</th>`);
         
         html += `</tr><tr><th class="row-header">Táv (km)</th>`; phases.forEach(l => html += `<td>${l.d}</td>`);
-        html += `</tr><tr><th class="row-header">Kapu beérk.</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
         
-        // JAVÍTÁS 3: KÖR IDŐ
+        // ÚJ: KÖR IDŐ
         html += `</tr><tr><th class="row-header">Kör idő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.loopSec || 0)}</td>`);
         
+        html += `</tr><tr><th class="row-header">Kapu beérk.</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
         html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
         
-        // JAVÍTÁS 2: UTOLSÓ ORVOSI IDŐ LÁTHATÓSÁGA
         html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
         phases.forEach((l) => {
             html += `<td>${l.vetSec>0 ? toTimeStr(l.vetSec) : "-"}</td>`;
