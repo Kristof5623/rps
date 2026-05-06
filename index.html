@@ -923,7 +923,8 @@
             jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>';
         }
 
-        localRaces.mult.forEach(r => {
+        // --- DÁTUM SZERINTI RENDEZÉS ITT TÖRTÉNIK (Múltbéli) ---
+        localRaces.mult.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
             multCont.innerHTML += `
             <div class="race-card" style="border-left-color: #666;">
                 <div class="race-card-title">${r.name}</div>
@@ -938,7 +939,8 @@
             </div>`;
         });
 
-        localRaces.jovo.forEach(r => {
+        // --- DÁTUM SZERINTI RENDEZÉS ITT TÖRTÉNIK (Jövőbeli) ---
+        localRaces.jovo.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
             jovoCont.innerHTML += `
             <div class="race-card" style="border-left-color: var(--warning);">
                 <div class="race-card-title">${r.name}</div>
