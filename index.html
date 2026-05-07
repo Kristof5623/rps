@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v71 - BEÉRKEZTETŐ MODULBONTÁS</title>
+    <title>Verseny Kalkulátor v72</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -224,18 +224,18 @@
 <div class="sidebar" id="sidebar">
     <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: white;">⏱️ Verseny Kalkulátor</div>
     
+    <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
+        <div class="menu-title">Fő funkciók</div>
+        <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 ÉLŐ Verseny Kezelés</button>
+        <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
+    </div>
+
     <div id="szerepkor-menu" style="display: none; flex-direction: column;">
         <div class="menu-title">Feladatkörök</div>
         <button id="btn-menu-beerkeztetes" class="sidebar-btn checkin-only" onclick="switchMainTab('beerkeztetes-mod', this)">⏱️ Beérkeztetés</button>
         <button id="btn-menu-orvosi-ido" class="sidebar-btn checkin-only" onclick="switchMainTab('orvosi-ido-mod', this)">🏥 Orvosi Idő</button>
         <button id="btn-menu-orvosi" class="sidebar-btn doctor-only" onclick="switchMainTab('orvosi-mod', this)">🩺 Állatorvosi Vizsgálat</button>
         <button id="btn-menu-nyomtatas" class="sidebar-btn printer-only" onclick="switchMainTab('nyomtatas-mod', this)">🖨️ Nyomtatás</button>
-    </div>
-
-    <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
-        <div class="menu-title">Fő funkciók</div>
-        <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 ÉLŐ Verseny Kezelés</button>
-        <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
     </div>
 
     <div class="menu-title">Élő adatok</div>
@@ -2090,17 +2090,20 @@
         const list = document.getElementById('competitorList'); list.innerHTML = '';
         const sel = document.getElementById('selectCompetitor');
         const selBk = document.getElementById('sel-beerkeztetes');
+        const selOrvIdo = document.getElementById('sel-orvosi-ido');
         const selOrv = document.getElementById('sel-orvosi');
         const selNyom = document.getElementById('sel-nyomtatas');
 
         const currentSelected = sel.value;
         const currBk = selBk ? selBk.value : "";
+        const currOrvIdo = selOrvIdo ? selOrvIdo.value : "";
         const currOrv = selOrv ? selOrv.value : "";
         const currNyom = selNyom ? selNyom.value : "";
 
         const optBase = '<option value="">-- Válassz versenyzőt --</option>';
         sel.innerHTML = optBase;
         if(selBk) selBk.innerHTML = optBase;
+        if(selOrvIdo) selOrvIdo.innerHTML = optBase;
         if(selOrv) selOrv.innerHTML = optBase;
         if(selNyom) selNyom.innerHTML = optBase;
 
@@ -2114,12 +2117,14 @@
             const opt = `<option value="${c.bib}">#${c.bib} - ${c.name} (${catNames[c.dist]})</option>`;
             sel.innerHTML += opt;
             if(selBk) selBk.innerHTML += opt;
+            if(selOrvIdo) selOrvIdo.innerHTML += opt;
             if(selOrv) selOrv.innerHTML += opt;
             if(selNyom) selNyom.innerHTML += opt;
         });
 
         if(currentSelected) sel.value = currentSelected;
         if(currBk && selBk) selBk.value = currBk;
+        if(currOrvIdo && selOrvIdo) selOrvIdo.value = currOrvIdo;
         if(currOrv && selOrv) selOrv.value = currOrv;
         if(currNyom && selNyom) selNyom.value = currNyom;
     }
@@ -2641,6 +2646,7 @@
         document.getElementById('res3').style.display = 'block';
         document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + Math.ceil(d / (CALC_LIMIT / 3600)))}</strong>`;
     }
+    
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
         if (savedMode === 'terv') savedMode = 'versenyek'; 
