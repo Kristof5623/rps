@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v72</title>
+    <title>Verseny Kalkulátor v73</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -1011,6 +1011,29 @@
         document.querySelectorAll('#fo-mod .tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(mode).style.display = 'block';
         btn.classList.add('active');
+
+        if (mode === 'verseny') {
+            const selectedBib = document.getElementById('selectCompetitor').value;
+            const activeEl = document.activeElement;
+            const formCont = document.getElementById('verseny-form-container');
+            const formContainsFocus = activeEl && formCont && formCont.contains(activeEl);
+            if (selectedBib && !formContainsFocus) {
+                loadCompetitorData();
+            }
+        }
+    }
+
+    function refreshVersenyTabIfNeeded(bib) {
+        const versenyTab = document.getElementById('verseny');
+        if (!versenyTab || versenyTab.style.display !== 'block') return;
+        const selectedBib = document.getElementById('selectCompetitor').value;
+        if (!selectedBib || selectedBib !== bib) return;
+        const activeEl = document.activeElement;
+        const formCont = document.getElementById('verseny-form-container');
+        const formContainsFocus = activeEl && formCont && formCont.contains(activeEl);
+        if (!formContainsFocus) {
+            loadCompetitorData();
+        }
     }
 
     function switchVersenyekTab(tabId, btn) {
@@ -1813,6 +1836,7 @@
             showAnimatedBtn('btn-bk-mentes');
             document.getElementById('sel-beerkeztetes').value = '';
             document.getElementById('beerkeztetes-form').style.display = 'none';
+            refreshVersenyTabIfNeeded(comp.bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
     
@@ -1862,6 +1886,7 @@
             showAnimatedBtn('btn-bk-vet-mentes');
             document.getElementById('sel-orvosi-ido').value = '';
             document.getElementById('orvosi-ido-form').style.display = 'none';
+            refreshVersenyTabIfNeeded(comp.bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
@@ -1887,7 +1912,7 @@
         }
 
         if(l.oh && l.oh !== '') {
-            document.getElementById('orv-vet-time').innerText = `Orvosi kapu: ${toTimeStr(toSec(l.oh, l.om, l.os))} (Rögzítve)`;
+            document.getElementById('orv-vet-time').innerText = `Orvosi idő: ${toTimeStr(toSec(l.oh, l.om, l.os))} (Rögzítve)`;
             document.getElementById('orv-vet-time').style.color = 'var(--primary)';
         } else {
             document.getElementById('orv-vet-time').innerText = `Orvosi idő még nincs rögzítve!`;
@@ -2609,8 +2634,8 @@
 
         html += `</tr><tr><th class="row-header">Kör idő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.loopSec || 0)}</td>`);
 
-        html += `</tr><tr><th class="row-header">Kapu beérk.</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
-        html += `</tr><tr><th class="row-header">Kapu átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
+        html += `</tr><tr><th class="row-header">Beérkezés</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
+        html += `</tr><tr><th class="row-header">Kör átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
 
         html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
         phases.forEach((l) => {
