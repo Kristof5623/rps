@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v67 - SÖTÉT GÖRGETŐSÁV & FIX MENÜ</title>
+    <title>Verseny Kalkulátor v68 - SZEREPKÖRÖK & FIX MENÜ</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -42,10 +42,14 @@
         
         .role-admin .admin-only, .role-admin .doctor-only, .role-admin .checkin-only, .role-admin .judge-only, .role-admin .printer-only { display: block !important; } 
         .role-admin #admin-menu, .role-admin #logout-section, .role-judge #admin-menu, .role-judge #logout-section { display: flex !important; }
-        .role-doctor .doctor-only { display: block !important; }
-        .role-checkin .checkin-only { display: block !important; }
-        .role-judge .judge-only { display: block !important; }
-        .role-printer .printer-only { display: block !important; }
+        
+        /* Bíró csak a teljes versenyt látja a Fo-modon belül */
+        .role-judge #btn-kiiras, .role-judge #btn-versenyzok, .role-judge #kiiras, .role-judge #versenyzok { display: none !important; }
+        .role-judge #btn-verseny { display: block !important; width: 100%; border-radius: 10px; background: var(--primary); color: white;}
+
+        .role-doctor .doctor-only, .role-doctor #szerepkor-menu, .role-doctor #logout-section { display: flex !important; display: block !important; }
+        .role-checkin .checkin-only, .role-checkin #szerepkor-menu, .role-checkin #logout-section { display: flex !important; display: block !important; }
+        .role-printer .printer-only, .role-printer #szerepkor-menu, .role-printer #logout-section { display: flex !important; display: block !important; }
         /* ---------------------------------- */
 
         .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; border-right: 1px solid #333; height: 100vh; overflow-y: auto; flex-shrink: 0; }
@@ -76,9 +80,11 @@
 
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; min-width: 0; }
+        input[type="text"] { width: 100%; }
 
         label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
-        select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; font-size: 1rem; width: 100%; margin-top: 5px; }
+        select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; font-size: 1rem; margin-top: 5px; }
+        select { width: 100%; }
         .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; width: 100%; }
         .time-group input { text-align: center; flex: 1; }
 
@@ -164,6 +170,19 @@
         .live-time.warning { color: var(--danger); animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
+        /* NYOMTATÁS STÍLUS */
+        @media print {
+            body { background: white !important; color: black !important; display: block; overflow: visible; height: auto;}
+            .sidebar, .mobile-header, .overlay, #toastMessage, #customConfirm, #infoModal, #adatlapModal, #catSwapModal { display: none !important; }
+            .main-wrapper { padding: 0 !important; overflow: visible !important; height: auto !important; display: block !important; }
+            .container { border: none !important; background: transparent !important; padding: 0 !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important;}
+            .mode-content { display: none !important; }
+            #nyomtatas-mod { display: block !important; }
+            
+            #nyomtatas-mod h3, #nyomtatas-mod p, #sel-nyomtatas, label[for="sel-nyomtatas"], #btn-nyomtatas-indit { display: none !important; }
+            #print-sticker { display: block !important; border: none !important; padding: 0 !important; width: 100%; font-size: 14pt; page-break-inside: avoid; }
+        }
+
         @media (max-width: 800px) {
             body { flex-direction: column; }
             .main-wrapper { padding: 10px; }
@@ -203,10 +222,18 @@
 <div class="sidebar" id="sidebar">
     <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: white;">⏱️ Verseny Kalkulátor</div>
     
+    <div id="szerepkor-menu" style="display: none; flex-direction: column;">
+        <div class="menu-title">Feladatkörök</div>
+        
+        <button id="btn-menu-beerkeztetes" class="sidebar-btn admin-only checkin-only" onclick="switchMainTab('beerkeztetes-mod', this)">⏱️ Kapu Beérkeztetés</button>
+        <button id="btn-menu-orvosi" class="sidebar-btn admin-only doctor-only" onclick="switchMainTab('orvosi-mod', this)">🩺 Állatorvosi Vizsgálat</button>
+        <button id="btn-menu-nyomtatas" class="sidebar-btn admin-only printer-only" onclick="switchMainTab('nyomtatas-mod', this)">🖨️ Nyomtatás</button>
+    </div>
+
     <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
-        <div class="menu-title">Fő funkciók</div>
+        <div class="menu-title">Bíró & Admin</div>
         <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 ÉLŐ Verseny Kezelés</button>
-        <button id="btn-menu-export" class="sidebar-btn" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
+        <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
     </div>
 
     <div class="menu-title">Élő adatok</div>
@@ -224,7 +251,7 @@
     
     <div id="login-section">
         <form onsubmit="doLogin(); return false;">
-            <div class="menu-title">Adminisztráció</div>
+            <div class="menu-title">Bejelentkezés</div>
             <input type="text" id="loginUser" name="username" class="sidebar-input" placeholder="Felhasználónév" autocomplete="username" required>
             <input type="password" id="loginPass" name="password" class="sidebar-input" placeholder="Jelszó" autocomplete="current-password" required>
             <button type="submit" class="sidebar-submit">Bejelentkezés</button>
@@ -233,7 +260,7 @@
     </div>
 
     <div id="logout-section" style="display: none; flex-direction: column;">
-        <div class="menu-title">Adminisztráció</div>
+        <div class="menu-title">Fiók</div>
         <div id="logged-in-role-text" style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Szerepkör</div>
         <button class="sidebar-submit" style="background:#440000; border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
     </div>
@@ -242,6 +269,69 @@
 <div class="main-wrapper">
     <div class="container">
         
+        <div id="beerkeztetes-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">⏱️ Kapu Beérkeztetés</h3>
+            <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Csak a beérkezési idő rögzítése. Válaszd ki a versenyzőt:</p>
+            <label style="color: var(--primary);">Versenyző:</label>
+            <select id="sel-beerkeztetes" onchange="loadBeerkeztetesData()" style="border-color: var(--primary);">
+                <option value="">-- Válassz --</option>
+            </select>
+            
+            <div id="beerkeztetes-form" style="display:none; background:#2c2c2e; padding:15px; border-radius:12px; margin-top:15px; border-left:4px solid var(--primary);">
+                <h4 id="bk-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
+                <label>Kapu beérkezés (Idő):</label>
+                <div class="time-group">
+                    <input type="number" id="bk-h" placeholder="00" oninput="jump(this, 'bk-m')"> :
+                    <input type="number" id="bk-m" placeholder="00" oninput="jump(this, 'bk-s')"> :
+                    <input type="number" id="bk-s" placeholder="00">
+                </div>
+                <button id="btn-bk-mentes" class="calc-btn" onclick="saveBeerkeztetesData()">Beérkezés Mentése</button>
+            </div>
+        </div>
+
+        <div id="orvosi-mod" class="mode-content">
+            <h3 style="color:var(--success); margin-bottom: 15px;">🩺 Állatorvosi Vizsgálat</h3>
+            <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Orvosi (Vet) idő, pulzus és értékelés rögzítése.</p>
+            <label style="color: var(--success);">Versenyző:</label>
+            <select id="sel-orvosi" onchange="loadOrvosiData()" style="border-color: var(--success);">
+                <option value="">-- Válassz --</option>
+            </select>
+            
+            <div id="orvosi-form" style="display:none; background:#2c2c2e; padding:15px; border-radius:12px; margin-top:15px; border-left:4px solid var(--success);">
+                <h4 id="orv-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
+                <div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:15px;" id="orv-arr-time">Beérkezett: --:--:--</div>
+                
+                <label>Orvosi Vizsgálat (Vet) ideje:</label>
+                <div class="time-group">
+                    <input type="number" id="orv-h" placeholder="00" oninput="jump(this, 'orv-m')"> :
+                    <input type="number" id="orv-m" placeholder="00" oninput="jump(this, 'orv-s')"> :
+                    <input type="number" id="orv-s" placeholder="00" oninput="jump(this, 'orv-pulse')">
+                </div>
+                
+                <label>Pulzus (bpm):</label>
+                <input type="number" id="orv-pulse" placeholder="pl. 56" oninput="jump(this, 'orv-notes')">
+                
+                <label>Értékelés / Megjegyzés:</label>
+                <input type="text" id="orv-notes" placeholder="pl. A / 1 / OK">
+                
+                <button id="btn-orv-mentes" class="calc-btn" style="background:var(--success);" onclick="saveOrvosiData()">Orvosi Adatok Mentése</button>
+            </div>
+        </div>
+
+        <div id="nyomtatas-mod" class="mode-content">
+            <h3 style="color:var(--text); margin-bottom: 15px;">🖨️ Nyomtatás</h3>
+            <label for="sel-nyomtatas" style="color: var(--text);">Versenyző kiválasztása:</label>
+            <select id="sel-nyomtatas" onchange="loadNyomtatasData()" style="border-color: var(--text);">
+                <option value="">-- Válassz --</option>
+            </select>
+
+            <div id="nyomtatas-form" style="display:none; margin-top:20px;">
+                <div id="print-sticker" style="background:#fff; color:#000; padding:20px; border-radius:10px; border:2px solid #000; font-family: sans-serif;">
+                    </div>
+                <button id="btn-nyomtatas-indit" class="calc-btn" style="background:var(--primary); color:white; margin-top:20px;" onclick="window.print()">Nyomtatás indítása</button>
+            </div>
+        </div>
+
         <div id="versenyek" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 15px;">🏁 Versenyek</h3>
             <div class="tabs">
@@ -357,7 +447,7 @@
                         <input type="number" id="vsR" placeholder="00" oninput="jump(this, 'vh1')">
                     </div>
                     <div id="lapInputsContainer"></div>
-                    <button class="calc-btn admin-only" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
+                    <button class="calc-btn" id="btn-kiertel-mentes" onclick="calcVerseny()">Kiértékelés / Mentés</button>
                     <div id="res2" style="display:none"></div>
                 </div>
             </div>
@@ -756,10 +846,7 @@
             }
             renderLocalRaces();
             
-            // Ha épp az export menüben vagyunk, frissítsük a listát
-            if (document.getElementById('export-mod').classList.contains('active')) {
-                renderExportList();
-            }
+            if (document.getElementById('export-mod').classList.contains('active')) { renderExportList(); }
             
             if (viewingPastRaceData && document.getElementById('past-race-view').classList.contains('active')) {
                 const updatedRace = localRaces.mult.find(x => x.id === viewingPastRaceData.id);
@@ -783,9 +870,7 @@
                 const selectedBib = document.getElementById('selectCompetitor').value;
                 const activeEl = document.activeElement;
                 const formContainsFocus = activeEl && document.getElementById('verseny').contains(activeEl);
-                if (selectedBib && !formContainsFocus) { 
-                    loadCompetitorData(); 
-                }
+                if (selectedBib && !formContainsFocus) { loadCompetitorData(); }
             }
         });
     }
@@ -814,7 +899,18 @@
             document.body.classList.add('role-' + role);
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('logout-section').style.display = 'flex';
-            document.getElementById('logged-in-role-text').innerText = "✅ " + role.toUpperCase() + " mód aktív";
+            
+            let roleNameHu = role;
+            if(role === 'judge') roleNameHu = "Bíró";
+            if(role === 'checkin') roleNameHu = "Beérkeztető";
+            if(role === 'doctor') roleNameHu = "Állatorvos";
+            if(role === 'printer') roleNameHu = "Nyomtató";
+            
+            document.getElementById('logged-in-role-text').innerText = "✅ " + roleNameHu.toUpperCase() + " mód";
+            
+            // Ha bíró, automatikusan a teljes versenyre dobjuk
+            if(role === 'judge') { switchSubMode('verseny', document.getElementById('btn-verseny')); }
+            
         } else {
             document.getElementById('login-section').style.display = 'block';
             document.getElementById('logout-section').style.display = 'none';
@@ -853,15 +949,14 @@
     }
 
     function switchSidebarMode(targetId, btn) {
-        if(btn && btn.id === 'btn-menu-adatlapok') {
-            viewingPastRaceData = null; 
-        }
+        if(btn && btn.id === 'btn-menu-adatlapok') { viewingPastRaceData = null; }
         document.querySelectorAll('.mode-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
         if(btn) btn.classList.add('active');
         localStorage.setItem('currentMode', targetId); 
         if(window.innerWidth <= 800) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
+        
         if (targetId === 'adatlapok') renderAdatlapList();
         if (targetId === 'export-mod') renderExportList();
     }
@@ -1518,65 +1613,47 @@
 
         if(rajt === 0) { document.getElementById('rm-res2').style.display='none'; return; }
         
-        let curStart = rajt; let totalPure = 0; let totalD = 0; let html = ""; let anyHigh = false;
-        
         for(let i=1; i<=count; i++) {
-            const isFinalLap = (i === count); 
             const d = parseFloat(document.getElementById(`rm-vd${i}`).value) || 0;
-            const arr = toSec(document.getElementById(`rm-vh${i}`).value, document.getElementById(`rm-vm${i}`).value, document.getElementById(`rm-vs${i}`).value);
-            const vet = toSec(document.getElementById(`rm-voh${i}`).value, document.getElementById(`rm-vom${i}`).value, document.getElementById(`rm-vos${i}`).value);
-            
-            let lapData = { d, h: document.getElementById(`rm-vh${i}`).value, m: document.getElementById(`rm-vm${i}`).value, s: document.getElementById(`rm-vs${i}`).value, oh: document.getElementById(`rm-voh${i}`).value, om: document.getElementById(`rm-vom${i}`).value, os: document.getElementById(`rm-vos${i}`).value, startSec: curStart, arrSec: arr, vetSec: vet, isComplete: (d>0 && arr>0) };
-
-            if(!lapData.isComplete) { if(comp) comp.laps.push(lapData); continue; }
-            
-            let loopTime = arr - curStart; if(loopTime<=0) loopTime += 86400;
-            let phaseTime; let pulzusTime = 0;
-
-            if (isFinalLap) {
-                phaseTime = loopTime;
-                if(vet > 0) pulzusTime = vet - arr < 0 ? vet - arr + 86400 : vet - arr; 
-            } else {
-                phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
-                pulzusTime = vet > 0 ? (vet - arr < 0 ? vet - arr + 86400 : vet - arr) : 0;
-            }
-            
-            lapData.loopSec = loopTime; lapData.phaseSec = phaseTime; lapData.pulzusSec = pulzusTime;
-            lapData.loopSpd = d / (loopTime/3600); lapData.phaseSpd = d / (phaseTime/3600);
-            
-            totalPure += phaseTime; totalD += d;
-            lapData.rideTime = totalPure; lapData.rideSpd = totalD / (totalPure/3600);
-            lapData.nextStart = (vet > 0 ? vet : arr) + 2400;
-            curStart = lapData.nextStart;
+            let lapData = { d, h: document.getElementById(`rm-vh${i}`).value, m: document.getElementById(`rm-vm${i}`).value, s: document.getElementById(`rm-vs${i}`).value, oh: document.getElementById(`rm-voh${i}`).value, om: document.getElementById(`rm-vom${i}`).value, os: document.getElementById(`rm-vos${i}`).value };
             if(comp) comp.laps.push(lapData);
-
-            if(lapData.loopSpd >= 16 || lapData.phaseSpd >= 16) anyHigh = true;
-            let loopColor = lapData.loopSpd >= 16 ? 'var(--warning)' : 'var(--success)';
-            let phaseColor = lapData.phaseSpd >= 16 ? 'var(--warning)' : 'var(--success)';
+        }
+        
+        comp = recalcCompetitorData(comp, modalRaceConfig);
+        
+        let html = "";
+        let countLaps = comp.laps.length;
+        for(let i=0; i<countLaps; i++) {
+            let l = comp.laps[i];
+            if(!l.isComplete) continue;
+            let loopColor = l.loopSpd >= 16 ? 'var(--warning)' : 'var(--success)';
+            let phaseColor = l.phaseSpd >= 16 ? 'var(--warning)' : 'var(--success)';
+            let isFinalLap = (i === countLaps - 1);
 
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
-                <span class="plan-header" style="color:${loopColor}">${i}. KÖR</span>
-                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(lapData.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(loopTime)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${lapData.loopSpd.toFixed(2)} km/h</b></div>
-                ${vet > 0 ? `
+                <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
+                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(l.arrSec - l.startSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
+                ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
-                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(phaseTime)}</b></div>
-                ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${lapData.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
-                <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(lapData.pulzusSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(l.phaseSec)}</b></div>
+                ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${l.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
+                <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(l.pulzusSec)}</b></div>
                 ` : ""}
             </div>`;
         }
         
-        if(totalD > 0) {
-            const avg = totalD / (totalPure/3600);
-            let avgColor = (avg >= 16 || anyHigh) ? 'var(--warning)' : 'var(--success)';
+        if (comp.laps && comp.laps.length > 0 && comp.laps[0].isComplete) {
+            let lastComplete = comp.laps.slice().reverse().find(x => x.isComplete);
+            let avgColor = (lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
             html += `<div class="summary-total">
                 <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalPure)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${avg.toFixed(2)} km/h</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(lastComplete.rideTime)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${lastComplete.rideSpd.toFixed(2)} km/h</b></div>
             </div>`;
         }
+        
         document.getElementById('rm-res2').style.display='block'; document.getElementById('rm-res2').innerHTML = html;
 
         if (comp) {
@@ -1587,6 +1664,230 @@
         showAnimatedBtn('rm-btn-kiertel-mentes');
     }
 
+    // --- ÚJ SZEREPKÖR FUNKCIÓK (RECALC DATA KÖZÖS MOTOR) ---
+    function recalcCompetitorData(comp, config) {
+        if (!comp) return comp;
+        const baseDist = comp.dist.replace('j', '');
+        const cfg = config[baseDist] || { h:'', m:'', s:'', laps:[] };
+        
+        let expectedLaps = cfg.laps ? cfg.laps.length : 1;
+        let rajt = toSec(comp.startTime?.h || cfg.h, comp.startTime?.m || cfg.m, comp.startTime?.s || cfg.s);
+        
+        if (rajt === 0) return comp;
+        
+        let curStart = rajt;
+        let totalPure = 0;
+        let totalD = 0;
+        
+        if (!comp.laps) comp.laps = [];
+        
+        for (let i = 0; i < expectedLaps; i++) {
+            let l = comp.laps[i] || { h:'', m:'', s:'', oh:'', om:'', os:'' };
+            l.d = parseFloat(l.d) || parseFloat(cfg.laps[i]) || 0;
+            
+            const arr = toSec(l.h, l.m, l.s);
+            const vet = toSec(l.oh, l.om, l.os);
+            const isFinalLap = (i === expectedLaps - 1);
+            
+            l.startSec = curStart;
+            l.arrSec = arr;
+            l.vetSec = vet;
+            l.isComplete = (l.d > 0 && arr > 0);
+            
+            if (!l.isComplete) { comp.laps[i] = l; continue; }
+            
+            let loopTime = arr - curStart; 
+            if (loopTime <= 0) loopTime += 86400;
+            
+            let phaseTime; let pulzusTime = 0;
+
+            if (isFinalLap) {
+                phaseTime = loopTime;
+                if(vet > 0) pulzusTime = vet - arr < 0 ? vet - arr + 86400 : vet - arr; 
+            } else {
+                phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
+                pulzusTime = vet > 0 ? (vet - arr < 0 ? vet - arr + 86400 : vet - arr) : 0;
+            }
+            
+            l.loopSec = loopTime; 
+            l.phaseSec = phaseTime; 
+            l.pulzusSec = pulzusTime;
+            l.loopSpd = l.d / (loopTime/3600); 
+            l.phaseSpd = l.d / (phaseTime/3600);
+            
+            totalPure += phaseTime; 
+            totalD += l.d;
+            l.rideTime = totalPure; 
+            l.rideSpd = totalD / (totalPure/3600);
+            l.nextStart = (vet > 0 ? vet : arr) + 2400; 
+            
+            curStart = l.nextStart;
+            comp.laps[i] = l;
+        }
+        return comp;
+    }
+
+    function getActiveLapIndex(comp, config) {
+        if (!comp || !comp.laps) return 0;
+        const baseDist = comp.dist.replace('j', '');
+        const cfg = config[baseDist] || { laps: [] };
+        let expectedLaps = cfg.laps ? cfg.laps.length : 1;
+        
+        for (let i = 0; i < expectedLaps; i++) {
+            let l = comp.laps[i];
+            if (!l || !l.h || l.h === '') return i; 
+            if (i < expectedLaps - 1 && (!l.oh || l.oh === '')) return i; 
+        }
+        return expectedLaps - 1; 
+    }
+
+    // --- BEÉRKEZTETÉS (CHECKIN) MÓD ---
+    function loadBeerkeztetesData() {
+        const bib = document.getElementById('sel-beerkeztetes').value;
+        const form = document.getElementById('beerkeztetes-form');
+        if(!bib) { form.style.display = 'none'; return; }
+        
+        const comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+        
+        let idx = getActiveLapIndex(comp, raceConfig);
+        document.getElementById('bk-lap-title').innerText = `${idx + 1}. Kör Beérkeztetése`;
+        
+        let l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
+        document.getElementById('bk-h').value = l.h || '';
+        document.getElementById('bk-m').value = l.m || '';
+        document.getElementById('bk-s').value = l.s || '';
+        
+        form.style.display = 'block';
+    }
+
+    function saveBeerkeztetesData() {
+        const bib = document.getElementById('sel-beerkeztetes').value;
+        let comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+
+        let idx = getActiveLapIndex(comp, raceConfig);
+        if(!comp.laps) comp.laps = [];
+        if(!comp.laps[idx]) comp.laps[idx] = {};
+        
+        comp.laps[idx].h = document.getElementById('bk-h').value;
+        comp.laps[idx].m = document.getElementById('bk-m').value;
+        comp.laps[idx].s = document.getElementById('bk-s').value;
+        
+        comp = recalcCompetitorData(comp, raceConfig);
+        db.ref('competitors/' + comp.bib).set(comp).then(() => {
+            showAnimatedBtn('btn-bk-mentes');
+            document.getElementById('sel-beerkeztetes').value = '';
+            document.getElementById('beerkeztetes-form').style.display = 'none';
+        }).catch(e => showToast("Hiba: " + e.message, true));
+    }
+
+    // --- ORVOSI MÓD ---
+    function loadOrvosiData() {
+        const bib = document.getElementById('sel-orvosi').value;
+        const form = document.getElementById('orvosi-form');
+        if(!bib) { form.style.display = 'none'; return; }
+        
+        const comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+        
+        let idx = getActiveLapIndex(comp, raceConfig);
+        let l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
+        
+        document.getElementById('orv-lap-title').innerText = `${idx + 1}. Kör Orvosi Vizsgálata`;
+        
+        if(l.h && l.h !== '') {
+            document.getElementById('orv-arr-time').innerText = `Kapu beérkezés: ${toTimeStr(toSec(l.h, l.m, l.s))} (Rögzítve)`;
+            document.getElementById('orv-arr-time').style.color = 'var(--success)';
+        } else {
+            document.getElementById('orv-arr-time').innerText = `Versenyző még körön van!`;
+            document.getElementById('orv-arr-time').style.color = 'var(--danger)';
+        }
+
+        document.getElementById('orv-h').value = l.oh || '';
+        document.getElementById('orv-m').value = l.om || '';
+        document.getElementById('orv-s').value = l.os || '';
+        document.getElementById('orv-pulse').value = l.pulse || '';
+        document.getElementById('orv-notes').value = l.vetNotes || '';
+        
+        form.style.display = 'block';
+    }
+
+    function saveOrvosiData() {
+        const bib = document.getElementById('sel-orvosi').value;
+        let comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+
+        let idx = getActiveLapIndex(comp, raceConfig);
+        if(!comp.laps) comp.laps = [];
+        if(!comp.laps[idx]) comp.laps[idx] = {};
+        
+        comp.laps[idx].oh = document.getElementById('orv-h').value;
+        comp.laps[idx].om = document.getElementById('orv-m').value;
+        comp.laps[idx].os = document.getElementById('orv-s').value;
+        comp.laps[idx].pulse = document.getElementById('orv-pulse').value;
+        comp.laps[idx].vetNotes = document.getElementById('orv-notes').value;
+        
+        comp = recalcCompetitorData(comp, raceConfig);
+        db.ref('competitors/' + comp.bib).set(comp).then(() => {
+            showAnimatedBtn('btn-orv-mentes');
+            document.getElementById('sel-orvosi').value = '';
+            document.getElementById('orvosi-form').style.display = 'none';
+        }).catch(e => showToast("Hiba: " + e.message, true));
+    }
+
+    // --- NYOMTATÁS MÓD ---
+    function loadNyomtatasData() {
+        const bib = document.getElementById('sel-nyomtatas').value;
+        const form = document.getElementById('nyomtatas-form');
+        if(!bib) { form.style.display = 'none'; return; }
+        
+        const comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+
+        let phases = (comp.laps || []).filter(l => l.isComplete);
+        
+        let html = `
+            <div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px;">
+                <h2 style="margin:0 0 5px 0;">#${comp.bib} - ${comp.name}</h2>
+                <div style="font-size:1.1rem;">Ló neve: <b>${comp.internal || "Nincs megadva"}</b></div>
+                <div style="font-size:1rem;">Kategória: <b>${catNames[comp.dist]}</b></div>
+            </div>
+        `;
+        
+        if (phases.length === 0) {
+            html += `<p>Még nincs befejezett kör.</p>`;
+        } else {
+            phases.forEach((l, i) => {
+                html += `
+                <div style="margin-bottom: 15px; padding: 10px; border: 1px dashed #666; border-radius: 8px;">
+                    <h4 style="margin: 0 0 5px 0; font-size: 1.1rem;">${i+1}. Szakasz</h4>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>Kör idő: <b>${toTimeStr(l.loopSec)}</b></span>
+                        <span>Sebesség: <b>${l.loopSpd.toFixed(2)} km/h</b></span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>Beérkezés: <b>${toTimeStr(l.arrSec)}</b></span>
+                        <span>Orvosi (Vet): <b>${l.vetSec > 0 ? toTimeStr(l.vetSec) : '-'}</b></span>
+                    </div>
+                    <div style="background:#eee; padding:5px; border-radius:5px; margin-top:5px; font-weight:bold;">
+                        Pulzus: ${l.pulse || '-'} bpm &nbsp;|&nbsp; Értékelés: ${l.vetNotes || '-'}
+                    </div>
+                </div>`;
+            });
+            let last = phases[phases.length - 1];
+            html += `
+            <div style="background:#000; color:#fff; padding:10px; border-radius:8px; margin-top:15px;">
+                <h3 style="margin:0 0 5px 0;">Összesített Eredmény</h3>
+                <div>Menetidő: <b>${toTimeStr(last.rideTime)}</b></div>
+                <div>Átlagsebesség: <b>${last.rideSpd.toFixed(2)} km/h</b></div>
+                <div>Státusz: <b>${comp.isEliminated ? 'KIESETT' : 'VERSENYBEN'}</b></div>
+            </div>`;
+        }
+
+        document.getElementById('print-sticker').innerHTML = html;
+        form.style.display = 'block';
+    }
 
     // --- FŐ ÉLŐ VERSENY FUNKCIÓK ---
     function updateStatusLabel(toggleId = 'compStatusToggle', labelId = 'compStatusLabel') {
@@ -1707,8 +2008,20 @@
     function updateCompetitorDisplays() {
         const list = document.getElementById('competitorList'); list.innerHTML = '';
         const sel = document.getElementById('selectCompetitor');
+        const selBk = document.getElementById('sel-beerkeztetes');
+        const selOrv = document.getElementById('sel-orvosi');
+        const selNyom = document.getElementById('sel-nyomtatas');
+        
         const currentSelected = sel.value;
-        sel.innerHTML = '<option value="">-- Manuális --</option>';
+        const currBk = selBk ? selBk.value : "";
+        const currOrv = selOrv ? selOrv.value : "";
+        const currNyom = selNyom ? selNyom.value : "";
+
+        const optBase = '<option value="">-- Válassz versenyzőt --</option>';
+        sel.innerHTML = optBase;
+        if(selBk) selBk.innerHTML = optBase;
+        if(selOrv) selOrv.innerHTML = optBase;
+        if(selNyom) selNyom.innerHTML = optBase;
         
         competitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             list.innerHTML += `<div class="competitor-item">
@@ -1717,9 +2030,17 @@
                 </div>
                 <button class="edit-btn admin-only" onclick="editCompetitor('${c.bib}')">Módosítás</button>
             </div>`;
-            sel.innerHTML += `<option value="${c.bib}">#${c.bib} - ${c.name}</option>`;
+            const opt = `<option value="${c.bib}">#${c.bib} - ${c.name} (${catNames[c.dist]})</option>`;
+            sel.innerHTML += opt;
+            if(selBk) selBk.innerHTML += opt;
+            if(selOrv) selOrv.innerHTML += opt;
+            if(selNyom) selNyom.innerHTML += opt;
         });
+        
         if(currentSelected) sel.value = currentSelected;
+        if(currBk && selBk) selBk.value = currBk;
+        if(currOrv && selOrv) selOrv.value = currOrv;
+        if(currNyom && selNyom) selNyom.value = currNyom;
     }
 
     function loadCompetitorData() {
@@ -1773,72 +2094,60 @@
         if (comp) {
             comp.startTime = { h: document.getElementById('vhR').value, m: document.getElementById('vmR').value, s: document.getElementById('vsR').value };
             comp.isEliminated = !document.getElementById('compStatusToggle').checked; 
-            comp.laps = [];
+            
+            for(let i=0; i<count; i++) {
+                if(!comp.laps) comp.laps = [];
+                if(!comp.laps[i]) comp.laps[i] = {};
+                comp.laps[i].d = document.getElementById(`vd${i+1}`).value;
+                comp.laps[i].h = document.getElementById(`vh${i+1}`).value;
+                comp.laps[i].m = document.getElementById(`vm${i+1}`).value;
+                comp.laps[i].s = document.getElementById(`vs${i+1}`).value;
+                comp.laps[i].oh = document.getElementById(`voh${i+1}`).value;
+                comp.laps[i].om = document.getElementById(`vom${i+1}`).value;
+                comp.laps[i].os = document.getElementById(`vos${i+1}`).value;
+            }
         }
 
         if(rajt === 0) { document.getElementById('res2').style.display='none'; return; }
         
-        let curStart = rajt; let totalPure = 0; let totalD = 0; let html = ""; let anyHigh = false;
-        
-        for(let i=1; i<=count; i++) {
-            const isFinalLap = (i === count); 
-            const d = parseFloat(document.getElementById(`vd${i}`).value) || 0;
-            const arr = toSec(document.getElementById(`vh${i}`).value, document.getElementById(`vm${i}`).value, document.getElementById(`vs${i}`).value);
-            const vet = toSec(document.getElementById(`voh${i}`).value, document.getElementById(`vom${i}`).value, document.getElementById(`vos${i}`).value);
-            
-            let lapData = { d, h: document.getElementById(`vh${i}`).value, m: document.getElementById(`vm${i}`).value, s: document.getElementById(`vs${i}`).value, oh: document.getElementById(`voh${i}`).value, om: document.getElementById(`vom${i}`).value, os: document.getElementById(`vos${i}`).value, startSec: curStart, arrSec: arr, vetSec: vet, isComplete: (d>0 && arr>0) };
+        // Futtatjuk a közös kalkulátort
+        comp = recalcCompetitorData(comp, raceConfig);
 
-            if(!lapData.isComplete) { if(comp) comp.laps.push(lapData); continue; }
-            
-            let loopTime = arr - curStart; if(loopTime<=0) loopTime += 86400;
-            
-            let phaseTime; let pulzusTime = 0;
-
-            if (isFinalLap) {
-                phaseTime = loopTime;
-                if(vet > 0) pulzusTime = vet - arr < 0 ? vet - arr + 86400 : vet - arr; 
-            } else {
-                phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
-                pulzusTime = vet > 0 ? (vet - arr < 0 ? vet - arr + 86400 : vet - arr) : 0;
-            }
-            
-            lapData.loopSec = loopTime; lapData.phaseSec = phaseTime; lapData.pulzusSec = pulzusTime;
-            lapData.loopSpd = d / (loopTime/3600); lapData.phaseSpd = d / (phaseTime/3600);
-            
-            totalPure += phaseTime; totalD += d;
-            lapData.rideTime = totalPure; lapData.rideSpd = totalD / (totalPure/3600);
-            lapData.nextStart = (vet > 0 ? vet : arr) + 2400;
-            curStart = lapData.nextStart;
-            if(comp) comp.laps.push(lapData);
-
-            if(lapData.loopSpd >= 16 || lapData.phaseSpd >= 16) anyHigh = true;
-            let loopColor = lapData.loopSpd >= 16 ? 'var(--warning)' : 'var(--success)';
-            let phaseColor = lapData.phaseSpd >= 16 ? 'var(--warning)' : 'var(--success)';
+        let html = "";
+        let countLaps = comp.laps.length;
+        for(let i=0; i<countLaps; i++) {
+            let l = comp.laps[i];
+            if(!l.isComplete) continue;
+            let loopColor = l.loopSpd >= 16 ? 'var(--warning)' : 'var(--success)';
+            let phaseColor = l.phaseSpd >= 16 ? 'var(--warning)' : 'var(--success)';
+            let isFinalLap = (i === countLaps - 1);
 
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
-                <span class="plan-header" style="color:${loopColor}">${i}. KÖR</span>
-                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(lapData.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(loopTime)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${lapData.loopSpd.toFixed(2)} km/h</b></div>
-                ${vet > 0 ? `
+                <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
+                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(l.arrSec - l.startSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
+                ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
-                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(phaseTime)}</b></div>
-                ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${lapData.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
-                <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(lapData.pulzusSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(l.phaseSec)}</b></div>
+                ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${l.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
+                <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(l.pulzusSec)}</b></div>
                 ` : ""}
-                ${i < count ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #333; font-size:0.9rem; color:var(--text-dim);">Kimenetel pihenő (40p) után: <b style="color:white; float:right;">${toTimeStr(lapData.nextStart)}</b></div>` : ''}
             </div>`;
         }
         
-        if(totalD > 0) {
-            const avg = totalD / (totalPure/3600);
-            let avgColor = (avg >= 16 || anyHigh) ? 'var(--warning)' : 'var(--success)';
-            html += `<div class="summary-total">
-                <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalPure)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${avg.toFixed(2)} km/h</b></div>
-            </div>`;
+        if (comp.laps && comp.laps.length > 0 && comp.laps[0].isComplete) {
+            let lastComplete = comp.laps.slice().reverse().find(x => x.isComplete);
+            if(lastComplete) {
+                let avgColor = (lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
+                html += `<div class="summary-total">
+                    <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
+                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(lastComplete.rideTime)}</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${lastComplete.rideSpd.toFixed(2)} km/h</b></div>
+                </div>`;
+            }
         }
+        
         document.getElementById('res2').style.display='block'; document.getElementById('res2').innerHTML = html;
 
         if (comp) {
