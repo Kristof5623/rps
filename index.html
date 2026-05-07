@@ -1333,7 +1333,7 @@
             catComps.forEach(c => {
                 let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
                 let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; let rankDisplay = rankStr === "Kiesett" ? "Kiesett" : rankStr + "º";
-                let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás ${info.gapStr}</div>` : '';
+                let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás: ${info.gapStr}</div>` : '';
                 let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
                 if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
                 let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
