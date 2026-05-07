@@ -1697,7 +1697,7 @@
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
                 <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec - l.startSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
@@ -2237,7 +2237,7 @@
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
                 <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec - l.startSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
