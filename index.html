@@ -2168,11 +2168,11 @@
         if(lapsArr.length === 0) {
             (cfg.laps || []).forEach((ld, i) => { if(document.getElementById(`vd${i+1}`)) document.getElementById(`vd${i+1}`).value = ld; });
         }
-        calcVerseny();
+        calcVerseny(false);
     }
  
  
-    function calcVerseny() {
+    function calcVerseny(saveToDb = true) {
         const count = parseInt(document.getElementById('lapCount').value);
         const bib = document.getElementById('selectCompetitor').value;
         const rajt = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
@@ -2212,8 +2212,8 @@
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
                 <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Kapu beérk.:</span> <b style="color:white;">${toTimeStr(l.arrSec - l.startSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Kapu átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec - l.startSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
                 <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(l.phaseSec)}</b></div>
@@ -2237,12 +2237,11 @@
 
         document.getElementById('res2').style.display='block'; document.getElementById('res2').innerHTML = html;
 
-        if (comp) {
+        if (saveToDb && comp) {
             const cleanComp = JSON.parse(JSON.stringify(comp)); 
             db.ref('competitors/' + comp.bib).set(cleanComp);
+            showAnimatedBtn('btn-kiertel-mentes');
         }
-
-        showAnimatedBtn('btn-kiertel-mentes');
     }
     // --- ALAPOK ÉS SEGÉDFÜGGVÉNYEK ---
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
@@ -2291,7 +2290,7 @@
         for(let i = 1; i <= count; i++) {
             let html = `<div class="lap-card"><h4>${i}. KÖR</h4><label>Táv (km):</label><input type="number" id="${prefix}d${i}" step="0.1" placeholder="20">`;
             if(prefix !== 't') {
-                html += `<label>Kapu beérk.:</label>
+                html += `<label>Beérkezés:</label>
                          <div class="time-group">
                              <input type="number" id="${prefix}h${i}" oninput="jump(this, '${prefix}m${i}')" placeholder="00"> :
                              <input type="number" id="${prefix}m${i}" oninput="jump(this, '${prefix}s${i}')" placeholder="00"> :
