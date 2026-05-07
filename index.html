@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v63 - DÁTUM SZERINTI RENDEZÉS</title>
+    <title>Verseny Kalkulátor v64 - EXCEL EXPORT</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -923,7 +923,7 @@
             jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>';
         }
 
-        // --- DÁTUM SZERINTI RENDEZÉS ITT TÖRTÉNIK (Múltbéli) ---
+        // --- DÁTUM SZERINTI RENDEZÉS (Múltbéli) ---
         localRaces.mult.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
             multCont.innerHTML += `
             <div class="race-card" style="border-left-color: #666;">
@@ -939,7 +939,7 @@
             </div>`;
         });
 
-        // --- DÁTUM SZERINTI RENDEZÉS ITT TÖRTÉNIK (Jövőbeli) ---
+        // --- DÁTUM SZERINTI RENDEZÉS (Jövőbeli) ---
         localRaces.jovo.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
             jovoCont.innerHTML += `
             <div class="race-card" style="border-left-color: var(--warning);">
@@ -953,6 +953,76 @@
                 </div>
             </div>`;
         });
+    }
+    
+    // --- EXPORTÁLÁS CSV / EXCEL FUNKCIÓ ---
+    function exportRaceToCSV() {
+        const ctx = getAdatlapContext();
+        if(!ctx || !ctx.comps || ctx.comps.length === 0) {
+            showToast("Nincs exportálható adat ebben a versenyben!", true);
+            return;
+        }
+        
+        // UTF-8 BOM, hogy az Excel normálisan kezelje az ékezeteket
+        let csvContent = "\uFEFF"; 
+        csvContent += "Kategória;Helyezés;Rajtszám;Versenyző;Ló;Státusz;Össz. Menetidő;Átlagsebesség (km/h)\n";
+        
+        let ranksInfo = calculateCurrentRanks(ctx.comps, ctx.config);
+        let activeCats = getActiveCategories(ctx.comps, ctx.config);
+        
+        activeCats.forEach(cat => {
+            let catComps = ctx.comps.filter(c => c.dist === cat);
+            
+            // Sorrendbe rakjuk ugyanúgy, ahogy a képernyőn látjuk
+            catComps.sort((a,b) => {
+                if (a.isEliminated && !b.isEliminated) return 1;
+                if (!a.isEliminated && b.isEliminated) return -1;
+                if (!a.isEliminated && !b.isEliminated) { return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999); }
+                return parseInt(a.bib) - parseInt(b.bib);
+            });
+            
+            catComps.forEach(c => {
+                let rankStr = ranksInfo[c.bib]?.rank || "-";
+                let statusObj = getCompLiveStatus(c, ctx.config);
+                
+                let totalTimeStr = "-";
+                let avgSpeedStr = "-";
+                
+                let completedLaps = (c.laps || []).filter(l => l.isComplete);
+                if (completedLaps.length > 0) {
+                    let lastLap = completedLaps[completedLaps.length - 1];
+                    totalTimeStr = toTimeStr(lastLap.rideTime);
+                    // A sebességnél pont helyett vessző, hogy az Excel számként kezelje (magyar formátum)
+                    avgSpeedStr = lastLap.rideSpd.toFixed(2).replace('.', ','); 
+                }
+                
+                let row = [
+                    catNames[cat] || cat,
+                    rankStr,
+                    c.bib,
+                    c.name,
+                    c.internal || "",
+                    statusObj.text,
+                    totalTimeStr,
+                    avgSpeedStr
+                ];
+                
+                // Idézőjelek közé tesszük, hogy a nevekben lévő esetleges pontosvesszők ne roncsolják a táblát
+                csvContent += row.map(v => `"${v}"`).join(";") + "\n";
+            });
+        });
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        
+        let safeName = (ctx.name || "Eredmenyek").replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.setAttribute("download", safeName + "_export.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
     
     // --- VENDÉG NÉZET MÚLTBÉLI VERSENYEKHEZ BEÉPÍTVE ---
@@ -981,7 +1051,10 @@
         let activeCats = getActiveCategories(comps, config);
 
         if (!pastAdatlapFilter || pastAdatlapFilter === 'all') {
-            let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
+            let html = `<div style="display:flex; justify-content:center; margin-bottom: 15px;">
+                            <button class="calc-btn" style="background:#217346; color:white; width:auto; padding:10px 20px; font-size:0.9rem; margin-top:0;" onclick="exportRaceToCSV()">📥 Eredmények exportálása (Excel / CSV)</button>
+                        </div>`;
+            html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
             if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Nincsenek adatok ebben a versenyben.</p>`; } 
             else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setPastAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
             cont.innerHTML = html + `<button class="calc-btn" style="background:#444; color:white; margin-top:20px; font-size:0.9rem; padding:10px;" onclick="closePastRaceModal()">🔙 Vissza a versenyekhez</button></div>`;
@@ -1967,7 +2040,10 @@
         let activeCats = getActiveCategories(ctx.comps, ctx.config);
 
         if (!currentAdatlapFilter || currentAdatlapFilter === 'all') {
-            let html = `<div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">`;
+            let html = `<div style="display:flex; justify-content:center; margin-bottom: 15px;">
+                            <button class="calc-btn" style="background:#217346; color:white; width:auto; padding:10px 20px; font-size:0.9rem; margin-top:0;" onclick="exportRaceToCSV()">📥 Eredmények exportálása (Excel / CSV)</button>
+                        </div>`;
+            html += `<div style="display:flex; flex-direction:column; gap:10px; margin-top:0;">`;
             if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Még nincs beállított kategória vagy versenyző.</p>`; } 
             else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
             cont.innerHTML = html + `</div>`;
