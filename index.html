@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v65 - HIVATALOS EXPORT</title>
+    <title>Verseny Kalkulátor v66 - JAVÍTOTT EXCEL EXPORT</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -955,15 +955,20 @@
         activeCats.forEach((cat, index) => {
             let catNameStr = catNames[cat]; 
             
-            csvContent += `"${race.name}",,,,,,,,,,,,\n`;
-            csvContent += `"${index + 1}.vrsz.-${catNameStr}-es verseny",,,,,,,,,,,,\n`;
-            csvContent += `,,,,,,,,,,,,\n`;
-            csvContent += `"www.tavlovasok.hu",,,,,,,,,,,,\n`;
-            csvContent += `"Elbírálás: Távlovaglás",,,,,,,,,,,,\n`;
-            csvContent += `,,,,,,,,,,,,\n`;
-            csvContent += `,,,,,,,,,,,,\n`;
-            csvContent += `"Igazolási szám","Versenyző","Rajtszám","Ló","Egyesület","Kategória","_","Hely","Végeredmény",,,,\n`;
-            csvContent += `,,,,,,,,"Idő","Büntetőpont","Megj.","Sárgalap","Pihenőnap"\n`;
+            // Használjunk pontosvesszőt (;) hogy a magyar Excel automatikusan oszlopokra bontsa
+            csvContent += `"${race.name}";;;;;;;;;;;;\n`;
+            csvContent += `"${index + 1}.vrsz.-${catNameStr}-es verseny";;;;;;;;;;;;\n`;
+            csvContent += `;;;;;;;;;;;\;\n`;
+            csvContent += `"www.tavlovasok.hu";;;;;;;;;;;;\n`;
+            csvContent += `"Elbírálás: Távlovaglás";;;;;;;;;;;;\n`;
+            csvContent += `;;;;;;;;;;;\;\n`;
+            csvContent += `;;;;;;;;;;;\;\n`;
+            
+            let header1 = ["Igazolási szám", "Versenyző", "Rajtszám", "Ló", "Egyesület", "Kategória", "_", "Hely", "Végeredmény", "", "", "", ""];
+            let header2 = ["", "", "", "", "", "", "", "", "Idő", "Büntetőpont", "Megj.", "Sárgalap", "Pihenőnap"];
+
+            csvContent += header1.map(v => `"${v}"`).join(";") + "\n";
+            csvContent += header2.map(v => `"${v}"`).join(";") + "\n";
 
             let catComps = comps.filter(c => c.dist === cat);
             
@@ -1011,10 +1016,11 @@
                     "12" // Pihenőnap alapértelmezett
                 ];
                 
-                csvContent += row.map(v => `"${v}"`).join(",") + "\n";
+                // Csatlakozás pontosvesszővel az Excel miatt
+                csvContent += row.map(v => `"${v}"`).join(";") + "\n";
             });
-            csvContent += `,,,,,,,,,,,,\n`; 
-            csvContent += `,,,,,,,,,,,,\n`; 
+            csvContent += `;;;;;;;;;;;\;\n`; 
+            csvContent += `;;;;;;;;;;;\;\n`; 
         });
         
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
