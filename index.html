@@ -172,6 +172,20 @@
         .live-time.warning { color: var(--danger); animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
 
+        #fullscreenLiveOverlay { display: none; position: fixed; inset: 0; background: #000; color: #fff; z-index: 99999; overflow-y: auto; padding: 20px; }
+        #fullscreenLiveOverlay.active { display: flex; justify-content: center; align-items: center; }
+        #fullscreenLiveOverlay .fullscreen-panel { width: 100%; max-width: 960px; }
+        #fullscreenLiveOverlay .fullscreen-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; font-size: 1rem; color: var(--text); }
+        #fullscreenLiveOverlay .fullscreen-hint { color: var(--text-dim); font-size: 0.95rem; }
+        body.fullscreen-active { overflow: hidden !important; }
+        body.fullscreen-active .sidebar, body.fullscreen-active .mobile-header, body.fullscreen-active .overlay, body.fullscreen-active .confirm-modal, body.fullscreen-active .modal { display: none !important; }
+        body.fullscreen-active .main-wrapper { overflow: hidden !important; }
+        body.fullscreen-active .container { border-radius: 0 !important; padding: 0 !important; width: 100vw !important; max-width: 100vw !important; min-height: 100vh !important; border: none !important; background: transparent !important; box-shadow: none !important; }
+        body.fullscreen-active .mode-content { display: none !important; }
+        body.fullscreen-active #elo-rajtok { display: block !important; }
+        body.fullscreen-active #elo-rajtok h3, body.fullscreen-active #btn-fullscreen-live { display: none !important; }
+        body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
+
         /* NYOMTATÁS STÍLUS */
         @media print {
             body { background: white !important; color: black !important; display: block; overflow: visible; height: auto;}
@@ -188,10 +202,23 @@
         @media (max-width: 800px) {
             body { flex-direction: column; }
             .main-wrapper { padding: 10px; }
+            .container { max-width: 100%; border-radius: 0 0 20px 20px; }
+            .mode-content { padding-bottom: 30px; }
             .mobile-header { display: block; }
-            .sidebar { position: fixed; left: -280px; top: 0; bottom: 0; width: 280px; z-index: 999; transition: left 0.3s ease; }
+            .sidebar { position: fixed; left: -100%; top: 0; bottom: 0; width: 100%; max-width: 320px; z-index: 999; transition: left 0.3s ease; }
             .sidebar.open { left: 0; }
             .overlay.open { display: block; }
+            .live-item { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .live-time { font-size: 1.5rem; }
+            .time-group { flex-direction: column; align-items: stretch; }
+            .time-group input { width: 100%; }
+            .tabs { flex-direction: column; }
+            .tab-btn { width: 100%; }
+            .stat-box.large { width: 100%; }
+        }
+        @media (max-width: 520px) {
+            .sidebar { width: 100%; max-width: 100%; }
+            .container { border-radius: 0; }
         }
     </style>
 </head>
@@ -478,7 +505,16 @@
             </div>
         </div>
 
-        <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
+        <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><button id="btn-fullscreen-live" class="calc-btn admin-only" style="background:var(--primary); color:white; margin-bottom: 15px; width:auto; padding: 10px 15px;" onclick="enterLiveFullscreen()">Teljes képernyő</button><div id="liveCountdownContainer"></div></div>
+        <div id="fullscreenLiveOverlay">
+            <div class="fullscreen-panel">
+                <div class="fullscreen-header">
+                    <div>🔴 Élő Kiindulások</div>
+                    <div class="fullscreen-hint">ESC kilép</div>
+                </div>
+                <div id="fullscreenLiveContent"></div>
+            </div>
+        </div>
         
         <div id="adatlapok" class="mode-content">
             <h3 id="adatlapok-title" style="color:var(--primary); margin-bottom: 15px;">📊 Versenyzői Adatlapok</h3>
@@ -2407,7 +2443,41 @@
             html += `<div class="live-item"><div><b>#${item.comp.bib} ${item.comp.name}</b><br><small>${item.label}: ${toTimeStr(item.nextStart)}</small></div><div class="live-time ${blinkClass}">${formatLiveTime(d)}</div></div>`;
         });
         live.innerHTML = html || '<div style="text-align:center; padding:20px;">Nincs várakozó.</div>';
+        const fullscreenContent = document.getElementById('fullscreenLiveContent');
+        if (fullscreenContent && document.getElementById('fullscreenLiveOverlay')?.classList.contains('active')) {
+            fullscreenContent.innerHTML = live.innerHTML;
+        }
     }, 1000);
+
+    function enterLiveFullscreen() {
+        const overlay = document.getElementById('fullscreenLiveOverlay');
+        const content = document.getElementById('fullscreenLiveContent');
+        const countdown = document.getElementById('liveCountdownContainer');
+        if (!overlay || !content) return;
+        content.innerHTML = countdown ? countdown.innerHTML : '<div style="text-align:center; padding:20px;">Nincs várakozó.</div>';
+        overlay.classList.add('active');
+        document.body.classList.add('fullscreen-active');
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+    }
+
+    function exitLiveFullscreen() {
+        const overlay = document.getElementById('fullscreenLiveOverlay');
+        if (!overlay) return;
+        overlay.classList.remove('active');
+        document.body.classList.remove('fullscreen-active');
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('fullscreenLiveOverlay')?.classList.contains('active')) {
+            exitLiveFullscreen();
+            e.preventDefault();
+        }
+    });
 
     // --- ADATLAPOK, RANGSOROLÁS ÉS ÁLLAPOTKÖVETÉS ---
     function getAdatlapContext() {
