@@ -19,7 +19,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #0A84FF; }
         * { scrollbar-width: thin; scrollbar-color: #444 #111111; }
 
-        html, body { width: 100vw; min-height: 100vh; overflow: hidden; margin: 0; padding: 0; }
+        html, body { width: 100vw; min-height: 100vh; overflow-x: hidden; overflow-y: auto; margin: 0; padding: 0; }
 
         :root {
             --bg: #000000;
@@ -212,8 +212,7 @@
             .live-time { font-size: 1.5rem; }
             .time-group { flex-direction: column; align-items: stretch; }
             .time-group input { width: 100%; }
-            .tabs { flex-direction: column; }
-            .tab-btn { width: 100%; }
+            .tab-btn { width: auto; }
             .stat-box.large { width: 100%; }
         }
         @media (max-width: 520px) {
