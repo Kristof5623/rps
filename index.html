@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v76.3</title>
-    <title>Verseny Kalkulátor v76.4</title>
+    <title>Verseny Kalkulátor v76.5</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -132,15 +131,12 @@
         
         .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; flex-wrap: wrap; gap: 10px;}
         
-        .stats-header-container { display: flex; flex-direction: column; align-items: flex-start; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
-        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: flex-start; align-items: center; width: 100%; }
         .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
         .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; }
         .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
         .stat-box.large { font-size: 1.1rem; padding: 8px 20px; display: flex; flex-direction: row; align-items: center;}
         .stat-box.small { font-size: 0.75rem; }
         .stat-val { font-size: 1rem; font-weight: 900; margin-top:2px; }
-        .stats-ctrl-row { display: flex; gap: 8px; justify-content: flex-start; width: 100%; flex-wrap: wrap;}
         .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-wrap: wrap;}
         .stat-btn { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;}
         .stat-btn:hover { background: #eee; }
@@ -1347,12 +1343,13 @@
             let html = `
                 <div class="stats-header-container">
                     <div class="stats-top-row">
-                        <div class="stat-box large">${catNames[pastAdatlapFilter]} <span style="cursor:pointer; margin-left:12px; font-size:1.4rem;" onclick="showCatInfo('${pastAdatlapFilter}', true)">ℹ️</span></div>
+                        <div class="stat-box large">${catNames[pastAdatlapFilter]}</div>
                         <div class="stat-box small">Teljesítette:<span class="stat-val">${qual} (${qualPct}%)</span></div>
                         <div class="stat-box small">Kiesett:<span class="stat-val">${elim} (${elimPct}%)</span></div>
                     </div>
                     <div class="stats-ctrl-row">
                         <button class="stat-btn" onclick="setPastAdatlapFilter(null)">⮜ Vissza a kategóriákhoz</button>
+                        <button class="stat-btn" onclick="showCatInfo('${pastAdatlapFilter}', true)" style="font-size:1.1rem; padding:4px 10px;">ℹ️</button>
                     </div>
                 </div>
                 <div id="pastAdatlapItemsContainer"></div>
@@ -2637,13 +2634,14 @@
             cont.innerHTML = `
                 <div class="stats-header-container">
                     <div class="stats-top-row">
-                        <div class="stat-box large">${catNames[currentAdatlapFilter]} <span style="cursor:pointer; margin-left:12px; font-size:1.4rem;" onclick="showCatInfo('${currentAdatlapFilter}', ${viewingPastRaceData !== null})">ℹ️</span></div>
+                        <div class="stat-box large">${catNames[currentAdatlapFilter]}</div>
                         <div class="stat-box small">Teljesítette:<span class="stat-val">${qual} (${qualPct}%)</span></div>
                         <div class="stat-box small">Kiesett:<span class="stat-val">${elim} (${elimPct}%)</span></div>
                     </div>
                     <div class="stats-ctrl-row">
                         <button class="stat-btn" onclick="setAdatlapFilter(null)">⮜ Kategóriák</button>
                         <button class="stat-btn" onclick="openCatSwapModal()">⇆</button>
+                        <button class="stat-btn" onclick="showCatInfo('${currentAdatlapFilter}', ${viewingPastRaceData !== null})" style="font-size:1.1rem; padding:4px 10px;">ℹ️</button>
                         <div class="clock-display" id="liveClockText">--:--:--</div>
                     </div>
                 </div>
