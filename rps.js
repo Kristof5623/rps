@@ -945,7 +945,7 @@
             existingData.isEliminated = oldComp.isEliminated || false;
         }
 
-        const newComp = { bib: bib, name: name, dist: dist, internal: internal, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
+        const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
         db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('rm-addCompBtn');
             cancelRmEdit();
@@ -957,6 +957,9 @@
         if(!comp) return;
         document.getElementById('rm-regBib').value = comp.bib;
         document.getElementById('rm-regName').value = comp.name;
+        document.getElementById('rm-regStartNum').value = comp.startNum || '';
+        document.getElementById('rm-regLicense').value = comp.license || '';
+        document.getElementById('rm-regClub').value = comp.club || '';
         document.getElementById('rm-regDist').value = comp.dist;
         document.getElementById('rm-regInternal').value = comp.internal || '';
         modalEditingBib = comp.bib; 
@@ -970,6 +973,9 @@
         modalEditingBib = null;
         document.getElementById('rm-regBib').value = '';
         document.getElementById('rm-regName').value = '';
+        document.getElementById('rm-regStartNum').value = '';
+        document.getElementById('rm-regLicense').value = '';
+        document.getElementById('rm-regClub').value = '';
         document.getElementById('rm-regInternal').value = '';
         document.getElementById('rm-addCompBtn').innerText = "Hozzáadás";
         document.getElementById('rm-cancelEditBtn').style.display = "none";
@@ -994,14 +1000,27 @@
         
         modalCompetitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             list.innerHTML += `<div class="competitor-item">
-                <div style="flex:1;" onclick="switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny')); document.getElementById('rm-selectCompetitor').value='${c.bib}'; loadRmCompetitorData();">
+                <div style="flex:1; cursor:pointer;" onclick="switchRmTab('rm-verseny', document.getElementById('rm-tab-btn-verseny')); document.getElementById('rm-selectCompetitor').value='${c.bib}'; loadRmCompetitorData();">
                     <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
-                <button class="edit-btn admin-only" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="edit-btn admin-only" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
+                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteRmCompetitorDirect('${c.bib}')">Törlés</button>
+                </div>
             </div>`;
             sel.innerHTML += `<option value="${c.bib}">#${c.bib} - ${c.name}</option>`;
         });
         if(currentSelected) sel.value = currentSelected;
+    }
+
+    function deleteRmCompetitorDirect(bib) {
+        if (!modalRaceId) return;
+        const type = document.getElementById('rm-type').value;
+        showConfirm("Versenyző törlése", "Biztosan törölni akarod ezt a versenyzőt ebből a listából?", () => {
+            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).remove().then(() => {
+                if (modalEditingBib === bib) cancelRmEdit();
+            }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
+        });
     }
 
     // --- MODAL: TELJES VERSENY (EREDMÉNYEK) ---
@@ -1445,6 +1464,9 @@
         if(!comp) return;
         document.getElementById('regBib').value = comp.bib;
         document.getElementById('regName').value = comp.name;
+        document.getElementById('regStartNum').value = comp.startNum || '';
+        document.getElementById('regLicense').value = comp.license || '';
+        document.getElementById('regClub').value = comp.club || '';
         document.getElementById('regDist').value = comp.dist;
         document.getElementById('regInternal').value = comp.internal || '';
         editingBib = comp.bib; 
@@ -1458,6 +1480,9 @@
         editingBib = null;
         document.getElementById('regBib').value = '';
         document.getElementById('regName').value = '';
+        document.getElementById('regStartNum').value = '';
+        document.getElementById('regLicense').value = '';
+        document.getElementById('regClub').value = '';
         document.getElementById('regInternal').value = '';
         document.getElementById('addCompBtn').innerText = "Hozzáadás";
         document.getElementById('cancelEditBtn').style.display = "none";
@@ -1467,6 +1492,9 @@
     function saveCompetitor() {
         const bib = document.getElementById('regBib').value;
         const name = document.getElementById('regName').value;
+        const startNum = document.getElementById('regStartNum').value;
+        const license = document.getElementById('regLicense').value;
+        const club = document.getElementById('regClub').value;
         const dist = document.getElementById('regDist').value;
         const internal = document.getElementById('regInternal').value; 
         if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
@@ -1482,7 +1510,7 @@
             existingData.isEliminated = oldComp.isEliminated || false;
         }
 
-        const newComp = { bib: bib, name: name, dist: dist, internal: internal, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
+        const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
         db.ref('competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('addCompBtn');
             cancelEdit();
@@ -1521,10 +1549,13 @@
 
         competitors.sort((a,b) => parseInt(a.bib) - parseInt(b.bib)).forEach(c => {
             list.innerHTML += `<div class="competitor-item">
-                <div style="flex:1;" onclick="switchSubMode('verseny', document.getElementById('btn-verseny')); document.getElementById('selectCompetitor').value='${c.bib}'; loadCompetitorData();">
+                <div style="flex:1; cursor:pointer;" onclick="switchSubMode('verseny', document.getElementById('btn-verseny')); document.getElementById('selectCompetitor').value='${c.bib}'; loadCompetitorData();">
                     <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
-                <button class="edit-btn admin-only" onclick="editCompetitor('${c.bib}')">Módosítás</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="edit-btn admin-only" onclick="editCompetitor('${c.bib}')">Módosítás</button>
+                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteCompetitorDirect('${c.bib}')">Törlés</button>
+                </div>
             </div>`;
             const opt = `<option value="${c.bib}">#${c.bib} - ${c.name} (${catNames[c.dist]})</option>`;
             sel.innerHTML += opt;
@@ -1539,6 +1570,14 @@
         if(currOrvIdo && selOrvIdo) selOrvIdo.value = currOrvIdo;
         if(currOrv && selOrv) selOrv.value = currOrv;
         if(currNyom && selNyom) selNyom.value = currNyom;
+    }
+
+    function deleteCompetitorDirect(bib) {
+        showConfirm("Élő versenyző törlése", "Biztosan törölni szeretnéd az élő versenyből?", () => {
+            db.ref('competitors/' + bib).remove().then(() => {
+                if (editingBib === bib) cancelEdit();
+            }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
+        });
     }
 
     function loadCompetitorData() {
@@ -2108,4 +2147,3 @@
         if (savedMode === 'terv') savedMode = 'versenyek'; 
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
     };
-
