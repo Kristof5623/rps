@@ -308,10 +308,14 @@
     auth.onAuthStateChanged((user) => {
         if (user) {
             db.ref('users/' + user.uid + '/role').once('value').then((snapshot) => {
-                const role = snapshot.val() || 'guest';
+                let role = String(snapshot.val() || 'guest').toLowerCase();
+                const validRoles = ['admin', 'doctor', 'checkin', 'judge', 'printer', 'guest'];
+                if (!validRoles.includes(role)) {
+                    role = 'guest';
+                }
                 applyAuthUI(true, role);
-                if(role === 'admin') runAutoMigration();
-            }).catch(e => {
+                if (role === 'admin') runAutoMigration();
+            }).catch(() => {
                 applyAuthUI(true, 'guest');
             });
         } else {
@@ -328,10 +332,12 @@
             document.getElementById('logout-section').style.display = 'flex';
             
             let roleNameHu = role;
+            if(role === 'guest') roleNameHu = "Vendég";
             if(role === 'judge') roleNameHu = "Bíró";
             if(role === 'checkin') roleNameHu = "Beérkeztető";
             if(role === 'doctor') roleNameHu = "Állatorvos";
             if(role === 'printer') roleNameHu = "Nyomtató";
+            if(role === 'admin') roleNameHu = "Admin";
             document.getElementById('logged-in-role-text').innerText = "✅ " + roleNameHu.toUpperCase() + " mód";
             
             if(role === 'judge') { switchSubMode('verseny', document.getElementById('btn-verseny')); }
