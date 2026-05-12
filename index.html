@@ -131,13 +131,13 @@
         
         .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; flex-wrap: wrap; gap: 10px;}
         
-        .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
-        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; width: 100%; }
+        .stats-header-container { display: flex; flex-direction: column; align-items: flex-start; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
+        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: flex-start; width: 100%; }
         .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
         .stat-box.large { font-size: 1.1rem; padding: 8px 20px; display: flex; flex-direction: row; align-items: center;}
         .stat-box.small { font-size: 0.75rem; }
         .stat-val { font-size: 1rem; font-weight: 900; margin-top:2px; }
-        .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-wrap: wrap;}
+        .stats-ctrl-row { display: flex; gap: 8px; justify-content: flex-start; width: 100%; flex-wrap: wrap;}
         .stat-btn { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;}
         .stat-btn:hover { background: #eee; }
         .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
@@ -212,7 +212,6 @@
             .live-time { font-size: 1.5rem; }
             #btn-fullscreen-live { display: none !important; }
             .tab-btn { width: auto; }
-            .stat-box.large { width: 100%; }
         }
         @media (max-width: 520px) {
             .sidebar { width: 100%; max-width: 100%; }
@@ -385,19 +384,19 @@
         <div id="versenyek" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 15px;">🏁 Versenyek</h3>
             <div class="tabs">
-                <button id="btn-v-mult" class="tab-btn active" onclick="switchVersenyekTab('v-mult', this)">Múltbéli verseny</button>
-                <button id="btn-v-jovo" class="tab-btn" onclick="switchVersenyekTab('v-jovo', this)">Jövőbeli verseny</button>
+                <button id="btn-v-mult" class="tab-btn" onclick="switchVersenyekTab('v-mult', this)">Múltbéli verseny</button>
+                <button id="btn-v-jovo" class="tab-btn active" onclick="switchVersenyekTab('v-jovo', this)">Jövőbeli verseny</button>
                 <button id="btn-v-jelen" class="tab-btn" onclick="switchVersenyekTab('v-jelen', this)">Jelenlegi verseny</button>
             </div>
 
-            <div id="v-mult" class="verseny-tab-content" style="display:block;">
+            <div id="v-mult" class="verseny-tab-content" style="display:none;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
                 <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
-            <div id="v-jovo" class="verseny-tab-content" style="display:none;">
+            <div id="v-jovo" class="verseny-tab-content" style="display:block;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
                 </div>
@@ -456,7 +455,7 @@
                 
                 <button id="addCompBtn" class="calc-btn add-btn admin-only" onclick="saveCompetitor()">Hozzáadás</button>
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
-                <button id="deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
+                <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
                 <div id="competitorList"></div>
@@ -503,7 +502,7 @@
             </div>
         </div>
 
-        <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><button id="btn-fullscreen-live" class="calc-btn admin-only" style="background:var(--primary); color:white; margin-bottom: 15px; width:auto; padding: 10px 15px;" onclick="enterLiveFullscreen()">Teljes képernyő</button><div id="liveCountdownContainer"></div></div>
+        <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
         <div id="fullscreenLiveOverlay">
             <div class="fullscreen-panel">
                 <div class="fullscreen-header">
@@ -589,7 +588,7 @@
             </select>
             <button id="rm-addCompBtn" class="calc-btn add-btn admin-only" onclick="saveRmCompetitor()">Hozzáadás</button>
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
-            <button id="rm-deleteCompBtn" class="cancel-btn admin-only" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
+            <button id="rm-deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
 
             <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
             <div id="rm-competitorList"></div>
