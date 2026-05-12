@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Verseny Kalkulátor v76.5</title>
+    <title>Verseny Kalkulátor v76.6</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -141,6 +142,7 @@
         .stat-btn { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;}
         .stat-btn:hover { background: #eee; }
         .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
+        .mobile-break { display: none; }
 
         .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; padding-bottom: 25px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; width: 100%; }
         .adatlap-card:hover { background: #d5d5d5; }
@@ -204,6 +206,7 @@
             .stats-header-container { align-items: center; }
             .stats-top-row { justify-content: center; }
             .stats-ctrl-row { justify-content: center; }
+            .mobile-break { display: block; flex-basis: 100%; height: 0; margin: 0; }
             .main-wrapper { padding: 10px; height: auto; flex: 1; overflow-y: auto; }
             .container { max-width: 100%; border-radius: 0 0 20px 20px; margin-bottom: 20px; }
             .mode-content { padding-bottom: 30px; }
@@ -1349,6 +1352,7 @@
                     </div>
                     <div class="stats-ctrl-row">
                         <button class="stat-btn" onclick="setPastAdatlapFilter(null)">⮜ Vissza a kategóriákhoz</button>
+                        <div class="mobile-break"></div>
                         <button class="stat-btn" onclick="showCatInfo('${pastAdatlapFilter}', true)" style="font-size:1.1rem; padding:4px 10px;">ℹ️</button>
                     </div>
                 </div>
@@ -2641,6 +2645,7 @@
                     <div class="stats-ctrl-row">
                         <button class="stat-btn" onclick="setAdatlapFilter(null)">⮜ Kategóriák</button>
                         <button class="stat-btn" onclick="openCatSwapModal()">⇆</button>
+                        <div class="mobile-break"></div>
                         <button class="stat-btn" onclick="showCatInfo('${currentAdatlapFilter}', ${viewingPastRaceData !== null})" style="font-size:1.1rem; padding:4px 10px;">ℹ️</button>
                         <div class="clock-display" id="liveClockText">--:--:--</div>
                     </div>
