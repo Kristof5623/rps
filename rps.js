@@ -925,6 +925,9 @@
     function saveRmCompetitor() {
         if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
         const type = document.getElementById('rm-type').value;
+        const raceDate = document.getElementById('rm-date').value;
+        const today = new Date().toISOString().split('T')[0];
+        if(type === 'mult' || raceDate <= today) { showToast("Múltbéli vagy jelenlegi versenyek versenyzőit nem lehet módosítani!", true); return; }
         const bib = document.getElementById('rm-regBib').value;
         const name = document.getElementById('rm-regName').value;
         const dist = document.getElementById('rm-regDist').value;
