@@ -210,8 +210,7 @@
             .overlay.open { display: block; }
             .live-item { flex-direction: column; align-items: flex-start; gap: 12px; }
             .live-time { font-size: 1.5rem; }
-            .time-group { flex-direction: column; align-items: stretch; }
-            .time-group input { width: 100%; }
+            #btn-fullscreen-live { display: none !important; }
             .tab-btn { width: auto; }
             .stat-box.large { width: 100%; }
         }
@@ -2471,6 +2470,15 @@
     }
 
     document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.code === 'KeyA') {
+            const activeMode = document.querySelector('.mode-content.active');
+            if (activeMode?.id === 'elo-rajtok') {
+                enterLiveFullscreen();
+                e.preventDefault();
+                return;
+            }
+        }
+
         if (e.key === 'Escape' && document.getElementById('fullscreenLiveOverlay')?.classList.contains('active')) {
             exitLiveFullscreen();
             e.preventDefault();
