@@ -1350,7 +1350,19 @@
         if(currentVal) sel.value = currentVal;
     }
 
-    // --- ORVOSI MÓD (FRISSÍTETT) ---
+    // --- ORVOSI MÓD (JAVÍTOTT: Helyes kör kiválasztása) ---
+    function getVetLapIndex(comp) {
+        if (!comp || !comp.laps) return 0;
+        let idx = 0;
+        for (let i = 0; i < comp.laps.length; i++) {
+            // A legutolsó kört keressük, ahová a lovas már beérkezett (van beérkezési ideje)
+            if (comp.laps[i] && comp.laps[i].h && comp.laps[i].h !== '') {
+                idx = i;
+            }
+        }
+        return idx;
+    }
+
     function loadOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
         const form = document.getElementById('orvosi-form');
@@ -1359,7 +1371,8 @@
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
         
-        let idx = getActiveLapIndex(comp, raceConfig);
+        // JAVÍTÁS: A speciális orvosi kör-keresőt használjuk!
+        let idx = getVetLapIndex(comp);
         let l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
         document.getElementById('orv-lap-title').innerText = `${idx + 1}. Kör Orvosi Vizsgálata`;
         
@@ -1402,7 +1415,8 @@
         let comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
-        let idx = getActiveLapIndex(comp, raceConfig);
+        // JAVÍTÁS: A speciális orvosi kör-keresőt használjuk mentésnél is!
+        let idx = getVetLapIndex(comp);
         if(!comp.laps) comp.laps = [];
         if(!comp.laps[idx]) comp.laps[idx] = {};
         
