@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v78</title>
+    <title>Verseny Kalkulátor v78.1</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -252,9 +252,9 @@
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
                 <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
                 <div class="admin-only" style="background: #222; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning);">
-                    <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás (JSON fájl)</h4>
-                    <input type="file" id="rm-bulk-file" accept=".json" style="background: #111; color: white; padding: 10px; border-radius: 6px; width: 100%; margin-bottom: 10px; border: 1px solid #444;">
-                    <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromJson('rm-bulk-file', true)">Fájl feltöltése és Hozzáadás</button>
+                    <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás (Kód bemásolása)</h4>
+                    <textarea id="rm-bulk-text" rows="5" placeholder="Illeszd be ide a JSON kódot..." style="background: #111; color: white; padding: 10px; border-radius: 6px; width: 100%; margin-bottom: 10px; border: 1px solid #444; font-family: monospace; resize: vertical;"></textarea>
+                    <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromText('rm-bulk-text', true)">Kód beolvasása és Hozzáadás</button>
                 </div>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>
@@ -393,9 +393,9 @@
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
             <button id="rm-deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
             <div class="admin-only" style="background: #222; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning);">
-                <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás (JSON fájl)</h4>
-                <input type="file" id="rm-bulk-file" accept=".json" style="background: #111; color: white; padding: 10px; border-radius: 6px; width: 100%; margin-bottom: 10px; border: 1px solid #444;">
-                <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromJson('rm-bulk-file', true)">Fájl feltöltése és Hozzáadás</button>
+                <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás (Kód bemásolása)</h4>
+                <textarea id="rm-bulk-text" rows="5" placeholder="Illeszd be ide a JSON kódot..." style="background: #111; color: white; padding: 10px; border-radius: 6px; width: 100%; margin-bottom: 10px; border: 1px solid #444; font-family: monospace; resize: vertical;"></textarea>
+                <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromText('rm-bulk-text', true)">Kód beolvasása és Hozzáadás</button>
             </div>
 
             <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált versenyzők:</h4>

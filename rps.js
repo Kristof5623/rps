@@ -2157,55 +2157,51 @@
         document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + Math.ceil(d / (CALC_LIMIT / 3600)))}</strong>`;
     }
 
-    // --- TÖMEGES IMPORTÁLÁS FÁJLBÓL ---
-    function importCompetitorsFromJson(inputId, isModal) {
-        const fileInput = document.getElementById(inputId);
-        const file = fileInput.files[0];
+    // --- TÖMEGES IMPORTÁLÁS SZÖVEGBŐL ---
+    function importCompetitorsFromText(textareaId, isModal) {
+        const textArea = document.getElementById(textareaId);
+        const jsonText = textArea.value.trim();
         
-        if (!file) {
-            showToast("Kérlek, válassz ki egy JSON fájlt a feltöltéshez!", true);
+        if (!jsonText) {
+            showToast("Kérlek, másold be a kódot a szövegdobozba!", true);
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                // Megnézzük, hogy van-e benne "competitors" burok, vagy már maga az adat
-                const compsToImport = data.competitors ? data.competitors : data;
-                
-                if (!compsToImport || Object.keys(compsToImport).length === 0) {
-                    showToast("A fájl üres vagy nem tartalmaz versenyzőket!", true);
+        try {
+            const data = JSON.parse(jsonText);
+            // Megnézzük, hogy van-e benne "competitors" burok, vagy már maga az adat
+            const compsToImport = data.competitors ? data.competitors : data;
+            
+            if (!compsToImport || Object.keys(compsToImport).length === 0) {
+                showToast("A kód üres vagy nem tartalmaz versenyzőket!", true);
+                return;
+            }
+
+            // Eldöntjük, hogy hova mentsünk (ÉLŐ vagy MODAL)
+            let dbRef;
+            if (isModal) {
+                if (!modalRaceId) {
+                    showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true);
                     return;
                 }
-
-                // Eldöntjük, hogy hova mentsünk (ÉLŐ vagy MODAL)
-                let dbRef;
-                if (isModal) {
-                    if (!modalRaceId) {
-                        showToast("Hiba: Előbb mentsd el a verseny alapadatait (Név, Dátum)!", true);
-                        return;
-                    }
-                    const type = document.getElementById('rm-type').value || 'jovo';
-                    dbRef = db.ref('races/' + type + '/' + modalRaceId + '/competitors');
-                } else {
-                    dbRef = db.ref('competitors');
-                }
-
-                // Az UPDATE parancs nem törli a meglévőket, csak hozzáadja/frissíti a listát!
-                dbRef.update(compsToImport).then(() => {
-                    showToast(`Sikeres importálás: ${Object.keys(compsToImport).length} versenyző hozzáadva!`);
-                    fileInput.value = ""; // Input mező kiürítése
-                    if (isModal) updateRmCompetitorDisplays();
-                }).catch(err => {
-                    showToast("Hiba az adatbázis feltöltésekor: " + err.message, true);
-                });
-
-            } catch (err) {
-                showToast("Hibás a JSON fájl formátuma! Csak jó JSON fájlt tölthetsz fel.", true);
+                const type = document.getElementById('rm-type').value || 'jovo';
+                dbRef = db.ref('races/' + type + '/' + modalRaceId + '/competitors');
+            } else {
+                dbRef = db.ref('competitors');
             }
-        };
-        reader.readAsText(file);
+
+            // Az UPDATE parancs nem törli a meglévőket, csak hozzáadja/frissíti a listát!
+            dbRef.update(compsToImport).then(() => {
+                showToast(`Sikeres importálás: ${Object.keys(compsToImport).length} versenyző hozzáadva!`);
+                textArea.value = ""; // Input mező kiürítése
+                if (isModal) updateRmCompetitorDisplays();
+            }).catch(err => {
+                showToast("Hiba az adatbázis feltöltésekor: " + err.message, true);
+            });
+
+        } catch (err) {
+            showToast("Hibás a kód! Ellenőrizd, hogy az egészet kimásoltad-e a kapcsos zárójelekkel együtt.", true);
+        }
     }
     
     window.onload = function() {
