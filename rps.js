@@ -2157,19 +2157,18 @@
         document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + Math.ceil(d / (CALC_LIMIT / 3600)))}</strong>`;
     }
 
-    // --- TÖMEGES IMPORTÁLÁS SZÖVEGBŐL ---
-    function importCompetitorsFromText(textareaId, isModal) {
-        const textArea = document.getElementById(textareaId);
-        const jsonText = textArea.value.trim();
+    // --- TÖMEGES IMPORTÁLÁS FELUGRÓ ABLAKKAL ---
+    function importCompetitorsFromPrompt(isModal) {
+        // A böngésző saját beviteli ablakát dobja fel
+        const jsonText = prompt("Kérlek, másold be ide (Ctrl+V vagy jobb klikk -> Beillesztés) a JSON kódot:");
         
-        if (!jsonText) {
-            showToast("Kérlek, másold be a kódot a szövegdobozba!", true);
-            return;
+        // Ha a Mégse gombra nyomott, vagy üresen hagyta
+        if (!jsonText || jsonText.trim() === "") {
+            return; 
         }
 
         try {
-            const data = JSON.parse(jsonText);
-            // Megnézzük, hogy van-e benne "competitors" burok, vagy már maga az adat
+            const data = JSON.parse(jsonText.trim());
             const compsToImport = data.competitors ? data.competitors : data;
             
             if (!compsToImport || Object.keys(compsToImport).length === 0) {
@@ -2177,7 +2176,6 @@
                 return;
             }
 
-            // Eldöntjük, hogy hova mentsünk (ÉLŐ vagy MODAL)
             let dbRef;
             if (isModal) {
                 if (!modalRaceId) {
@@ -2190,17 +2188,15 @@
                 dbRef = db.ref('competitors');
             }
 
-            // Az UPDATE parancs nem törli a meglévőket, csak hozzáadja/frissíti a listát!
             dbRef.update(compsToImport).then(() => {
                 showToast(`Sikeres importálás: ${Object.keys(compsToImport).length} versenyző hozzáadva!`);
-                textArea.value = ""; // Input mező kiürítése
                 if (isModal) updateRmCompetitorDisplays();
             }).catch(err => {
                 showToast("Hiba az adatbázis feltöltésekor: " + err.message, true);
             });
 
         } catch (err) {
-            showToast("Hibás a kód! Ellenőrizd, hogy az egészet kimásoltad-e a kapcsos zárójelekkel együtt.", true);
+            showToast("Hibás a kód! Biztos, hogy az egészet (a { } zárójelekkel együtt) kimásoltad?", true);
         }
     }
     
