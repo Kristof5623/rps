@@ -925,13 +925,16 @@
     function saveRmCompetitor() {
         if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
         const type = document.getElementById('rm-type').value;
-        const raceDate = document.getElementById('rm-date').value;
-        const today = new Date().toISOString().split('T')[0];
-        if(type === 'mult' || raceDate <= today) { showToast("Múltbéli vagy jelenlegi versenyek versenyzőit nem lehet módosítani!", true); return; }
+        
+        // ÚJ: Beolvassuk az összes mezőt (ezek hiányoztak!)
         const bib = document.getElementById('rm-regBib').value;
         const name = document.getElementById('rm-regName').value;
+        const startNum = document.getElementById('rm-regStartNum').value; 
+        const license = document.getElementById('rm-regLicense').value;   
+        const club = document.getElementById('rm-regClub').value;         
         const dist = document.getElementById('rm-regDist').value;
         const internal = document.getElementById('rm-regInternal').value; 
+        
         if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
         
         if (modalEditingBib && modalEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove(); }
@@ -945,6 +948,7 @@
             existingData.isEliminated = oldComp.isEliminated || false;
         }
 
+        // ÚJ: Itt már hiba nélkül tudja menteni az összes adatot
         const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
         db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('rm-addCompBtn');
