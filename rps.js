@@ -1406,7 +1406,7 @@
         if(!comp.laps) comp.laps = [];
         if(!comp.laps[idx]) comp.laps[idx] = {};
         
-        // Adatok mentése
+        // Adatok mentése a felületről
         comp.laps[idx].pulse = document.getElementById('orv-pulse').value;
         comp.laps[idx].hrri = document.getElementById('orv-hrri').value;
         comp.laps[idx].nyalka = document.getElementById('orv-nyalka').value;
@@ -1418,16 +1418,23 @@
         comp.laps[idx].vetName = document.getElementById('orv-vet-name').value;
         comp.laps[idx].vetNotes = document.getElementById('orv-notes').value;
         
-        // Ha az orvos kiesettre tette, a versenyző státusza is frissül!
+        // Státusz beállítása a kapcsoló alapján
         const isQualified = document.getElementById('orvStatusToggle').checked;
         comp.laps[idx].vetDecision = isQualified ? "Továbbengedve" : "Eliminated";
         comp.isEliminated = !isQualified;
 
+        // Újrakalkulálás és mentés
         comp = recalcCompetitorData(comp, raceConfig);
         db.ref('competitors/' + comp.bib).set(comp).then(() => {
+            // 1. Gomb animáció (Sikeresen mentve! ✅)
             showAnimatedBtn('btn-orv-mentes');
-            document.getElementById('sel-orvosi').value = '';
-            document.getElementById('orvosi-form').style.display = 'none';
+            
+            // 2. Késleltetett bezárás (1000 ms = 1 másodperc)
+            setTimeout(() => {
+                document.getElementById('sel-orvosi').value = '';
+                document.getElementById('orvosi-form').style.display = 'none';
+            }, 1000);
+            
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
