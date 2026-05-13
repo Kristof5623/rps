@@ -1416,7 +1416,6 @@
         comp.laps[idx].belhang = document.getElementById('orv-belhang').value;
         comp.laps[idx].mozgas = document.getElementById('orv-mozgas').value;
         comp.laps[idx].vetName = document.getElementById('orv-vet-name').value;
-        comp.laps[idx].vetDecision = document.getElementById('orv-decision').value;
         comp.laps[idx].vetNotes = document.getElementById('orv-notes').value;
         
         // Ha az orvos kiesettre tette, a versenyző státusza is frissül!
