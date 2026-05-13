@@ -149,11 +149,31 @@
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-arr-time">Beérkezett: --:--:--</div>
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:20px;" id="orv-vet-time">Orvosi: --:--:--</div>
                 
-                <label>Pulzus (bpm):</label>
-                <input type="number" id="orv-pulse" placeholder="pl. 56" oninput="jump(this, 'orv-notes')">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><label>Pulzus:</label><input type="text" id="orv-pulse" placeholder="pl. 56"></div>
+                    <div><label>HRRI:</label><input type="text" id="orv-hrri" placeholder="pl. 59"></div>
+                    <div><label>Nyálkahártya:</label><input type="text" id="orv-nyalka" placeholder="pl. A/B/C"></div>
+                    <div><label>Kapilláris telítődés:</label><input type="text" id="orv-crt" placeholder="pl. 1/2/3"></div>
+                    <div><label>Farizom, nyereghely:</label><input type="text" id="orv-farizom" placeholder="pl. A/B/C"></div>
+                    <div><label>Vízháztartás:</label><input type="text" id="orv-vizhaztartas" placeholder="pl. 1/2/3"></div>
+                    <div><label>Bélműködés:</label><input type="text" id="orv-belhang" placeholder="pl. A/B/C"></div>
+                    <div><label>Mozgás:</label><input type="text" id="orv-mozgas" placeholder="pl. A/B/C"></div>
+                </div>
                 
-                <label>Értékelés / Megjegyzés:</label>
-                <input type="text" id="orv-notes" placeholder="pl. A / 1 / OK">
+                <label>Állatorvos:</label>
+                <select id="orv-vet-name"></select>
+
+                <label>Orvosi Döntés:</label>
+                <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
+                    <label class="switch">
+                        <input type="checkbox" id="orvStatusToggle" checked onchange="updateStatusLabel('orvStatusToggle', 'orvStatusLabel')">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="orvStatusLabel" class="status-label" style="color: var(--success);">Továbbengedve</span>
+                </div>
+
+                <label>Megjegyzés:</label>
+                <input type="text" id="orv-notes" placeholder="pl. OK">
                 
                 <button id="btn-orv-mentes" class="calc-btn" style="background:var(--success);" onclick="saveOrvosiData()">Orvosi Adatok Mentése</button>
             </div>
@@ -218,6 +238,7 @@
             <h3 style="color:var(--primary); margin-top:0; margin-bottom:15px;">🔴 ÉLŐ Verseny Kezelés</h3>
             <div class="tabs">
                 <button id="btn-kiiras" class="tab-btn active" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
+                <button id="btn-orvosok" class="tab-btn admin-only" onclick="switchSubMode('orvosok', this)">Állatorvosok</button>
                 <button id="btn-versenyzok" class="tab-btn" onclick="switchSubMode('versenyzok', this)">Versenyzők</button>
                 <button id="btn-verseny" class="tab-btn" onclick="switchSubMode('verseny', this)">Teljes verseny</button>
             </div>
@@ -263,6 +284,16 @@
                 <div id="competitorList"></div>
             </div>
 
+            <div id="orvosok" class="sub-mode-content" style="display:none;">
+                <h4 style="margin-bottom: 15px; color: white;">ÉLŐ: Állatorvosok felvitele</h4>
+                <label>Állatorvos neve (pl. Dr. Szabó János):</label>
+                <input type="text" id="regVetName" placeholder="Név megadása...">
+                <button class="calc-btn add-btn admin-only" onclick="saveVet()">Orvos Hozzáadása</button>
+
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált Állatorvosok:</h4>
+                <div id="vetListContainer"></div>
+            </div>
+            
             <div id="verseny" class="sub-mode-content" style="display:none;">
                 <h4 style="color:white; margin-bottom:15px; margin-top:0;">ÉLŐ: Eredmények bevitele</h4>
                 <label style="color: var(--primary);">Versenyző kiválasztása:</label>
@@ -346,6 +377,7 @@
         <div class="tabs" id="rm-tab-bar" style="display:flex; margin-bottom: 15px;">
             <button class="tab-btn active" id="rm-tab-btn-alap" onclick="switchRmTab('rm-alap', this)">Alap adatok</button>
             <button class="tab-btn" id="rm-tab-btn-kiiras" onclick="switchRmTab('rm-kiiras', this)">Verseny Kiírás</button>
+            <button id="btn-orvosok" class="tab-btn admin-only" onclick="switchSubMode('orvosok', this)">Állatorvosok</button>
             <button class="tab-btn" id="rm-tab-btn-versenyzok" onclick="switchRmTab('rm-versenyzok', this)">Versenyzők</button>
             <button class="tab-btn" id="rm-tab-btn-verseny" onclick="switchRmTab('rm-verseny', this)">Eredmények</button>
         </div>

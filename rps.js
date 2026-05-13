@@ -19,6 +19,7 @@
     const CALC_LIMIT = 15.99;
     let currentAdatlapFilter = null; 
     let dbListenersActive = false; 
+    let liveVets = [];
     
     let viewingPastRaceData = null; 
     let pastAdatlapFilter = null; 
@@ -300,6 +301,13 @@
                 if (selectedBib && !formContainsFocus) { loadOrvosiData(); }
             }
         });
+
+        db.ref('vets').on('value', snap => {
+            liveVets = snap.val() ? Object.values(snap.val()) : [];
+            renderVetList();
+            updateVetDropdowns();
+        });  
+
     }
 
     startDatabaseListeners();
@@ -1306,7 +1314,43 @@
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
-    // --- ORVOSI MÓD ---
+    // --- ÁLLATORVOSOK FELVITELE (ÚJ FUNKCIÓK) ---
+    function saveVet() {
+        const name = document.getElementById('regVetName').value.trim();
+        if(!name) { showToast("Add meg az orvos nevét!", true); return; }
+        const id = Date.now().toString();
+        db.ref('vets/' + id).set({ id: id, name: name });
+        document.getElementById('regVetName').value = '';
+        showToast("Állatorvos sikeresen hozzáadva!");
+    }
+
+    function deleteVet(id) {
+        showConfirm("Orvos törlése", "Biztosan törlöd ezt az állatorvost a listából?", () => {
+            db.ref('vets/' + id).remove();
+        });
+    }
+
+    function renderVetList() {
+        const cont = document.getElementById('vetListContainer'); if(!cont) return;
+        cont.innerHTML = '';
+        if(liveVets.length === 0) { cont.innerHTML = '<div style="color:var(--text-dim);">Nincs állatorvos rögzítve.</div>'; return; }
+        liveVets.forEach(v => {
+            cont.innerHTML += `<div class="competitor-item">
+                <div style="flex:1;"><b>${v.name}</b></div>
+                <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteVet('${v.id}')">Törlés</button>
+            </div>`;
+        });
+    }
+
+    function updateVetDropdowns() {
+        const sel = document.getElementById('orv-vet-name'); if(!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">-- Válassz orvost --</option>';
+        liveVets.forEach(v => { sel.innerHTML += `<option value="${v.name}">${v.name}</option>`; });
+        if(currentVal) sel.value = currentVal;
+    }
+
+    // --- ORVOSI MÓD (FRISSÍTETT) ---
     function loadOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
         const form = document.getElementById('orvosi-form');
@@ -1323,7 +1367,7 @@
             document.getElementById('orv-arr-time').innerText = `Beérkezés: ${toTimeStr(toSec(l.h, l.m, l.s))} (Rögzítve)`;
             document.getElementById('orv-arr-time').style.color = 'var(--success)';
         } else {
-            document.getElementById('orv-arr-time').innerText = `Versenyző még a pályán van! (Nincs beérkezési idő)`;
+            document.getElementById('orv-arr-time').innerText = `Versenyző még a pályán van!`;
             document.getElementById('orv-arr-time').style.color = 'var(--warning)';
         }
 
@@ -1335,7 +1379,19 @@
             document.getElementById('orv-vet-time').style.color = 'var(--warning)';
         }
 
+        // Adatok betöltése
         document.getElementById('orv-pulse').value = l.pulse || '';
+        document.getElementById('orv-hrri').value = l.hrri || '';
+        document.getElementById('orv-nyalka').value = l.nyalka || '';
+        document.getElementById('orv-crt').value = l.crt || '';
+        document.getElementById('orv-farizom').value = l.farizom || '';
+        document.getElementById('orv-vizhaztartas').value = l.vizhaztartas || '';
+        document.getElementById('orv-belhang').value = l.belhang || '';
+        document.getElementById('orv-mozgas').value = l.mozgas || '';
+        document.getElementById('orv-vet-name').value = l.vetName || '';
+        const isQualified = l.vetDecision !== 'Eliminated';
+        document.getElementById('orvStatusToggle').checked = isQualified;
+        updateStatusLabel('orvStatusToggle', 'orvStatusLabel');
         document.getElementById('orv-notes').value = l.vetNotes || '';
         
         form.style.display = 'block';
@@ -1350,9 +1406,24 @@
         if(!comp.laps) comp.laps = [];
         if(!comp.laps[idx]) comp.laps[idx] = {};
         
+        // Adatok mentése
         comp.laps[idx].pulse = document.getElementById('orv-pulse').value;
+        comp.laps[idx].hrri = document.getElementById('orv-hrri').value;
+        comp.laps[idx].nyalka = document.getElementById('orv-nyalka').value;
+        comp.laps[idx].crt = document.getElementById('orv-crt').value;
+        comp.laps[idx].farizom = document.getElementById('orv-farizom').value;
+        comp.laps[idx].vizhaztartas = document.getElementById('orv-vizhaztartas').value;
+        comp.laps[idx].belhang = document.getElementById('orv-belhang').value;
+        comp.laps[idx].mozgas = document.getElementById('orv-mozgas').value;
+        comp.laps[idx].vetName = document.getElementById('orv-vet-name').value;
+        comp.laps[idx].vetDecision = document.getElementById('orv-decision').value;
         comp.laps[idx].vetNotes = document.getElementById('orv-notes').value;
         
+        // Ha az orvos kiesettre tette, a versenyző státusza is frissül!
+        const isQualified = document.getElementById('orvStatusToggle').checked;
+        comp.laps[idx].vetDecision = isQualified ? "Továbbengedve" : "Eliminated";
+        comp.isEliminated = !isQualified;
+
         comp = recalcCompetitorData(comp, raceConfig);
         db.ref('competitors/' + comp.bib).set(comp).then(() => {
             showAnimatedBtn('btn-orv-mentes');
@@ -1361,7 +1432,7 @@
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
-    // --- NYOMTATÁS MÓD ---
+    // --- NYOMTATÁS MÓD (CSAK AKTUÁLIS KÖR) ---
     function loadNyomtatasData() {
         const bib = document.getElementById('sel-nyomtatas').value;
         const form = document.getElementById('nyomtatas-form');
@@ -1370,55 +1441,95 @@
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
-        let phases = (comp.laps || []).filter(l => l.isComplete);
+        // Csak azokat a köröket nézzük, ahova beérkezett
+        let phases = (comp.laps || []).filter(l => l.arrSec > 0 || l.vetSec > 0);
+        
         let html = `
             <div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px;">
                 <h2 style="margin:0 0 5px 0;">#${comp.bib} - ${comp.name}</h2>
                 <div style="font-size:1.1rem;">Ló neve: <b>${comp.internal || "Nincs megadva"}</b></div>
+                <div style="font-size:1.1rem;">Egyesület: <b>${comp.club || "-"}</b></div>
                 <div style="font-size:1rem;">Kategória: <b>${catNames[comp.dist]}</b></div>
             </div>
         `;
+        
         if (phases.length === 0) {
-            html += `<p>Még nincs befejezett kör.</p>`;
+            html += `<p>Még nincs befejezett szakasz.</p>`;
         } else {
-            phases.forEach((l, i) => {
-                html += `
-                <div style="margin-bottom: 15px; padding: 10px; border: 1px dashed #666; border-radius: 8px;">
-                    <h4 style="margin: 0 0 5px 0; font-size: 1.1rem;">${i+1}. Szakasz</h4>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span>Kör idő: <b>${toTimeStr(l.loopSec)}</b></span>
-                        <span>Sebesség: <b>${l.loopSpd.toFixed(2)} km/h</b></span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span>Beérkezés: <b>${toTimeStr(l.arrSec)}</b></span>
-                        <span>Orvosi (Vet): <b>${l.vetSec > 0 ? toTimeStr(l.vetSec) : '-'}</b></span>
-                    </div>
-                    <div style="background:#eee; padding:5px; border-radius:5px; margin-top:5px; font-weight:bold;">
-                        Pulzus: ${l.pulse || '-'} bpm &nbsp;|&nbsp; Értékelés: ${l.vetNotes || '-'}
-                    </div>
-                </div>`;
-            });
-            let last = phases[phases.length - 1];
+            // CSAK AZ UTOLSÓ SZAKASZT nyomtatjuk!
+            let lastIdx = phases.length - 1;
+            let l = phases[lastIdx];
+            let valodiKorSzam = comp.laps.indexOf(l) + 1; 
+
             html += `
-            <div style="background:#000; color:#fff; padding:10px; border-radius:8px; margin-top:15px;">
-                <h3 style="margin:0 0 5px 0;">Összesített Eredmény</h3>
-                <div>Menetidő: <b>${toTimeStr(last.rideTime)}</b></div>
-                <div>Átlagsebesség: <b>${last.rideSpd.toFixed(2)} km/h</b></div>
-                <div>Státusz: <b>${comp.isEliminated ? 'KIESETT' : 'VERSENYBEN'}</b></div>
+            <div style="margin-bottom: 15px; padding: 10px; border: 1px dashed #000; border-radius: 8px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 1.3rem; text-align: center; background:#000; color:#fff; padding:5px;">${valodiKorSzam}. Szakasz - Állatorvosi Adatlap</h3>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size: 1.1rem;">
+                    <span>Érkezés: <b>${l.arrSec > 0 ? toTimeStr(l.arrSec) : '-'}</b></span>
+                    <span>Orvosi (Vet): <b>${l.vetSec > 0 ? toTimeStr(l.vetSec) : '-'}</b></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size: 1.1rem; border-bottom: 2px solid #000; padding-bottom: 5px;">
+                    <span>Kör idő: <b>${l.loopSec > 0 ? toTimeStr(l.loopSec) : '-'}</b></span>
+                    <span>Sebesség: <b>${l.loopSpd ? l.loopSpd.toFixed(2) : '0.00'} km/h</b></span>
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse; font-size: 1.1rem; text-align: left;">
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #000; width: 25%;">Pulzus:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold; width: 25%;">${l.pulse || '-'}</td>
+                        <td style="padding: 6px; border: 1px solid #000; width: 25%;">HRRI:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold; width: 25%;">${l.hrri || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #000;">Nyálkahártya:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.nyalka || '-'}</td>
+                        <td style="padding: 6px; border: 1px solid #000;">CRT:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.crt || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #000;">Vízháztartás:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.vizhaztartas || '-'}</td>
+                        <td style="padding: 6px; border: 1px solid #000;">Bélhangok:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.belhang || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #000;">Farizom:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;" colspan="3">${l.farizom || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #000;">Mozgás:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;" colspan="3">${l.mozgas || '-'}</td>
+                    </tr>
+                </table>
+
+                <div style="margin-top: 15px; font-size: 1.1rem;">
+                    Állatorvos: <b>${l.vetName || 'Nincs megadva'}</b><br>
+                    Döntés: <b style="color:${l.vetDecision === 'Eliminated' ? 'red' : 'green'}; text-transform: uppercase;">${l.vetDecision || '-'}</b><br>
+                    Megjegyzés: <b>${l.vetNotes || '-'}</b>
+                </div>
             </div>`;
+            
+            // Végeredmény kijelzése, ha kiesett, vagy befejezte
+            let baseDist = comp.dist.replace('j', '');
+            let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 1;
+            
+            if (valodiKorSzam === expectedLaps || comp.isEliminated) {
+                html += `
+                <div style="border: 2px solid #000; padding:10px; margin-top:15px; font-size: 1.2rem;">
+                    <h3 style="margin:0 0 5px 0;">Végeredmény (Összesített)</h3>
+                    <div>Teljes Menetidő: <b>${l.rideTime > 0 ? toTimeStr(l.rideTime) : '-'}</b></div>
+                    <div>Átlagsebesség: <b>${l.rideSpd ? l.rideSpd.toFixed(2) : '0.00'} km/h</b></div>
+                    <div>Státusz: <b style="text-transform: uppercase;">${comp.isEliminated ? 'KIESETT (Eliminated)' : 'BEFEJEZTE'}</b></div>
+                </div>`;
+            }
         }
 
         document.getElementById('print-sticker').innerHTML = html;
         form.style.display = 'block';
     }
-// --- FŐ ÉLŐ VERSENY FUNKCIÓK ---
-    function updateStatusLabel(toggleId = 'compStatusToggle', labelId = 'compStatusLabel') {
+
+    // --- FŐ ÉLŐ VERSENY FUNKCIÓK ---
+    function updateStatusLabel(toggleId, labelId) {
         const toggle = document.getElementById(toggleId);
         const label = document.getElementById(labelId);
         if (toggle.checked) {
-            label.innerText = "Versenyben"; label.style.color = "var(--success)";
+            label.innerText = (labelId === 'orvStatusLabel') ? "Továbbengedve" : "Versenyben";
+            label.style.color = 'var(--success)';
         } else {
-            label.innerText = "Kiesett"; label.style.color = "var(--danger)";
+            label.innerText = (labelId === 'orvStatusLabel') ? "Eliminated (Kiesett)" : "Kiesett";
+            label.style.color = 'var(--danger)';
         }
     }
 
