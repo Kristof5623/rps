@@ -825,12 +825,17 @@
 
     function showAnimatedBtn(btnId) {
         const btn = document.getElementById(btnId);
-        if(btn) {
+        if(btn && !btn.dataset.animating) {
+            btn.dataset.animating = "true";
             const origText = btn.innerText;
             const origBg = btn.style.background;
             btn.innerText = 'Sikeresen mentve! ✅';
             btn.style.background = '#28a745';
-            setTimeout(() => { btn.innerText = origText; btn.style.background = origBg; }, 2000);
+            setTimeout(() => { 
+                btn.innerText = origText; 
+                btn.style.background = origBg; 
+                delete btn.dataset.animating;
+            }, 2000);
         }
     }
 
@@ -1111,7 +1116,7 @@
                 <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
-                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(l.phaseSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${toTimeStr(l.phaseSec)}</b></div>
                 ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${l.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
                 <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(l.pulzusSec)}</b></div>
                 ` : ""}
@@ -1121,7 +1126,8 @@
         if (comp.laps && comp.laps.length > 0 && comp.laps[0].isComplete) {
             let lastComplete = comp.laps.slice().reverse().find(x => x.isComplete);
             if (lastComplete) {
-                let avgColor = (lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
+                let hasSpeeding = comp.laps.some(l => l.isComplete && (l.loopSpd >= 16 || l.phaseSpd >= 16));
+                let avgColor = (hasSpeeding || lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
                 html += `<div class="summary-total">
                     <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
                     <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(lastComplete.rideTime)}</b></div>
@@ -1671,7 +1677,7 @@
                 <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
                 <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
-                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${isFinalLap ? '-' : toTimeStr(l.phaseSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${toTimeStr(l.phaseSec)}</b></div>
                 ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${l.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
                 <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(l.pulzusSec)}</b></div>
                 ` : ""}
@@ -1681,7 +1687,8 @@
         if (comp.laps && comp.laps.length > 0 && comp.laps[0].isComplete) {
             let lastComplete = comp.laps.slice().reverse().find(x => x.isComplete);
             if(lastComplete) {
-                let avgColor = (lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
+                let hasSpeeding = comp.laps.some(l => l.isComplete && (l.loopSpd >= 16 || l.phaseSpd >= 16));
+                let avgColor = (hasSpeeding || lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
                 html += `<div class="summary-total">
                     <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
                     <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(lastComplete.rideTime)}</b></div>
@@ -2119,7 +2126,11 @@
 
         html += `</tr><tr><th class="row-header">Pulzus idő</th>`; phases.forEach(l => html += `<td>${l.pulzusSec>0?toTimeStr(l.pulzusSec):"-"}</td>`);
         html += `</tr><tr><th class="row-header">Össz. menetidő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.rideTime)}</td>`);
-        html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.rideSpd>=16?'warning-speed':'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`);
+        html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; phases.forEach((l, i) => {
+            let anySpeedingSoFar = phases.slice(0, i + 1).some(p => p.loopSpd >= 16 || p.phaseSpd >= 16);
+            let isWarning = anySpeedingSoFar || l.rideSpd >= 16;
+            html += `<td class="${isWarning ? 'warning-speed' : 'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`;
+        });
         html += `</tr><tr><th class="row-header">Helyezés</th>${ranksHtml}</tr><tr><th class="row-header">Lemaradás</th>${gapsHtml}</tr></table></div>`;
         document.getElementById('modalBody').innerHTML = html; document.getElementById('adatlapModal').style.display = 'flex';
     }
