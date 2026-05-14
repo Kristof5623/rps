@@ -1452,7 +1452,7 @@
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
-    // --- NYOMTATÁS MÓD (15x10cm FEKTETETT - EGYSÉGES KLINIKAI RÁCS, OUT IDŐVEL) ---
+    // --- NYOMTATÁS MÓD (15x10cm FEKTETETT - KIEMELT VERSENY NÉVVEL ÉS NAGY TÁVVAL) ---
     function loadNyomtatasData() {
         const bib = document.getElementById('sel-nyomtatas').value;
         const form = document.getElementById('nyomtatas-form');
@@ -1484,100 +1484,127 @@
         let recStr = (l.arrSec > 0 && l.vetSec > 0) ? toTimeStr(l.vetSec - l.arrSec) : '-';
         let outStr = (l.nextStart > 0 && !isFinalLap && l.vetDecision !== 'Eliminated') ? toTimeStr(l.nextStart) : (isFinalLap ? 'FINISH' : '-');
 
-        // SZERKEZET: 15x10cm FEKTETETT (145mm x 95mm)
+        // Verseny nevének lekérése
+        let raceNameStr = liveRaceMeta ? liveRaceMeta.name : "Élő Verseny";
+
+        // SZERKEZET: 15x10cm FEKTETETT (145mm x 95mm).
         let html = `
-            <div style="width: 145mm; height: 95mm; border: 3px solid #000; padding: 3mm; box-sizing: border-box; background: #fff; color: #000; font-family: 'Arial Narrow', Arial, sans-serif; display: block; margin: 0 auto;">
+            <div style="width: 145mm; height: 95mm; border: 3px solid #000; padding: 2mm; box-sizing: border-box; background: #fff; color: #000; font-family: 'Arial Narrow', Arial, sans-serif; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; margin: 0 auto;">
                 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 2mm;">
-                    <tr>
-                        <td style="width: 18%; border: 2px solid #000; text-align: center; background: #000; color: #fff; font-size: 32pt; font-weight: bold; padding: 1mm;">#${comp.bib}</td>
-                        <td style="width: 52%; padding-left: 3mm;">
-                            <div style="font-size: 16pt; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden;">${comp.name}</div>
-                            <div style="font-size: 12pt;">${comp.internal || "Ló neve hiányzik"}</div>
-                            <div style="font-size: 10pt; color: #444;">${comp.club || "-"}</div>
-                        </td>
-                        <td style="width: 30%;">
-                            <table style="width: 100%; border-collapse: collapse; text-align: center;">
-                                <tr style="background: #e0e0e0; font-size: 9pt; font-weight: bold;">
-                                    <td style="border: 1px solid #000; padding: 1mm;">ARR</td>
-                                    <td style="border: 1px solid #000; padding: 1mm;">IN</td>
-                                    <td style="border: 1px solid #000; padding: 1mm;">REC</td>
-                                </tr>
-                                <tr style="font-size: 15pt; font-weight: bold;">
-                                    <td style="border: 1px solid #000; padding: 1mm;">${arrStr}</td>
-                                    <td style="border: 1px solid #000; padding: 1mm;">${inStr}</td>
-                                    <td style="border: 1px solid #000; padding: 1mm;">${recStr}</td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
+                <div style="flex: 0 0 auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 16%; border: 2px solid #000; text-align: center;; color: #000000; font-size: 30pt; font-weight: bold; padding: 1mm; text-transform: uppercase;">#${comp.bib}</td>
+                            <td style="width: 54%; padding-left: 2.5mm; padding-right: 2.5mm; vertical-align: top;">
+                                
+                                <div style="text-align: center; background: #d0d0d0; padding: 1.5mm; margin-bottom: 1.5mm; border: 1px solid #000; border-radius: 3px; font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+                                    ${raceNameStr}
+                                </div>
 
-                <table style="width: 100%; height: 50mm; border-collapse: collapse; margin-bottom: 2mm;">
-                    <tr style="background: #000; color: #fff; font-size: 10pt; text-transform: uppercase; height: 5mm;">
-                        <th style="border: 1px solid #000; padding: 1mm; width: 12%;">LOOP</th>
-                        <th style="border: 1px solid #000; padding: 1mm; width: 28%;">Pulzus / HRRI</th>
-                        <th style="border: 1px solid #000; padding: 1mm; width: 60%;">Klinikai Paraméterek</th>
-                    </tr>
-                    <tr>
-                        <td style="border: 2px solid #000; text-align: center; font-size: 30pt; font-weight: bold; vertical-align: middle;">${valodiKorSzam}</td>
-                        <td style="border: 1px solid #000; padding: 1mm; text-align: center; vertical-align: middle;">
-                            <div style="font-size: 11pt; color: #444;">PULZUS (HR)</div>
-                            <div style="font-size: 32pt; font-weight: bold; margin-bottom: 3mm;">${l.pulse || '-'}</div>
-                            <div style="font-size: 11pt; color: #444;">HRRI</div>
-                            <div style="font-size: 22pt; font-weight: bold;">${l.hrri || '-'}</div>
-                        </td>
-                        <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
-                            <table style="width: 100%; height: 100%; border-collapse: collapse; text-align: center;">
-                                <tr>
-                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa; width: 50%;">
-                                        <div style="font-size: 10pt; color: #444;">Nyálkahártya</div>
-                                        <div style="font-size: 14pt; font-weight: bold;">${l.nyalka || '-'}</div>
-                                    </td>
-                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa; width: 50%;">
-                                        <div style="font-size: 10pt; color: #444;">Kapilláris (CRT)</div>
-                                        <div style="font-size: 14pt; font-weight: bold;">${l.crt || '-'}</div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa;">
-                                        <div style="font-size: 10pt; color: #444;">Vízháztartás</div>
-                                        <div style="font-size: 14pt; font-weight: bold;">${l.vizhaztartas || '-'}</div>
-                                    </td>
-                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa;">
-                                        <div style="font-size: 10pt; color: #444;">Bélműködés</div>
-                                        <div style="font-size: 14pt; font-weight: bold;">${l.belhang || '-'}</div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 2mm; border-right: 1px solid #aaa;">
-                                        <div style="font-size: 10pt; color: #444;">Farizom / Nyereghely</div>
-                                        <div style="font-size: 14pt; font-weight: bold;">${l.farizom || '-'}</div>
-                                    </td>
-                                    <td style="padding: 2mm; background: #f8f8f8;">
-                                        <div style="font-size: 10pt; color: #444; text-transform: uppercase;">Mozgás (Gait)</div>
-                                        <div style="font-size: 16pt; font-weight: bold;">${l.mozgas || '-'}</div>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
+                                <div style="font-size: 14pt; font-weight: bold; text-transform: uppercase; line-height: 1.1; word-wrap: break-word;">${comp.name}</div>
+                                <div style="font-size: 11pt; margin-top: 1mm;">${comp.internal || "Ló neve hiányzik"}</div>
+                            </td>
+                            <td style="width: 30%; vertical-align: middle;">
+                                <table style="width: 100%; border-collapse: collapse; text-align: center;">
+                                    <tr style="background: #e0e0e0; font-size: 8pt; font-weight: bold;">
+                                        <td style="border: 1px solid #000; padding: 1mm;">ARR</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">IN</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">REC</td>
+                                    </tr>
+                                    <tr style="font-size: 13pt; font-weight: bold;">
+                                        <td style="border: 1px solid #000; padding: 1mm;">${arrStr}</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">${inStr}</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">${recStr}</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
 
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="width: 50%; border: 2px solid #000; background: #e0e0e0; padding: 2mm; text-align: center;">
-                            <div style="font-size: 10pt; text-transform: uppercase;">Kimeneteli Idő / OUT</div>
-                            <div style="font-size: 28pt; font-weight: bold; letter-spacing: 2px; color: #000;">
-                                ${outStr}
-                            </div>
-                        </td>
-                        <td style="width: 50%; padding-left: 3mm; vertical-align: middle;">
-                            <div style="font-size: 12pt;"><b>Orvos:</b> ${l.vetName || "-"}</div>
-                            <div style="font-size: 11pt; margin-top: 2mm; font-style: italic; line-height: 1.2;"><b>Megjegyzés:</b> ${l.vetNotes || "-"}</div>
-                        </td>
-                    </tr>
-                </table>
+                <div style="flex: 1 1 auto; margin: 1.5mm 0; min-height: 0;">
+                    <table style="width: 100%; height: 100%; border-collapse: collapse;">
+                        <tr style="color: #000000; font-size: 9pt; text-transform: uppercase; height: 4.5mm;">
+                            <th style="border: 1px solid #000; padding: 0.5mm; width: 14%;">TÁV / LOOP</th>
+                            <th style="border: 1px solid #000; padding: 0.5mm; width: 26%;">Pulzus / HRRI</th>
+                            <th style="border: 1px solid #000; padding: 0.5mm; width: 60%;">Klinikai Paraméterek</th>
+                        </tr>
+                        <tr>
+                            <td style="border: 2px solid #000; padding: 0; height: 100%;">
+                                <table style="width: 100%; height: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="background: #e0e0e0; border-bottom: 2px solid #000; text-align: center; vertical-align: middle; height: 45%;">
+                                            <div style="font-size: 16pt; font-weight: bold; text-transform: uppercase;">${catNames[comp.dist]}</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: center; vertical-align: middle; height: 55%;">
+                                            <div style="font-size: 32pt; font-weight: bold;">${valodiKorSzam}</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td style="border: 1px solid #000; padding: 1mm; text-align: center; vertical-align: middle;">
+                                <div style="font-size: 10pt; color: #000000;">PULZUS (HR)</div>
+                                <div style="font-size: 30pt; font-weight: bold; margin-bottom: 1.5mm;">${l.pulse || '-'}</div>
+                                <div style="font-size: 10pt; color: #000000;">HRRI</div>
+                                <div style="font-size: 20pt; font-weight: bold;">${l.hrri || '-'}</div>
+                            </td>
+                            <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
+                                <table style="width: 100%; height: 100%; border-collapse: collapse; text-align: center;">
+                                    <tr>
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa; width: 50%;">
+                                            <div style="font-size: 9pt; color: #000000;">Nyálkahártya</div>
+                                            <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.nyalka || '-'}</div>
+                                        </td>
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa; width: 50%;">
+                                            <div style="font-size: 9pt; color: #000000;">Kapilláris (CRT)</div>
+                                            <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.crt || '-'}</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa;">
+                                            <div style="font-size: 9pt; color: #000000;">Vízháztartás</div>
+                                            <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.vizhaztartas || '-'}</div>
+                                        </td>
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa;">
+                                            <div style="font-size: 9pt; color: #000000;">Bélműködés</div>
+                                            <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.belhang || '-'}</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 1.5mm; border-right: 1px solid #aaa;">
+                                            <div style="font-size: 9pt; color: #000000;">Farizom / Nyereghely</div>
+                                            <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.farizom || '-'}</div>
+                                        </td>
+                                        <td style="padding: 1.5mm; background: #f8f8f8;">
+                                            <div style="font-size: 9pt; color: #000000;">Mozgás</div>
+                                            <div style="font-size: 15pt; font-weight: bold; text-transform: uppercase;">${l.mozgas || '-'}</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="flex: 0 0 auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 50%; border: 2px solid #000; background: #e0e0e0; padding: 1.5mm; text-align: center;">
+                                <div style="font-size: 9pt; text-transform: uppercase;">Kimeneteli Idő / OUT</div>
+                                <div style="font-size: 26pt; font-weight: bold; letter-spacing: 2px; color: #000; line-height: 1.1;">
+                                    ${outStr}
+                                </div>
+                            </td>
+                            <td style="width: 50%; padding-left: 3mm; vertical-align: middle;">
+                                <div style="font-size: 11pt;"><b>Orvos:</b> ${l.vetName || "-"}</div>
+                                <div style="font-size: 10pt; margin-top: 1mm; font-style: italic; line-height: 1.1;"><b>Megjegyzés:</b> ${l.vetNotes || "-"}</div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
             </div>
         `;
 
