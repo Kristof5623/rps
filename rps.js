@@ -1350,12 +1350,12 @@
         if(currentVal) sel.value = currentVal;
     }
 
-    // --- ORVOSI MÓD (JAVÍTOTT: Helyes kör kiválasztása) ---
+    // --- ORVOSI MÓD (ELŐZETES VIZSGÁLATTAL ÉS KÖRVÁLASZTÓVAL) ---
     function getVetLapIndex(comp) {
-        if (!comp || !comp.laps) return 0;
-        let idx = 0;
+        if (!comp || !comp.laps) return -1; // A -1 jelenti az ELŐZETES vizsgálatot
+        let idx = -1;
         for (let i = 0; i < comp.laps.length; i++) {
-            // A legutolsó kört keressük, ahová a lovas már beérkezett (van beérkezési ideje)
+            // A legutolsó kört keressük, ahová a lovas már beérkezett
             if (comp.laps[i] && comp.laps[i].h && comp.laps[i].h !== '') {
                 idx = i;
             }
@@ -1371,25 +1371,36 @@
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
         
-        // JAVÍTÁS: A speciális orvosi kör-keresőt használjuk!
         let idx = getVetLapIndex(comp);
-        let l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
-        document.getElementById('orv-lap-title').innerText = `${idx + 1}. Kör Orvosi Vizsgálata`;
+        let l = {};
         
-        if(l.h && l.h !== '') {
-            document.getElementById('orv-arr-time').innerText = `Beérkezés: ${toTimeStr(toSec(l.h, l.m, l.s))} (Rögzítve)`;
-            document.getElementById('orv-arr-time').style.color = 'var(--success)';
+        if (idx === -1) {
+            // NINCS MÉG KÖR -> ELŐZETES ÁLLATORVOSI
+            document.getElementById('orv-lap-title').innerText = `Előzetes Állatorvosi Vizsgálat (PRE-VET)`;
+            document.getElementById('orv-arr-time').innerText = `Rajt előtti állapot`;
+            document.getElementById('orv-arr-time').style.color = 'var(--primary)';
+            document.getElementById('orv-vet-time').innerText = `-`;
+            l = comp.preVet || {};
         } else {
-            document.getElementById('orv-arr-time').innerText = `Versenyző még a pályán van!`;
-            document.getElementById('orv-arr-time').style.color = 'var(--warning)';
-        }
+            // MÁR VAN KÖR
+            l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
+            document.getElementById('orv-lap-title').innerText = `${idx + 1}. Kör Orvosi Vizsgálata`;
+            
+            if(l.h && l.h !== '') {
+                document.getElementById('orv-arr-time').innerText = `Beérkezés: ${toTimeStr(toSec(l.h, l.m, l.s))} (Rögzítve)`;
+                document.getElementById('orv-arr-time').style.color = 'var(--success)';
+            } else {
+                document.getElementById('orv-arr-time').innerText = `Versenyző még a pályán van!`;
+                document.getElementById('orv-arr-time').style.color = 'var(--warning)';
+            }
 
-        if(l.oh && l.oh !== '') {
-            document.getElementById('orv-vet-time').innerText = `Orvosi idő: ${toTimeStr(toSec(l.oh, l.om, l.os))} (Rögzítve)`;
-            document.getElementById('orv-vet-time').style.color = 'var(--primary)';
-        } else {
-            document.getElementById('orv-vet-time').innerText = `Orvosi idő még nincs rögzítve!`;
-            document.getElementById('orv-vet-time').style.color = 'var(--warning)';
+            if(l.oh && l.oh !== '') {
+                document.getElementById('orv-vet-time').innerText = `Orvosi idő: ${toTimeStr(toSec(l.oh, l.om, l.os))} (Rögzítve)`;
+                document.getElementById('orv-vet-time').style.color = 'var(--primary)';
+            } else {
+                document.getElementById('orv-vet-time').innerText = `Orvosi idő még nincs rögzítve!`;
+                document.getElementById('orv-vet-time').style.color = 'var(--warning)';
+            }
         }
 
         // Adatok betöltése
@@ -1402,10 +1413,11 @@
         document.getElementById('orv-belhang').value = l.belhang || '';
         document.getElementById('orv-mozgas').value = l.mozgas || '';
         document.getElementById('orv-vet-name').value = l.vetName || '';
+        document.getElementById('orv-notes').value = l.vetNotes || '';
+        
         const isQualified = l.vetDecision !== 'Eliminated';
         document.getElementById('orvStatusToggle').checked = isQualified;
         updateStatusLabel('orvStatusToggle', 'orvStatusLabel');
-        document.getElementById('orv-notes').value = l.vetNotes || '';
         
         form.style.display = 'block';
     }
@@ -1415,44 +1427,47 @@
         let comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
-        // JAVÍTÁS: A speciális orvosi kör-keresőt használjuk mentésnél is!
         let idx = getVetLapIndex(comp);
-        if(!comp.laps) comp.laps = [];
-        if(!comp.laps[idx]) comp.laps[idx] = {};
+        let targetObj;
         
-        // Adatok mentése a felületről
-        comp.laps[idx].pulse = document.getElementById('orv-pulse').value;
-        comp.laps[idx].hrri = document.getElementById('orv-hrri').value;
-        comp.laps[idx].nyalka = document.getElementById('orv-nyalka').value;
-        comp.laps[idx].crt = document.getElementById('orv-crt').value;
-        comp.laps[idx].farizom = document.getElementById('orv-farizom').value;
-        comp.laps[idx].vizhaztartas = document.getElementById('orv-vizhaztartas').value;
-        comp.laps[idx].belhang = document.getElementById('orv-belhang').value;
-        comp.laps[idx].mozgas = document.getElementById('orv-mozgas').value;
-        comp.laps[idx].vetName = document.getElementById('orv-vet-name').value;
-        comp.laps[idx].vetNotes = document.getElementById('orv-notes').value;
+        if (idx === -1) {
+            // Előzetes orvosi mentése a preVet objektumba
+            if (!comp.preVet) comp.preVet = {};
+            targetObj = comp.preVet;
+        } else {
+            // Aktuális kör mentése
+            if(!comp.laps) comp.laps = [];
+            if(!comp.laps[idx]) comp.laps[idx] = {};
+            targetObj = comp.laps[idx];
+        }
         
-        // Státusz beállítása a kapcsoló alapján
+        // Adatok mentése
+        targetObj.pulse = document.getElementById('orv-pulse').value;
+        targetObj.hrri = document.getElementById('orv-hrri').value;
+        targetObj.nyalka = document.getElementById('orv-nyalka').value;
+        targetObj.crt = document.getElementById('orv-crt').value;
+        targetObj.farizom = document.getElementById('orv-farizom').value;
+        targetObj.vizhaztartas = document.getElementById('orv-vizhaztartas').value;
+        targetObj.belhang = document.getElementById('orv-belhang').value;
+        targetObj.mozgas = document.getElementById('orv-mozgas').value;
+        targetObj.vetName = document.getElementById('orv-vet-name').value;
+        targetObj.vetNotes = document.getElementById('orv-notes').value;
+        
         const isQualified = document.getElementById('orvStatusToggle').checked;
-        comp.laps[idx].vetDecision = isQualified ? "Továbbengedve" : "Eliminated";
+        targetObj.vetDecision = isQualified ? "Továbbengedve" : "Eliminated";
         comp.isEliminated = !isQualified;
 
-        // Újrakalkulálás és mentés
         comp = recalcCompetitorData(comp, raceConfig);
         db.ref('competitors/' + comp.bib).set(comp).then(() => {
-            // 1. Gomb animáció (Sikeresen mentve! ✅)
             showAnimatedBtn('btn-orv-mentes');
-            
-            // 2. Késleltetett bezárás (1000 ms = 1 másodperc)
             setTimeout(() => {
                 document.getElementById('sel-orvosi').value = '';
                 document.getElementById('orvosi-form').style.display = 'none';
             }, 1000);
-            
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
-    // --- NYOMTATÁS MÓD (15x10cm FEKTETETT - KIEMELT VERSENY NÉVVEL ÉS NAGY TÁVVAL) ---
+    // --- NYOMTATÁS MÓD (ELŐZETES TÁMOGATÁSSAL) ---
     function loadNyomtatasData() {
         const bib = document.getElementById('sel-nyomtatas').value;
         const form = document.getElementById('nyomtatas-form');
@@ -1461,46 +1476,55 @@
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
-        let phases = (comp.laps || []).filter(l => l.arrSec > 0 || l.vetSec > 0);
+        let idx = getVetLapIndex(comp);
+        let l, valodiKorSzam, isFinalLap, arrStr, inStr, recStr, outStr;
         
-        if (phases.length === 0) {
-            document.getElementById('print-sticker').innerHTML = `<p style="color:white; text-align:center;">Nincs rögzített adat.</p>`;
-            form.style.display = 'block';
-            return;
+        if (idx === -1) {
+            // ELŐZETES NYOMTATÁS
+            if (!comp.preVet || !comp.preVet.pulse) {
+                document.getElementById('print-sticker').innerHTML = `<p style="color:white; text-align:center;">Nincs rögzített előzetes adat.</p>`;
+                form.style.display = 'block';
+                return;
+            }
+            l = comp.preVet;
+            valodiKorSzam = "PRE";
+            isFinalLap = false;
+            arrStr = "-"; inStr = "-"; recStr = "-"; outStr = "-";
+        } else {
+            // NORMÁL KÖR NYOMTATÁS
+            let phases = (comp.laps || []).filter(lap => lap.arrSec > 0 || lap.vetSec > 0);
+            if (phases.length === 0) {
+                document.getElementById('print-sticker').innerHTML = `<p style="color:white; text-align:center;">Nincs rögzített adat.</p>`;
+                form.style.display = 'block';
+                return;
+            }
+            l = comp.laps[idx];
+            valodiKorSzam = idx + 1; 
+
+            let baseDist = comp.dist.replace('j', '');
+            let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 1;
+            isFinalLap = (valodiKorSzam === expectedLaps);
+
+            arrStr = l.arrSec > 0 ? toTimeStr(l.arrSec) : '-';
+            inStr = l.vetSec > 0 ? toTimeStr(l.vetSec) : '-';
+            recStr = (l.arrSec > 0 && l.vetSec > 0) ? toTimeStr(l.vetSec - l.arrSec) : '-';
+            outStr = (l.nextStart > 0 && !isFinalLap && l.vetDecision !== 'Eliminated') ? toTimeStr(l.nextStart) : (isFinalLap ? 'FINISH' : '-');
         }
 
-        // CSAK AZ UTOLSÓ KÖRT NYOMTATJUK
-        let lastIdx = phases.length - 1;
-        let l = phases[lastIdx];
-        let valodiKorSzam = comp.laps.indexOf(l) + 1; 
-
-        let baseDist = comp.dist.replace('j', '');
-        let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 1;
-        let isFinalLap = (valodiKorSzam === expectedLaps);
-
-        // Idők számítása
-        let arrStr = l.arrSec > 0 ? toTimeStr(l.arrSec) : '-';
-        let inStr = l.vetSec > 0 ? toTimeStr(l.vetSec) : '-';
-        let recStr = (l.arrSec > 0 && l.vetSec > 0) ? toTimeStr(l.vetSec - l.arrSec) : '-';
-        let outStr = (l.nextStart > 0 && !isFinalLap && l.vetDecision !== 'Eliminated') ? toTimeStr(l.nextStart) : (isFinalLap ? 'FINISH' : '-');
-
-        // Verseny nevének lekérése
         let raceNameStr = liveRaceMeta ? liveRaceMeta.name : "Élő Verseny";
 
-        // SZERKEZET: 15x10cm FEKTETETT (145mm x 95mm).
+        // HTML generálása a már megtervezett 15x10cm dizájnnal
         let html = `
             <div style="width: 145mm; height: 95mm; border: 3px solid #000; padding: 2mm; box-sizing: border-box; background: #fff; color: #000; font-family: 'Arial Narrow', Arial, sans-serif; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; margin: 0 auto;">
                 
                 <div style="flex: 0 0 auto;">
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="width: 16%; border: 2px solid #000; text-align: center;; color: #000000; font-size: 30pt; font-weight: bold; padding: 1mm; text-transform: uppercase;">#${comp.bib}</td>
+                            <td style="width: 16%; border: 2px solid #000; text-align: center; color:rgb(0, 0, 0)f; font-size: 30pt; font-weight: bold; padding: 1mm;">#${comp.bib}</td>
                             <td style="width: 54%; padding-left: 2.5mm; padding-right: 2.5mm; vertical-align: top;">
-                                
                                 <div style="text-align: center; background: #d0d0d0; padding: 1.5mm; margin-bottom: 1.5mm; border: 1px solid #000; border-radius: 3px; font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
                                     ${raceNameStr}
                                 </div>
-
                                 <div style="font-size: 14pt; font-weight: bold; text-transform: uppercase; line-height: 1.1; word-wrap: break-word;">${comp.name}</div>
                                 <div style="font-size: 11pt; margin-top: 1mm;">${comp.internal || "Ló neve hiányzik"}</div>
                             </td>
@@ -1534,12 +1558,12 @@
                                 <table style="width: 100%; height: 100%; border-collapse: collapse;">
                                     <tr>
                                         <td style="background: #e0e0e0; border-bottom: 2px solid #000; text-align: center; vertical-align: middle; height: 45%;">
-                                            <div style="font-size: 16pt; font-weight: bold; text-transform: uppercase;">${catNames[comp.dist]}</div>
+                                            <div style="font-size: 14pt; font-weight: bold; text-transform: uppercase;">${catNames[comp.dist]}</div>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td style="text-align: center; vertical-align: middle; height: 55%;">
-                                            <div style="font-size: 32pt; font-weight: bold;">${valodiKorSzam}</div>
+                                            <div style="font-size: 28pt; font-weight: bold;">${valodiKorSzam}</div>
                                         </td>
                                     </tr>
                                 </table>
@@ -1553,27 +1577,27 @@
                             <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
                                 <table style="width: 100%; height: 100%; border-collapse: collapse; text-align: center;">
                                     <tr>
-                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa; width: 50%;">
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #000000; border-right: 1px solid #000000; width: 50%;">
                                             <div style="font-size: 9pt; color: #000000;">Nyálkahártya</div>
                                             <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.nyalka || '-'}</div>
                                         </td>
-                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa; width: 50%;">
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #000000; width: 50%;">
                                             <div style="font-size: 9pt; color: #000000;">Kapilláris (CRT)</div>
                                             <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.crt || '-'}</div>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa;">
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #000000; border-right: 1px solid #000000;">
                                             <div style="font-size: 9pt; color: #000000;">Vízháztartás</div>
                                             <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.vizhaztartas || '-'}</div>
                                         </td>
-                                        <td style="padding: 1.5mm; border-bottom: 1px solid #aaa;">
+                                        <td style="padding: 1.5mm; border-bottom: 1px solid #000000;">
                                             <div style="font-size: 9pt; color: #000000;">Bélműködés</div>
                                             <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.belhang || '-'}</div>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 1.5mm; border-right: 1px solid #aaa;">
+                                        <td style="padding: 1.5mm; border-right: 1px solid #000000;">
                                             <div style="font-size: 9pt; color: #000000;">Farizom / Nyereghely</div>
                                             <div style="font-size: 13pt; font-weight: bold; text-transform: uppercase;">${l.farizom || '-'}</div>
                                         </td>
@@ -1604,12 +1628,85 @@
                         </tr>
                     </table>
                 </div>
-                
             </div>
         `;
 
         document.getElementById('print-sticker').innerHTML = html;
         form.style.display = 'block';
+    }
+
+
+    // --- ÚJ: ÁLLATORVOSI KARTON (TÖRTÉNET) MODAL A VERSENYZŐHÖZ ---
+    function openVetHistory(bib) {
+        const comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+
+        let html = `
+            <div style="background:#111; padding:20px; border-radius:15px; color:#fff; width: 100%; max-width: 950px; margin: auto;">
+                <h2 style="margin-top:0; border-bottom:2px solid var(--primary); padding-bottom:10px;">
+                    #${comp.bib} ${comp.name} - Állatorvosi Történet (Karton)
+                </h2>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse: collapse; text-align:center; margin-top:15px; font-size:0.95rem;">
+                        <tr style="background:#222; color:var(--primary);">
+                            <th style="padding:12px; border:1px solid #444;">Szakasz</th>
+                            <th style="padding:12px; border:1px solid #444;">HR / HRRI</th>
+                            <th style="padding:12px; border:1px solid #444;">Klinikai Értékek</th>
+                            <th style="padding:12px; border:1px solid #444;">Mozgás</th>
+                            <th style="padding:12px; border:1px solid #444;">Döntés</th>
+                            <th style="padding:12px; border:1px solid #444;">Orvos / Megjegyzés</th>
+                        </tr>
+        `;
+
+        // 1. Előzetes vizsgálat sor
+        if (comp.preVet && comp.preVet.pulse) {
+            html += generateVetRow('Előzetes (PRE)', comp.preVet);
+        }
+
+        // 2. Körök vizsgálatai
+        if (comp.laps && comp.laps.length > 0) {
+            comp.laps.forEach((lap, i) => {
+                if (lap.pulse || lap.vetDecision) { 
+                    html += generateVetRow(`${i+1}. Kör`, lap);
+                }
+            });
+        }
+
+        html += `
+                    </table>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('modalBody').innerHTML = html;
+        document.getElementById('adatlapModal').style.display = 'flex';
+    }
+
+    // Segédfüggvény a táblázat soraihoz
+    function generateVetRow(title, l) {
+        let statusColor = l.vetDecision === 'Eliminated' ? 'color:var(--danger);' : 'color:var(--success);';
+        let statusText = l.vetDecision === 'Továbbengedve' ? 'PASSED' : (l.vetDecision === 'Eliminated' ? 'ELIMINATED' : '-');
+        
+        return `
+            <tr style="border-bottom: 1px solid #333; background: #1a1a1c;">
+                <td style="padding:12px; border:1px solid #444; font-weight:bold; color:#fff;">${title}</td>
+                <td style="padding:12px; border:1px solid #444;">
+                    <b style="font-size:1.4rem; color:#fff;">${l.pulse || '-'}</b><br>
+                    <span style="color:#aaa;">HRRI: ${l.hrri || '-'}</span>
+                </td>
+                <td style="padding:12px; border:1px solid #444; font-size:0.85rem; text-align:left; color:#ccc; line-height: 1.4;">
+                    Nyálka: <b style="color:#fff;">${l.nyalka || '-'}</b> | CRT: <b style="color:#fff;">${l.crt || '-'}</b><br>
+                    Vízház: <b style="color:#fff;">${l.vizhaztartas || '-'}</b> | Bélm: <b style="color:#fff;">${l.belhang || '-'}</b><br>
+                    Farizom: <b style="color:#fff;">${l.farizom || '-'}</b>
+                </td>
+                <td style="padding:12px; border:1px solid #444; font-weight:bold; font-size:1.2rem; color:#fff;">${l.mozgas || '-'}</td>
+                <td style="padding:12px; border:1px solid #444; font-weight:bold; ${statusColor}">${statusText}</td>
+                <td style="padding:12px; border:1px solid #444; font-size:0.85rem; text-align:left; color:#ccc;">
+                    <b style="color:#fff;">${l.vetName || '-'}</b><br>
+                    <i style="color:#aaa;">${l.vetNotes || ''}</i>
+                </td>
+            </tr>
+        `;
     }
 
     // --- FŐ ÉLŐ VERSENY FUNKCIÓK ---
