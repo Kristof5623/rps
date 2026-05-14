@@ -1452,7 +1452,7 @@
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
-    // --- NYOMTATÁS MÓD (CSAK AKTUÁLIS KÖR) ---
+    // --- NYOMTATÁS MÓD (15x10cm FEKTETETT - EGYSÉGES KLINIKAI RÁCS, OUT IDŐVEL) ---
     function loadNyomtatasData() {
         const bib = document.getElementById('sel-nyomtatas').value;
         const form = document.getElementById('nyomtatas-form');
@@ -1461,80 +1461,125 @@
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
-        // Csak azokat a köröket nézzük, ahova beérkezett
         let phases = (comp.laps || []).filter(l => l.arrSec > 0 || l.vetSec > 0);
         
-        let html = `
-            <div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px;">
-                <h2 style="margin:0 0 5px 0;">#${comp.bib} - ${comp.name}</h2>
-                <div style="font-size:1.1rem;">Ló neve: <b>${comp.internal || "Nincs megadva"}</b></div>
-                <div style="font-size:1.1rem;">Egyesület: <b>${comp.club || "-"}</b></div>
-                <div style="font-size:1rem;">Kategória: <b>${catNames[comp.dist]}</b></div>
-            </div>
-        `;
-        
         if (phases.length === 0) {
-            html += `<p>Még nincs befejezett szakasz.</p>`;
-        } else {
-            // CSAK AZ UTOLSÓ SZAKASZT nyomtatjuk!
-            let lastIdx = phases.length - 1;
-            let l = phases[lastIdx];
-            let valodiKorSzam = comp.laps.indexOf(l) + 1; 
+            document.getElementById('print-sticker').innerHTML = `<p style="color:white; text-align:center;">Nincs rögzített adat.</p>`;
+            form.style.display = 'block';
+            return;
+        }
 
-            html += `
-            <div style="margin-bottom: 15px; padding: 10px; border: 1px dashed #000; border-radius: 8px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 1.3rem; text-align: center; background:#000; color:#fff; padding:5px;">${valodiKorSzam}. Szakasz - Állatorvosi Adatlap</h3>
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size: 1.1rem;">
-                    <span>Érkezés: <b>${l.arrSec > 0 ? toTimeStr(l.arrSec) : '-'}</b></span>
-                    <span>Orvosi (Vet): <b>${l.vetSec > 0 ? toTimeStr(l.vetSec) : '-'}</b></span>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size: 1.1rem; border-bottom: 2px solid #000; padding-bottom: 5px;">
-                    <span>Kör idő: <b>${l.loopSec > 0 ? toTimeStr(l.loopSec) : '-'}</b></span>
-                    <span>Sebesség: <b>${l.loopSpd ? l.loopSpd.toFixed(2) : '0.00'} km/h</b></span>
-                </div>
+        // CSAK AZ UTOLSÓ KÖRT NYOMTATJUK
+        let lastIdx = phases.length - 1;
+        let l = phases[lastIdx];
+        let valodiKorSzam = comp.laps.indexOf(l) + 1; 
+
+        let baseDist = comp.dist.replace('j', '');
+        let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 1;
+        let isFinalLap = (valodiKorSzam === expectedLaps);
+
+        // Idők számítása
+        let arrStr = l.arrSec > 0 ? toTimeStr(l.arrSec) : '-';
+        let inStr = l.vetSec > 0 ? toTimeStr(l.vetSec) : '-';
+        let recStr = (l.arrSec > 0 && l.vetSec > 0) ? toTimeStr(l.vetSec - l.arrSec) : '-';
+        let outStr = (l.nextStart > 0 && !isFinalLap && l.vetDecision !== 'Eliminated') ? toTimeStr(l.nextStart) : (isFinalLap ? 'FINISH' : '-');
+
+        // SZERKEZET: 15x10cm FEKTETETT (145mm x 95mm)
+        let html = `
+            <div style="width: 145mm; height: 95mm; border: 3px solid #000; padding: 3mm; box-sizing: border-box; background: #fff; color: #000; font-family: 'Arial Narrow', Arial, sans-serif; display: block; margin: 0 auto;">
                 
-                <table style="width: 100%; border-collapse: collapse; font-size: 1.1rem; text-align: left;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 2mm;">
                     <tr>
-                        <td style="padding: 6px; border: 1px solid #000; width: 25%;">Pulzus:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold; width: 25%;">${l.pulse || '-'}</td>
-                        <td style="padding: 6px; border: 1px solid #000; width: 25%;">HRRI:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold; width: 25%;">${l.hrri || '-'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px; border: 1px solid #000;">Nyálkahártya:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.nyalka || '-'}</td>
-                        <td style="padding: 6px; border: 1px solid #000;">CRT:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.crt || '-'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px; border: 1px solid #000;">Vízháztartás:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.vizhaztartas || '-'}</td>
-                        <td style="padding: 6px; border: 1px solid #000;">Bélhangok:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;">${l.belhang || '-'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px; border: 1px solid #000;">Farizom:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;" colspan="3">${l.farizom || '-'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px; border: 1px solid #000;">Mozgás:</td><td style="padding: 6px; border: 1px solid #000; font-weight: bold;" colspan="3">${l.mozgas || '-'}</td>
+                        <td style="width: 18%; border: 2px solid #000; text-align: center; background: #000; color: #fff; font-size: 32pt; font-weight: bold; padding: 1mm;">#${comp.bib}</td>
+                        <td style="width: 52%; padding-left: 3mm;">
+                            <div style="font-size: 16pt; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden;">${comp.name}</div>
+                            <div style="font-size: 12pt;">${comp.internal || "Ló neve hiányzik"}</div>
+                            <div style="font-size: 10pt; color: #444;">${comp.club || "-"}</div>
+                        </td>
+                        <td style="width: 30%;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: center;">
+                                <tr style="background: #e0e0e0; font-size: 9pt; font-weight: bold;">
+                                    <td style="border: 1px solid #000; padding: 1mm;">ARR</td>
+                                    <td style="border: 1px solid #000; padding: 1mm;">IN</td>
+                                    <td style="border: 1px solid #000; padding: 1mm;">REC</td>
+                                </tr>
+                                <tr style="font-size: 15pt; font-weight: bold;">
+                                    <td style="border: 1px solid #000; padding: 1mm;">${arrStr}</td>
+                                    <td style="border: 1px solid #000; padding: 1mm;">${inStr}</td>
+                                    <td style="border: 1px solid #000; padding: 1mm;">${recStr}</td>
+                                </tr>
+                            </table>
+                        </td>
                     </tr>
                 </table>
 
-                <div style="margin-top: 15px; font-size: 1.1rem;">
-                    Állatorvos: <b>${l.vetName || 'Nincs megadva'}</b><br>
-                    Döntés: <b style="color:${l.vetDecision === 'Eliminated' ? 'red' : 'green'}; text-transform: uppercase;">${l.vetDecision || '-'}</b><br>
-                    Megjegyzés: <b>${l.vetNotes || '-'}</b>
-                </div>
-            </div>`;
-            
-            // Végeredmény kijelzése, ha kiesett, vagy befejezte
-            let baseDist = comp.dist.replace('j', '');
-            let expectedLaps = (raceConfig[baseDist] && raceConfig[baseDist].laps) ? raceConfig[baseDist].laps.length : 1;
-            
-            if (valodiKorSzam === expectedLaps || comp.isEliminated) {
-                html += `
-                <div style="border: 2px solid #000; padding:10px; margin-top:15px; font-size: 1.2rem;">
-                    <h3 style="margin:0 0 5px 0;">Végeredmény (Összesített)</h3>
-                    <div>Teljes Menetidő: <b>${l.rideTime > 0 ? toTimeStr(l.rideTime) : '-'}</b></div>
-                    <div>Átlagsebesség: <b>${l.rideSpd ? l.rideSpd.toFixed(2) : '0.00'} km/h</b></div>
-                    <div>Státusz: <b style="text-transform: uppercase;">${comp.isEliminated ? 'KIESETT (Eliminated)' : 'BEFEJEZTE'}</b></div>
-                </div>`;
-            }
-        }
+                <table style="width: 100%; height: 50mm; border-collapse: collapse; margin-bottom: 2mm;">
+                    <tr style="background: #000; color: #fff; font-size: 10pt; text-transform: uppercase; height: 5mm;">
+                        <th style="border: 1px solid #000; padding: 1mm; width: 12%;">LOOP</th>
+                        <th style="border: 1px solid #000; padding: 1mm; width: 28%;">Pulzus / HRRI</th>
+                        <th style="border: 1px solid #000; padding: 1mm; width: 60%;">Klinikai Paraméterek</th>
+                    </tr>
+                    <tr>
+                        <td style="border: 2px solid #000; text-align: center; font-size: 30pt; font-weight: bold; vertical-align: middle;">${valodiKorSzam}</td>
+                        <td style="border: 1px solid #000; padding: 1mm; text-align: center; vertical-align: middle;">
+                            <div style="font-size: 11pt; color: #444;">PULZUS (HR)</div>
+                            <div style="font-size: 32pt; font-weight: bold; margin-bottom: 3mm;">${l.pulse || '-'}</div>
+                            <div style="font-size: 11pt; color: #444;">HRRI</div>
+                            <div style="font-size: 22pt; font-weight: bold;">${l.hrri || '-'}</div>
+                        </td>
+                        <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
+                            <table style="width: 100%; height: 100%; border-collapse: collapse; text-align: center;">
+                                <tr>
+                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa; width: 50%;">
+                                        <div style="font-size: 10pt; color: #444;">Nyálkahártya</div>
+                                        <div style="font-size: 14pt; font-weight: bold;">${l.nyalka || '-'}</div>
+                                    </td>
+                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa; width: 50%;">
+                                        <div style="font-size: 10pt; color: #444;">Kapilláris (CRT)</div>
+                                        <div style="font-size: 14pt; font-weight: bold;">${l.crt || '-'}</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa;">
+                                        <div style="font-size: 10pt; color: #444;">Vízháztartás</div>
+                                        <div style="font-size: 14pt; font-weight: bold;">${l.vizhaztartas || '-'}</div>
+                                    </td>
+                                    <td style="padding: 2mm; border-bottom: 1px solid #aaa;">
+                                        <div style="font-size: 10pt; color: #444;">Bélműködés</div>
+                                        <div style="font-size: 14pt; font-weight: bold;">${l.belhang || '-'}</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 2mm; border-right: 1px solid #aaa;">
+                                        <div style="font-size: 10pt; color: #444;">Farizom / Nyereghely</div>
+                                        <div style="font-size: 14pt; font-weight: bold;">${l.farizom || '-'}</div>
+                                    </td>
+                                    <td style="padding: 2mm; background: #f8f8f8;">
+                                        <div style="font-size: 10pt; color: #444; text-transform: uppercase;">Mozgás (Gait)</div>
+                                        <div style="font-size: 16pt; font-weight: bold;">${l.mozgas || '-'}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 50%; border: 2px solid #000; background: #e0e0e0; padding: 2mm; text-align: center;">
+                            <div style="font-size: 10pt; text-transform: uppercase;">Kimeneteli Idő / OUT</div>
+                            <div style="font-size: 28pt; font-weight: bold; letter-spacing: 2px; color: #000;">
+                                ${outStr}
+                            </div>
+                        </td>
+                        <td style="width: 50%; padding-left: 3mm; vertical-align: middle;">
+                            <div style="font-size: 12pt;"><b>Orvos:</b> ${l.vetName || "-"}</div>
+                            <div style="font-size: 11pt; margin-top: 2mm; font-style: italic; line-height: 1.2;"><b>Megjegyzés:</b> ${l.vetNotes || "-"}</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `;
 
         document.getElementById('print-sticker').innerHTML = html;
         form.style.display = 'block';
