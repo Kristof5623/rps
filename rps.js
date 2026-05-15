@@ -2484,8 +2484,8 @@
                     <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
                     <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                 </div>
-                <div class="adatlap-right" style="display:flex; align-items:center; gap:10px;">
-                    <button class="calc-btn" onclick="event.stopPropagation(); openVetHistory('${c.bib}')" style="background:var(--success); color:black; padding:6px 12px; margin:0; font-size:0.85rem; width:auto; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🩺 Karton</button>
+                <div class="adatlap-right">
+                    <button class="adatlap-action-btn" onclick="event.stopPropagation(); openVetHistory('${c.bib}')">🩺 Karton</button>
                     <div class="adatlap-arrow">❯</div>
                 </div>
                 <div class="adatlap-badges">${gapHtml}${speedHtml}</div>
