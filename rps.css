@@ -8,7 +8,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #0A84FF; }
         * { scrollbar-width: thin; scrollbar-color: #444 #111111; }
 
-html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; }
 
         :root {
             --bg: #000000;
@@ -48,47 +48,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0;
         
         .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #333; }
         
-.mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; width: 100%; flex-shrink: 0; }
-.hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; padding: 0; width: 100%; justify-content: flex-start; }
-.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 998; }
-.overlay.open { display: block; }
-
-.time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; width: 100%; }
-.time-group input { text-align: center; flex: 1; }
-
-label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
-select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; font-size: 1rem; margin-top: 5px; }
-select { width: 100%; }
-button.calc-btn { width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.1rem; text-transform: uppercase; transition: 0.2s; }
-button.calc-btn:hover { background: #4ade80; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-button.calc-btn:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-button.add-btn { background: var(--primary); color: white; }
-
-
-.select-group, .input-group { width: 100%; }
-
-.container { width: 100%; max-width: 640px; }
-
-@media (max-width: 800px) {
-    .main-wrapper { padding: 12px; height: auto; flex: 1; overflow-y: auto; }
-    .container { max-width: 100%; border-radius: 0 0 20px 20px; margin-bottom: 10px; }
-    .mode-content { padding-bottom: 30px; }
-    .mobile-header { display: block; }
-    .sidebar { position: fixed; left: -100%; top: 0; bottom: 0; width: 100%; max-width: 320px; z-index: 999; box-shadow: 0 0 30px rgba(0,0,0,0.4); background: var(--sidebar-bg); }
-    .sidebar.open { left: 0; }
-    .live-item { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .live-time { font-size: 1.5rem; }
-    #btn-fullscreen-live { display: none !important; }
-    .tab-btn { width: auto; }
-}
-@media (max-width: 520px) {
-    .sidebar { width: 100%; max-width: 100%; }
-    .container { border-radius: 0; }
-    .sidebar-input, .sidebar-submit, .calc-btn { font-size: 0.95rem; }
-    .menu-title { font-size: 0.75rem; }
-    .tab-btn { font-size: 0.8rem; padding: 10px 8px; }
-    .time-group input { max-width: 80px; }
-}
+        .mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: relative; z-index: 1000; width: 100%; flex-shrink: 0; }
+        .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; padding: 0; }
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 998; }
 
         .menu-title { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 15px; margin-top: 20px; letter-spacing: 1px; }
         .sidebar-btn { width: 100%; text-align: left; background: transparent; border: none; color: var(--text); padding: 12px 10px; border-radius: 8px; cursor: pointer; font-size: 1rem; margin-bottom: 5px; transition: 0.2s; }
@@ -111,6 +73,17 @@ button.add-btn { background: var(--primary); color: white; }
         input[type="number"] { -moz-appearance: textfield; min-width: 0; }
         input[type="text"] { width: 100%; }
 
+        label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
+        select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; font-size: 1rem; margin-top: 5px; }
+        select { width: 100%; }
+        .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; width: 100%; }
+        .time-group input { text-align: center; flex: 1; }
+
+        button.calc-btn { width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.1rem; text-transform: uppercase; transition: 0.2s; }
+        button.calc-btn:hover { background: #4ade80; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        button.calc-btn:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        button.add-btn { background: var(--primary); color: white; }
+        
         .edit-btn { background: #444; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
         .edit-btn:hover { background: var(--primary); color: white !important; }
         .cancel-btn { background: #444; color: white; padding: 15px; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 10px; width: 100%; text-transform: uppercase; display: none; }
@@ -161,30 +134,22 @@ button.add-btn { background: var(--primary); color: white; }
         .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
         .mobile-break { display: none; }
 
-        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 18px 16px 16px; border-radius: 12px; margin-top: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; cursor: pointer; transition: transform 0.2s, background 0.2s; border: 1px solid #888; width: 100%; }
-        .adatlap-card:hover { background: #d5d5d5; transform: translateY(-1px); }
-        .adatlap-rank { background: var(--teal); color: white; width: 46px; height: 46px; display: flex; justify-content: center; align-items: center; border-radius: 12px; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
-        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.85rem; }
-        .adatlap-info { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-        .adatlap-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-        .adatlap-bib { background: #fff; color: #000; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; border: 1px solid #555; flex-shrink:0; }
-        .adatlap-name { font-weight: bold; font-size: 1.05rem; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 80px); }
-        .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 6px; font-style: italic; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .adatlap-card { position: relative; overflow: hidden; background: #c5c5c5; color: #000; padding: 15px; padding-bottom: 25px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid #888; width: 100%; }
+        .adatlap-card:hover { background: #d5d5d5; }
+        .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; margin-right: 15px; flex-shrink: 0; }
+        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; }
+        .adatlap-info { flex: 1; display: flex; flex-direction: column; margin-right: 20px; overflow: hidden; }
+        .adatlap-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+        .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; border: 1px solid #555; flex-shrink:0;}
+        .adatlap-name { font-weight: bold; font-size: 1.1rem; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         
-        .adatlap-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; }
-        .adatlap-action-btn { background: rgba(28, 28, 30, 0.95); color: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; padding: 8px 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s, transform 0.2s; }
-        .adatlap-action-btn:hover { background: #2a2a2c; transform: translateY(-1px); }
+        .adatlap-right { position: absolute; right: 15px; top: 15px; }
         .adatlap-arrow { color: #555; font-size: 1.2rem; }
-        .adatlap-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; grid-column: 1 / -1; }
-        .adatlap-gap, .adatlap-speed-badge { border-radius: 999px; padding: 5px 10px; font-size: 0.78rem; font-weight: 700; }
-        .adatlap-gap { background: #777; color: white; }
-        .adatlap-speed-badge { background: var(--teal); color: white; }
-        .adatlap-live-status { padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 800; margin-left: auto; text-transform: uppercase; letter-spacing: 0.45px; box-shadow: 0 2px 4px rgba(0,0,0,0.18); }
-        @media (max-width: 720px) {
-            .adatlap-card { grid-template-columns: auto 1fr; }
-            .adatlap-right { flex-direction: row; align-items: center; justify-content: flex-end; width: 100%; }
-            .adatlap-badges { width: 100%; }
-        }
+        .adatlap-badges { position: absolute; bottom: 0; right: 0; display: flex; flex-direction: row; }
+        .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-top-left-radius: 8px; }
+        .adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; }
+        .adatlap-live-status { padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; margin-left: auto; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
