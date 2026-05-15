@@ -8,15 +8,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #0A84FF; }
         * { scrollbar-width: thin; scrollbar-color: #444 #111111; }
 
-html, body {
-    width: 100%;
-    min-height: 100vh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    margin: 0;
-    padding: 0;
-    scroll-behavior: smooth;
-}
+html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; }
 
         :root {
             --bg: #000000;
@@ -60,8 +52,6 @@ html, body {
 .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; padding: 0; width: 100%; justify-content: flex-start; }
 .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 998; }
 .overlay.open { display: block; }
-.sidebar { transition: left 0.3s ease, transform 0.3s ease; }
-.sidebar.open { left: 0; transform: none; }
 
 .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; width: 100%; }
 .time-group input { text-align: center; flex: 1; }
