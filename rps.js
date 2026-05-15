@@ -1639,44 +1639,91 @@
     }
 
 
+    // --- ÚJ: ÁLLATORVOSI KARTON (TÖRTÉNET) MODAL A VERSENYZŐHÖZ (ŠAMORÍN KÉP ALAPJÁN) ---
     // --- ÚJ: ÁLLATORVOSI KARTON (TÖRTÉNET) MODAL A VERSENYZŐHÖZ ---
     function openVetHistory(bib) {
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
 
-        let html = `
-            <div style="background:#111; padding:20px; border-radius:15px; color:#fff; width: 100%; max-width: 950px; margin: auto;">
-                <h2 style="margin-top:0; border-bottom:2px solid var(--primary); padding-bottom:10px;">
-                    #${comp.bib} ${comp.name} - Állatorvosi Történet (Karton)
-                </h2>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse: collapse; text-align:center; margin-top:15px; font-size:0.95rem;">
-                        <tr style="background:#222; color:var(--primary);">
-                            <th style="padding:12px; border:1px solid #444;">Szakasz</th>
-                            <th style="padding:12px; border:1px solid #444;">HR / HRRI</th>
-                            <th style="padding:12px; border:1px solid #444;">Klinikai Értékek</th>
-                            <th style="padding:12px; border:1px solid #444;">Mozgás</th>
-                            <th style="padding:12px; border:1px solid #444;">Döntés</th>
-                            <th style="padding:12px; border:1px solid #444;">Orvos / Megjegyzés</th>
-                        </tr>
-        `;
-
-        // 1. Előzetes vizsgálat sor
+        let columns = [];
         if (comp.preVet && comp.preVet.pulse) {
-            html += generateVetRow('Előzetes (PRE)', comp.preVet);
+            columns.push({ title: 'PRE', data: comp.preVet });
         }
-
-        // 2. Körök vizsgálatai
         if (comp.laps && comp.laps.length > 0) {
             comp.laps.forEach((lap, i) => {
-                if (lap.pulse || lap.vetDecision) { 
-                    html += generateVetRow(`${i+1}. Kör`, lap);
+                if (lap.pulse || lap.vetDecision) {
+                    columns.push({ title: `${i+1}. KÖR`, data: lap });
                 }
             });
         }
 
+        if (columns.length === 0) {
+            showToast("Még nincs rögzített orvosi adat ehhez a versenyzőhöz.", true);
+            return;
+        }
+
+        let html = `
+            <div style="background:#fff; padding:0; border-radius:12px; color:#000; width: 100%; max-width: 850px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
+                
+                <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
+                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${comp.bib} | ${comp.name}</div>
+                    <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${comp.internal || "Ló neve hiányzik"}</div>
+                </div>
+                
+                <div style="padding: 20px; overflow-x: auto;">
+                    <table style="width:100%; border-collapse: collapse; text-align:center; font-size:1rem; font-family: sans-serif;">
+                        <tr style="background:var(--teal); color:#fff;">
+                            <th style="padding:12px; border-bottom:2px solid #fff; text-align:left; width:30%;">Szakasz</th>
+        `;
+
+        columns.forEach(col => {
+            html += `<th style="padding:12px; border-bottom:2px solid #fff;">${col.title}</th>`;
+        });
+        html += `</tr>`;
+
+        const renderVetRowCustom = (label, valFn) => {
+            let rowHtml = `<tr style="border-bottom: 3px solid #fff; background: #fdfdfd;">
+                <td style="padding:10px; text-align:left; font-weight:bold; color:#333; background:#eaeaea;">${label}</td>`;
+            columns.forEach(col => {
+                rowHtml += `<td style="padding:10px;">${valFn(col)}</td>`;
+            });
+            rowHtml += `</tr>`;
+            return rowHtml;
+        };
+
+        // 1. SOR: Pulzus idő
+        html += renderVetRowCustom('Pulzus idő', col => {
+            if (col.title === 'PRE') return '-';
+            if (col.data.arrSec > 0 && col.data.vetSec > 0) return toTimeStr(col.data.vetSec - col.data.arrSec);
+            return '-';
+        });
+
+        // 2. SOR: Pulzus / HRRI (Pre-nél csak a pulzus)
+        html += renderVetRowCustom('Pulzus / HRRI', col => {
+            let p = formatVetBadge(col.data.pulse);
+            if (col.title === 'PRE') return p;
+            let h = formatVetBadge(col.data.hrri);
+            return `${p} / ${h}`;
+        });
+
+        // Klinikai paraméterek
+        html += renderVetRowCustom('Nyálkahártya', col => formatVetBadge(col.data.nyalka));
+        html += renderVetRowCustom('Kapilláris (CRT)', col => formatVetBadge(col.data.crt));
+        html += renderVetRowCustom('Vízháztartás', col => formatVetBadge(col.data.vizhaztartas));
+        html += renderVetRowCustom('Bélműködés', col => formatVetBadge(col.data.belhang));
+        html += renderVetRowCustom('Farizom, nyereghely', col => formatVetBadge(col.data.farizom));
+        html += renderVetRowCustom('Mozgás', col => formatVetBadge(col.data.mozgas));
+        
+        // Sima szöveges mezők
+        html += renderVetRowCustom('Állatorvos', col => escapeHtml(col.data.vetName));
+        html += renderVetRowCustom('Megjegyzés', col => escapeHtml(col.data.vetNotes));
+
         html += `
                     </table>
+                </div>
+                
+                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #fff;">
+                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#fff; color:#000; border: 2px solid #000; font-weight:bold; font-size: 1.1rem; cursor:pointer;" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>
         `;
@@ -1685,31 +1732,30 @@
         document.getElementById('adatlapModal').style.display = 'flex';
     }
 
-    // Segédfüggvény a táblázat soraihoz
-    function generateVetRow(title, l) {
-        let statusColor = l.vetDecision === 'Eliminated' ? 'color:var(--danger);' : 'color:var(--success);';
-        let statusText = l.vetDecision === 'Továbbengedve' ? 'PASSED' : (l.vetDecision === 'Eliminated' ? 'ELIMINATED' : '-');
+    // A Badge színező marad ugyanaz, a biztonság kedvéért itt van ez is:
+    function formatVetBadge(val) {
+        if (!val || val === '-') return '-';
+        let upVal = val.toString().trim().toUpperCase();
         
-        return `
-            <tr style="border-bottom: 1px solid #333; background: #1a1a1c;">
-                <td style="padding:12px; border:1px solid #444; font-weight:bold; color:#fff;">${title}</td>
-                <td style="padding:12px; border:1px solid #444;">
-                    <b style="font-size:1.4rem; color:#fff;">${l.pulse || '-'}</b><br>
-                    <span style="color:#aaa;">HRRI: ${l.hrri || '-'}</span>
-                </td>
-                <td style="padding:12px; border:1px solid #444; font-size:0.85rem; text-align:left; color:#ccc; line-height: 1.4;">
-                    Nyálka: <b style="color:#fff;">${l.nyalka || '-'}</b> | CRT: <b style="color:#fff;">${l.crt || '-'}</b><br>
-                    Vízház: <b style="color:#fff;">${l.vizhaztartas || '-'}</b> | Bélm: <b style="color:#fff;">${l.belhang || '-'}</b><br>
-                    Farizom: <b style="color:#fff;">${l.farizom || '-'}</b>
-                </td>
-                <td style="padding:12px; border:1px solid #444; font-weight:bold; font-size:1.2rem; color:#fff;">${l.mozgas || '-'}</td>
-                <td style="padding:12px; border:1px solid #444; font-weight:bold; ${statusColor}">${statusText}</td>
-                <td style="padding:12px; border:1px solid #444; font-size:0.85rem; text-align:left; color:#ccc;">
-                    <b style="color:#fff;">${l.vetName || '-'}</b><br>
-                    <i style="color:#aaa;">${l.vetNotes || ''}</i>
-                </td>
-            </tr>
-        `;
+        let color = '#333';
+        let border = '#888';
+        
+        if (['A', 'OK', '1', 'NORMÁL', 'NORMAL', 'TISZTA'].includes(upVal)) { 
+            color = '#28a745'; border = '#28a745'; 
+        }
+        else if (['B', '2', '+', '++', 'ENYHE'].includes(upVal)) { 
+            color = '#FF9F0A'; border = '#FF9F0A'; 
+        }
+        else if (['C', 'D', '3', '4', 'KIESETT', 'ELIMINATED', 'NEM TISZTA', 'SÁNTA'].includes(upVal)) { 
+            color = '#FF453A'; border = '#FF453A'; 
+        }
+
+        return `<div style="border: 2px solid ${border}; color: ${color}; border-radius: 6px; padding: 4px 10px; display: inline-block; font-weight: bold; font-size: 0.95rem; min-width: 38px; text-align: center; background: #fff;">${val}</div>`;
+    }
+
+    function escapeHtml(unsafe) {
+        if(!unsafe || unsafe === '-') return '-';
+        return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     // --- FŐ ÉLŐ VERSENY FUNKCIÓK ---
@@ -2395,50 +2441,78 @@
         });
     }
 
-    function openAdatlap(bib) {
+    function openAdatlap(bib, isPast = false) {
         const ctx = getAdatlapContext();
         const c = ctx.comps.find(comp => comp.bib == bib); if(!c) return;
         let phases = (c.laps || []).filter(l => l.isComplete);
         let sameCatComps = ctx.comps.filter(x => x.dist === c.dist);
-        let ranksHtml = ""; let gapsHtml = "";
-
+        
+        let ranks = [];
+        let gaps = [];
+        
         phases.forEach((l, i) => {
             let phaseComps = sameCatComps.filter(x => x.laps && x.laps[i] && x.laps[i].isComplete);
             phaseComps.sort((a, b) => a.laps[i].rideTime - b.laps[i].rideTime);
             let rank = phaseComps.findIndex(x => x.bib == c.bib) + 1;
             let gap = l.rideTime - phaseComps[0].laps[i].rideTime; 
-            ranksHtml += `<td style="font-weight:bold;">${rank}.</td>`;
-            gapsHtml += `<td style="color:${gap===0?'var(--success)':'#FF9F0A'};">${gap===0 ? '-' : '+'+toTimeStr(gap)}</td>`;
+            ranks.push(rank);
+            gaps.push(gap === 0 ? '-' : '+' + toTimeStr(gap));
         });
 
         if (c.isEliminated && phases.length > 0) {
-            let rankCells = ranksHtml.split('</td>'); rankCells[phases.length - 1] = `<td style="color:var(--danger); font-weight:bold;">Kiesett`; ranksHtml = rankCells.join('</td>');
+            ranks[phases.length - 1] = `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>`;
         }
 
-        let html = `<h3>#${c.bib} ${c.name} (${catNames[c.dist]})</h3><div class="table-responsive"><table class="ttrack-table"><tr><th class="row-header">Szakasz</th>`;
-        phases.forEach((_,i) => html += `<th class="col-header">${i+1}.</th>`);
+        let html = `
+            <div style="background:#fff; padding:0; border-radius:12px; color:#000; width: 100%; max-width: 900px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
+                
+                <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
+                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
+                    <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${c.internal || "Ló neve hiányzik"}</div>
+                </div>
+                
+                <div style="padding: 20px; overflow-x: auto;">
+                    <table style="width:100%; border-collapse: collapse; text-align:center; font-size:0.95rem; font-family: sans-serif;">
+                        <tr style="background:var(--teal); color:#fff;">
+                            <th style="padding:12px; border-bottom:2px solid #fff; text-align:left; width:25%;">Szakasz</th>
+        `;
+        
+        phases.forEach((_,i) => html += `<th style="padding:12px; border-bottom:2px solid #fff;">${i+1}. KÖR</th>`);
+        html += `</tr>`;
 
-        html += `</tr><tr><th class="row-header">Táv (km)</th>`; phases.forEach(l => html += `<td>${l.d}</td>`);
+        const renderDataRow = (label, valueFn) => {
+            let row = `<tr style="border-bottom: 3px solid #fff; background: #fdfdfd;"><td style="padding:10px; text-align:left; font-weight:bold; color:#333; background:#eaeaea;">${label}</td>`;
+            phases.forEach((l, i) => { row += `<td style="padding:10px;">${valueFn(l, i)}</td>`; });
+            row += `</tr>`; return row;
+        };
 
-        html += `</tr><tr><th class="row-header">Kör idő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.loopSec || 0)}</td>`);
-
-        html += `</tr><tr><th class="row-header">Beérkezés</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.arrSec)}</td>`);
-        html += `</tr><tr><th class="row-header">Kör átlag km/h</th>`; phases.forEach(l => html += `<td class="${l.loopSpd>=16?'warning-speed':'highlight-speed'}">${l.loopSpd.toFixed(2)}</td>`);
-
-        html += `</tr><tr><th class="row-header">Orvosi (Vet)</th>`;
-        phases.forEach((l) => {
-            html += `<td>${l.vetSec>0 ? toTimeStr(l.vetSec) : "-"}</td>`;
-        });
-
-        html += `</tr><tr><th class="row-header">Pulzus idő</th>`; phases.forEach(l => html += `<td>${l.pulzusSec>0?toTimeStr(l.pulzusSec):"-"}</td>`);
-        html += `</tr><tr><th class="row-header">Össz. menetidő</th>`; phases.forEach(l => html += `<td>${toTimeStr(l.rideTime)}</td>`);
-        html += `</tr><tr><th class="row-header">Össz. átlag km/h</th>`; phases.forEach((l, i) => {
+        html += renderDataRow('Táv (km)', l => `<b style="background:#eee; padding:2px 6px; border:1px solid #ccc; border-radius:4px;">${l.d}</b>`);
+        html += renderDataRow('Rajt', l => toTimeStr(l.startSec));
+        html += renderDataRow('Beérkezés', l => toTimeStr(l.arrSec));
+        html += renderDataRow('Kör idő', l => toTimeStr(l.loopSec || 0));
+        html += renderDataRow('Kör átlag km/h', l => `<span style="${l.loopSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : ''}">${l.loopSpd.toFixed(2)}</span>`);
+        html += renderDataRow('Orvosi (Vet)', l => l.vetSec > 0 ? toTimeStr(l.vetSec) : "-");
+        html += renderDataRow('Pulzus idő', l => l.pulzusSec > 0 ? toTimeStr(l.pulzusSec) : "-");
+        html += renderDataRow('Orvosi átlag km/h', l => l.phaseSpd ? `<span style="${l.phaseSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : ''}">${l.phaseSpd.toFixed(2)}</span>` : "-");
+        html += renderDataRow('Össz. menetidő', l => `<b>${toTimeStr(l.rideTime)}</b>`);
+        html += renderDataRow('Össz. átlag km/h', (l, i) => {
             let anySpeedingSoFar = phases.slice(0, i + 1).some(p => p.loopSpd >= 16 || p.phaseSpd >= 16);
             let isWarning = anySpeedingSoFar || l.rideSpd >= 16;
-            html += `<td class="${isWarning ? 'warning-speed' : 'highlight-speed'}">${l.rideSpd.toFixed(2)}</td>`;
+            return `<b style="${isWarning ? 'color:var(--danger);' : ''}">${l.rideSpd.toFixed(2)}</b>`;
         });
-        html += `</tr><tr><th class="row-header">Helyezés</th>${ranksHtml}</tr><tr><th class="row-header">Lemaradás</th>${gapsHtml}</tr></table></div>`;
-        document.getElementById('modalBody').innerHTML = html; document.getElementById('adatlapModal').style.display = 'flex';
+        html += renderDataRow('Helyezés', (l, i) => ranks[i] === `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>` ? ranks[i] : `<b>${ranks[i]}.</b>`);
+        html += renderDataRow('Lemaradás', (l, i) => gaps[i]);
+
+        html += `
+                    </table>
+                </div>
+                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #fff;">
+                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#fff; color:#000; border: 2px solid #000; font-weight:bold; font-size: 1.1rem; cursor:pointer;" onclick="closeAdatlap()">Bezárás</button>
+                </div>
+            </div>`;
+        
+        document.getElementById('modalBody').innerHTML = html; 
+        document.getElementById('adatlapModal').style.display = 'flex';
     }
 
     function closeAdatlap() { document.getElementById('adatlapModal').style.display = 'none'; }
