@@ -2631,6 +2631,169 @@
             showToast("Hibás a kód! Biztos, hogy az egészet (a { } zárójelekkel együtt) kimásoltad?", true);
         }
     }
+
+    // --- ADMIN: A4-ES LISTÁK NYOMTATÁSA (KÜLÖNVÁLASZTOTT NEVEZÉSI ÉS RAJTLISTA) ---
+    function printVersenyLista(mode) {
+        if (!competitors || competitors.length === 0) {
+            showToast("Nincsenek versenyzők az élő versenyben!", true);
+            return;
+        }
+
+        let raceName = liveRaceMeta ? liveRaceMeta.name : "Élő Verseny";
+        let win = window.open('', '_blank');
+        
+        let html = `
+        <html>
+        <head>
+            <title>${mode === 'rajt' ? 'Rajtlista' : 'Nevezési Lista'} - ${raceName}</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 15px; color: #000; background: #fff; font-size: 13px; }
+                .header-box { text-align: center; margin-bottom: 20px; }
+                h1 { margin: 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; }
+                h2 { margin: 5px 0 0 0; color: #444; font-size: 1.1rem; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 2px solid #000; }
+                th, td { border: 1px solid #666; padding: 6px 8px; text-align: left; vertical-align: middle; }
+                th { background: #e0e0e0; font-weight: bold; font-size: 0.85rem; text-transform: uppercase; text-align: center; }
+                .cat-header { background: #d0d0d0; font-weight: bold; font-size: 1.1rem; text-transform: uppercase; padding: 8px 10px; border-top: 2px solid #000; border-bottom: 2px solid #000; }
+                .bib-cell { font-weight: bold; font-size: 1.2rem; text-align: center; width: 10%; background: #f9f9f9; }
+                .time-cell { font-weight: bold; font-size: 1.1rem; text-align: center; width: 15%; background: #fff; }
+                .footer { margin-top: 20px; text-align: right; font-size: 0.75rem; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+                @media print { 
+                    body { padding: 0; }
+                    @page { margin: 1cm; }
+                    button { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header-box">
+                <h1>${raceName}</h1>
+                <h2>${mode === 'rajt' ? 'HIVATALOS RAJTLISTA / START LIST' : 'NEVEZÉSI LISTA / ENTRY LIST'}</h2>
+            </div>
+            <table>
+        `;
+
+        // Távok kigyűjtése és csökkenő sorrendbe rakása (80, 60, 40, 20)
+        let dists = [...new Set(competitors.map(c => c.dist))].sort((a,b) => parseInt(b) - parseInt(a));
+
+        dists.forEach(d => {
+            let comps = competitors.filter(c => c.dist === d).sort((a, b) => parseInt(a.bib) - parseInt(b.bib));
+            if (comps.length === 0) return;
+
+            let catName = catNames[d] || `${d} km`;
+            let baseDist = d.replace('j', '');
+            
+            // Valós rajtidő lekérése a "Versenykiírás" beállításokból
+            let startStr = "Nincs megadva";
+            if (raceConfig[baseDist] && raceConfig[baseDist].h !== undefined && raceConfig[baseDist].h !== '') {
+                let h = raceConfig[baseDist].h.toString().padStart(2,'0');
+                let m = raceConfig[baseDist].m.toString().padStart(2,'0');
+                let s = raceConfig[baseDist].s.toString().padStart(2,'0');
+                startStr = `${h}:${m}:${s}`;
+            }
+
+            let catHeaderContent = `${catName} KATEGÓRIA`;
+
+            html += `
+                <tr>
+                    <td colspan="4" class="cat-header">${catHeaderContent}</td>
+                </tr>
+            `;
+
+            if (mode === 'rajt') {
+                // RAJTLISTA: Idő az első, nincs igazolási szám, nincs klub
+                html += `
+                <tr>
+                    <th>Indulás ideje</th>
+                    <th>Rajtszám</th>
+                    <th>Versenyző neve</th>
+                    <th>Ló neve</th>
+                </tr>`;
+
+                comps.forEach(c => {
+                    html += `<tr>
+                        <td class="time-cell">${startStr}</td>
+                        <td class="bib-cell">#${c.bib}</td>
+                        <td style="font-size: 1.05rem;"><b>${c.name}</b></td>
+                        <td style="font-size: 1.05rem;"><b>${c.internal || '-'}</b></td>
+                    </tr>`;
+                });
+            } else {
+                // NEVEZÉSI LISTA: A korábbi részletes nézet
+                html += `
+                <tr>
+                    <th>Rajtszám</th>
+                    <th>Versenyző</th>
+                    <th>Ló</th>
+                    <th>Egyesület</th>
+                </tr>`;
+
+                comps.forEach(c => {
+                    html += `<tr>
+                        <td class="bib-cell">#${c.bib}</td>
+                        <td><b>${c.name}</b> ${c.license ? `<br><small style="color:#555;">Ig: ${c.license}</small>` : ''}</td>
+                        <td><b>${c.internal || '-'}</b> ${c.startNum ? `<br><small style="color:#555;">Startszám: ${c.startNum}</small>` : ''}</td>
+                        <td>${c.club || '-'}</td>
+                    </tr>`;
+                });
+            }
+        });
+
+        html += `
+            </table>
+            <div class="footer">
+                Generálva: <b>end-ride.com</b>
+            </div>
+            <script>window.onload = function() { window.print(); }</script>
+        </body></html>`;
+
+        win.document.write(html);
+        win.document.close();
+    }
+
+    // --- ADMIN: QR KÓD PLAKÁT NYOMTATÁSA A VERSENYHEZ ---
+    function printQRCodeFlyer() {
+        let win = window.open('', '_blank');
+        
+        let html = `
+        <html>
+        <head>
+            <title>QR Kód Plakát - end-ride.com</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; text-align: center; padding: 40px 20px; color: #000; background: #fff; }
+                h1 { font-size: 3.5rem; text-transform: uppercase; margin-bottom: 10px; color: #000000; letter-spacing: 2px; }
+                h2 { font-size: 2rem; color: #000000; margin-top: 0; margin-bottom: 50px; font-weight: normal; }
+                .qr-container { margin: 40px auto; padding: 20px; border: 8px solid #000; display: inline-block; border-radius: 20px; background: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, 0); }
+                img { width: 450px; height: 450px; display: block; }
+                p { font-size: 1.8rem; font-weight: bold; margin-top: 50px; color: #000000; }
+                .url-box { font-size: 3rem; font-weight: 900; margin-top: 20px; color: #000000; display: inlrgb(0, 0, 0)block; padding: 15px 40px; border-radius: 15px; letter-spacing: 2px; }
+                @media print { 
+                    body { padding: 0; }
+                    .qr-container { box-shadow: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Légy képben!</h1>
+            <h2><b>Kövesd a futamot élőben, percről percre!</b></h2>
+            
+            <div class="qr-container">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://end-ride.com" alt="QR Code">
+            </div>
+            
+            <p>Szkenneld be a telefonoddal, vagy írd be a böngészőbe:</p>
+            <div class="url-box">END-RIDE.COM</div>
+
+            <script>
+                // Egy pici késleltetés, hogy a QR kód képe biztosan betöltsön az internetről nyomtatás előtt
+                setTimeout(() => { window.print(); }, 800);
+            </script>
+        </body>
+        </html>`;
+
+        win.document.write(html);
+        win.document.close();
+    }
     
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';

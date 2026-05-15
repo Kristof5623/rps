@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v83</title>
+    <title>Verseny Kalkulátor v84</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -44,6 +44,9 @@
         <div class="menu-title">Fő funkciók</div>
         <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 ÉLŐ Verseny Kezelés</button>
         <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
+        <button class="sidebar-btn admin-only" onclick="printVersenyLista('nevezes')">🖨️ Nevezési Lista (A4)</button>
+        <button class="sidebar-btn admin-only" onclick="printVersenyLista('rajt')">🖨️ Rajtlista (A4)</button>
+        <button class="sidebar-btn admin-only" onclick="printQRCodeFlyer()">📲 QR Plakát (A4)</button>
     </div>
 
     <div id="szerepkor-menu" style="display: none; flex-direction: column;">
