@@ -377,7 +377,7 @@
         <div class="tabs" id="rm-tab-bar" style="display:flex; margin-bottom: 15px;">
             <button class="tab-btn active" id="rm-tab-btn-alap" onclick="switchRmTab('rm-alap', this)">Alap adatok</button>
             <button class="tab-btn" id="rm-tab-btn-kiiras" onclick="switchRmTab('rm-kiiras', this)">Verseny Kiírás</button>
-            <button id="btn-orvosok" class="tab-btn admin-only" onclick="switchSubMode('orvosok', this)">Állatorvosok</button>
+            <button class="tab-btn" id="rm-tab-btn-orvosok" onclick="switchRmTab('rm-orvosok', this)">Állatorvosok</button>
             <button class="tab-btn" id="rm-tab-btn-versenyzok" onclick="switchRmTab('rm-versenyzok', this)">Versenyzők</button>
             <button class="tab-btn" id="rm-tab-btn-verseny" onclick="switchRmTab('rm-verseny', this)">Eredmények</button>
         </div>
@@ -403,6 +403,14 @@
             <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt adhatod meg a távok rajtidejét és a köröket a kiválasztott versenyhez.</p>
             <div id="rm-kiirasContainer"></div>
             <button id="saveRmKiirasBtn" class="calc-btn admin-only" style="background:var(--primary); color:white;" onclick="saveRmKiiras()">Beállítások Mentése</button>
+        </div>
+
+        <div id="rm-orvosok" class="rm-tab-content" style="display:none;">
+            <h4 style="margin-bottom: 15px; color: white;">Állatorvosok ehhez a versenyhez</h4>
+            <label>Állatorvos neve:</label>
+            <input type="text" id="rm-regVetName" placeholder="pl. Dr. Kovács János">
+            <button id="rm-saveVetBtn" class="calc-btn add-btn admin-only" style="margin-top:0;" onclick="saveRmVet()">Orvos hozzáadása</button>
+            <div id="rm-vetListContainer" style="margin-top:20px;"></div>
         </div>
 
         <div id="rm-versenyzok" class="rm-tab-content" style="display:none;">
