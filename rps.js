@@ -193,7 +193,10 @@
     function runAutoMigration() {
         db.ref('/').once('value').then(snap => {
             let data = snap.val() || {};
-            let today = new Date().toISOString().split('T')[0];
+            
+            // Helyi időzóna szerinti pontos dátum (Magyar idő)
+            let d = new Date();
+            let today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             let meta = data.liveRaceMeta || null;
             let jovo = (data.races && data.races.jovo) ? data.races.jovo : {};
             
