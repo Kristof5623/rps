@@ -2385,7 +2385,7 @@
             let hasComp = comps.some(c => c.dist === d);
             let baseDist = d.replace('j','');
             let hasConfig = config[baseDist] && config[baseDist].h !== '';
-            if (hasComp || hasConfig) active.push(d);
+            if (hasComp || (!d.includes('j') && hasConfig)) active.push(d);
         });
         return active;
     }
