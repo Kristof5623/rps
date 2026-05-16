@@ -190,7 +190,7 @@
             .mode-content { display: none !important; }
             #nyomtatas-mod { display: block !important; }
             
-            #nyomtatas-mod h3, #nyomtatas-mod p, #sel-nyomtatas, label[for="sel-nyomtatas"], #btn-nyomtatas-indit { display: none !important; }
+            #nyomtatas-mod h3, #nyomtatas-mod p, #sel-nyomtatas, #nyom-bibInput, label[for="sel-nyomtatas"], #btn-nyomtatas-indit { display: none !important; }
             #print-sticker { display: block !important; border: none !important; padding: 0 !important; width: 100%; font-size: 14pt; page-break-inside: avoid; }
         }
 
