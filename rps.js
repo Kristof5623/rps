@@ -1673,7 +1673,7 @@
                                     <div style="width: 42mm; border: 2px solid #000; background: #f4f4f4; color: #000; padding: 1.5mm; text-align: center; border-radius: 4px;">
                                         <div style="font-size: 7pt; text-transform: uppercase; margin-bottom: 0.5mm;">LÉGY KÉPBEN:</div>
                                         <div style="font-size: 7pt; text-transform: uppercase; margin-bottom: 0.5mm;">KÖVESD ÉLŐBEN!</div>
-                                        <div style="font-size: 11pt; font-weight: 900;">END-RIDE.COM</div>
+                                        <div style="font-size: 11pt; font-weight: 900;">end-ride.com</div>
                                         <div style="font-size: 6.5pt; margin-top: 0.5mm; font-style: italic;">Valós idejű állás és részletes adatok.</div>
                                     </div>
                                 </div>
@@ -2785,7 +2785,7 @@
             </div>
             
             <p>Szkenneld be a telefonoddal, vagy írd be a böngészőbe:</p>
-            <div class="url-box">END-RIDE.COM</div>
+            <div class="url-box">end-ride.com/div>
 
             <script>
                 // Egy pici késleltetés, hogy a QR kód képe biztosan betöltsön az internetről nyomtatás előtt
