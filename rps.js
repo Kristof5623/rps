@@ -1778,12 +1778,14 @@
         document.getElementById('adatlapModal').style.display = 'flex';
     }
 
-    // --- SÖTÉT TÉMÁHOZ IGAZÍTOTT "TELIBE SZÍNEZETT" BADGE ---
+    // --- SÖTÉT TÉMÁHOZ IGAZÍTOTT "TELIBE SZÍNEZETT", CSUPA NAGYBETŰS BADGE ---
     function formatVetBadge(val) {
         if (!val || val === '-') return '-';
-        let upVal = val.toString().trim().toUpperCase();
         
-        // Alapértelmezett (pl. pulzus számok): Szürke háttér, fekete betű
+        // Itt alakítjuk át az összes bejövő értéket csupa nagybetűssé (pl. "Tiszta" -> "TISZTA", "a" -> "A")
+        let upVal = val.toString().trim().toUpperCase(); 
+        
+        // Alapértelmezett: Szürke háttér, fekete betű
         let bg = '#999'; 
         let color = '#000'; 
         
@@ -1797,7 +1799,8 @@
             bg = '#FF453A'; color = '#000'; 
         }
 
-        return `<div style="background: ${bg}; color: ${color}; border-radius: 6px; padding: 4px 10px; display: inline-block; font-weight: bold; font-size: 0.95rem; min-width: 38px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">${val}</div>`;
+        // Itt már a nagybetűs 'upVal'-t íratjuk ki a dobozba!
+        return `<div style="background: ${bg}; color: ${color}; border-radius: 8px; padding: 6px 14px; display: inline-block; font-weight: 900; font-size: 1.1rem; min-width: 50px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.4);">${upVal}</div>`;
     }
 
     function escapeHtml(unsafe) {
