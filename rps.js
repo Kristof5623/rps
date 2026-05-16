@@ -2804,6 +2804,35 @@
         win.document.write(html);
         win.document.close();
     }
+
+    // --- GYORS KERESÉS (RAJTSZÁM ALAPJÁN) SZINKRONIZÁLÁSA A DROPDOWN LISTÁKKAL ---
+    function syncBibInputToSelect(inputId, selectId) {
+        const inputVal = document.getElementById(inputId).value.toString().trim();
+        const selectEl = document.getElementById(selectId);
+        if (!selectEl) return;
+
+        // Ha törlöd a számot a mezőből, csukja be az adatlapot (ugorjon alapra)
+        if (inputVal === '') {
+            selectEl.value = "";
+            selectEl.dispatchEvent(new Event('change'));
+            return;
+        }
+
+        let found = false;
+        // Végigmegyünk a legördülő lista elemein, és keressük az egyezést
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].value === inputVal) {
+                selectEl.selectedIndex = i;
+                found = true;
+                break;
+            }
+        }
+
+        // Ha megtalálta a beírt rajtszámot, automatikusan rákattint helyetted!
+        if (found) {
+            selectEl.dispatchEvent(new Event('change'));
+        }
+    }
     
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';

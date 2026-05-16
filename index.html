@@ -97,9 +97,12 @@
             </div>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Beérkezési idő rögzítése. Válaszd ki a versenyzőt:</p>
             <label style="color: var(--primary);">Versenyző:</label>
-            <select id="sel-beerkeztetes" onchange="loadBeerkeztetesData()" style="border-color: var(--primary); margin-bottom:15px;">
-                <option value="">-- Válassz --</option>
-            </select>
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                <input type="number" id="bk-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('bk-bibInput', 'sel-beerkeztetes')">
+                <select id="sel-beerkeztetes" onchange="loadBeerkeztetesData()" style="flex:2; margin-top:0; border-color: var(--primary);">
+                    <option value="">-- Válassz --</option>
+                </select>
+            </div>
             
             <div id="beerkeztetes-form" style="display:none;">
                 <div style="background:#2c2c2e; padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
@@ -124,9 +127,12 @@
             </div>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Orvosi (Vet) vizsgálatra lépés rögzítése. Válaszd ki a versenyzőt:</p>
             <label style="color: var(--primary);">Versenyző:</label>
-            <select id="sel-orvosi-ido" onchange="loadOrvosiIdoData()" style="border-color: var(--primary); margin-bottom:15px;">
-                <option value="">-- Válassz --</option>
-            </select>
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                <input type="number" id="oi-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('oi-bibInput', 'sel-orvosi-ido')">
+                <select id="sel-orvosi-ido" onchange="loadOrvosiIdoData()" style="flex:2; margin-top:0; border-color: var(--primary);">
+                    <option value="">-- Válassz --</option>
+                </select>
+            </div>
             
             <div id="orvosi-ido-form" style="display:none;">
                 <div style="background:#2c2c2e; padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
@@ -149,9 +155,12 @@
             <h3 style="color:var(--success); margin-bottom: 15px;">🩺 Állatorvosi Vizsgálat</h3>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Pulzus és orvosi értékelés rögzítése.</p>
             <label style="color: var(--success);">Versenyző:</label>
-            <select id="sel-orvosi" onchange="loadOrvosiData()" style="border-color: var(--success);">
-                <option value="">-- Válassz --</option>
-            </select>
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                <input type="number" id="orv-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('orv-bibInput', 'sel-orvosi')">
+                <select id="sel-orvosi" onchange="loadOrvosiData()" style="flex:2; margin-top:0; border-color: var(--success);">
+                    <option value="">-- Válassz --</option>
+                </select>
+            </div>
             
             <div id="orvosi-form" style="display:none; background:#2c2c2e; padding:15px; border-radius:12px; margin-top:15px; border-left:4px solid var(--success);">
                 <h4 id="orv-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
@@ -191,9 +200,12 @@
         <div id="nyomtatas-mod" class="mode-content">
             <h3 style="color:var(--text); margin-bottom: 15px;">🖨️ Nyomtatás</h3>
             <label for="sel-nyomtatas" style="color: var(--text);">Versenyző kiválasztása:</label>
-            <select id="sel-nyomtatas" onchange="loadNyomtatasData()" style="border-color: var(--text);">
-                <option value="">-- Válassz --</option>
-            </select>
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                <input type="number" id="nyom-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('nyom-bibInput', 'sel-nyomtatas')">
+                <select id="sel-nyomtatas" onchange="loadNyomtatasData()" style="flex:2; margin-top:0; border-color: var(--text);">
+                    <option value="">-- Válassz --</option>
+                </select>
+            </div>
 
             <div id="nyomtatas-form" style="display:none; margin-top:20px;">
                 <div id="print-sticker" style="background:#fff; color:#000; padding:20px; border-radius:10px; border:2px solid #000; font-family: sans-serif;">
@@ -306,9 +318,12 @@
             <div id="verseny" class="sub-mode-content" style="display:none;">
                 <h4 style="color:white; margin-bottom:15px; margin-top:0;">ÉLŐ: Eredmények bevitele</h4>
                 <label style="color: var(--primary);">Versenyző kiválasztása:</label>
-                <select id="selectCompetitor" onchange="loadCompetitorData()" style="border-color: var(--primary);">
-                    <option value="">-- Manuális bevitel --</option>
-                </select>
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                    <input type="number" id="elo-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('elo-bibInput', 'selectCompetitor')">
+                    <select id="selectCompetitor" onchange="loadCompetitorData()" style="flex:2; margin-top:0; border-color: var(--primary);">
+                        <option value="">-- Manuális bevitel --</option>
+                    </select>
+                </div>
                 
                 <div id="verseny-form-container" style="display:none;">
                     <label>Versenyző státusza:</label>
@@ -456,9 +471,12 @@
         <div id="rm-verseny" class="rm-tab-content" style="display:none;">
             <h4 style="color:white; margin-bottom:15px; margin-top:0;">Eredmények rögzítése</h4>
             <label style="color: var(--primary);">Versenyző kiválasztása:</label>
-            <select id="rm-selectCompetitor" onchange="loadRmCompetitorData()" style="border-color: var(--primary);">
-                <option value="">-- Válassz a regisztráltak közül --</option>
-            </select>
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                <input type="number" id="rm-elo-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('rm-elo-bibInput', 'rm-selectCompetitor')">
+                <select id="rm-selectCompetitor" onchange="loadRmCompetitorData()" style="flex:2; margin-top:0; border-color: var(--primary);">
+                    <option value="">-- Válassz a regisztráltak közül --</option>
+                </select>
+            </div>
             
             <div id="rm-verseny-form-container" style="display:none;">
                 <label>Versenyző státusza:</label>
