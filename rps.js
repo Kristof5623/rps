@@ -1239,7 +1239,12 @@
             
             let phaseTime; let pulzusTime = 0;
             if (isFinalLap) {
-                phaseTime = loopTime;
+                // ÚJ LOGIKA 20 KM-hez: Az idő az Orvosi kapunál (VET) áll meg!
+                if (comp.dist === "20" || comp.dist === "20j") {
+                    phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
+                } else {
+                    phaseTime = loopTime;
+                }
                 if(vet > 0) pulzusTime = vet - arr < 0 ? vet - arr + 86400 : vet - arr;
             } else {
                 phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
@@ -2367,18 +2372,40 @@
                 let aLaps = (a.laps || []).filter(l => l.isComplete).length;
                 let bLaps = (b.laps || []).filter(l => l.isComplete).length;
                 if (aLaps !== bLaps) return bLaps - aLaps;
-                let aTime = aLaps > 0 ? a.laps[aLaps-1].rideTime : 0;
-                let bTime = bLaps > 0 ? b.laps[bLaps-1].rideTime : 0;
+                
+                let aLast = aLaps > 0 ? a.laps[aLaps-1] : null;
+                let bLast = bLaps > 0 ? b.laps[bLaps-1] : null;
+                
+                let aTime = aLast ? aLast.rideTime : 0;
+                let bTime = bLast ? bLast.rideTime : 0;
+
+                // SPECIÁLIS LOGIKA 20 KM-HEZ: Az Orvosi (VET) idő alapján rangsorolunk!
+                if (dist === "20" || dist === "20j") {
+                    let aVet = aLast && aLast.vetSec > 0 ? aLast.vetSec : 999999;
+                    let bVet = bLast && bLast.vetSec > 0 ? bLast.vetSec : 999999;
+                    return aVet - bVet;
+                }
+                
                 return aTime - bTime;
             });
+            
             catComps.forEach((c, index) => {
                 let gapStr = "";
                 let lastLapIndex = (c.laps || []).filter(l => l.isComplete).length - 1;
                 if (lastLapIndex >= 0 && !c.isEliminated) {
                     let sameLapComps = catComps.filter(x => x.laps && x.laps[lastLapIndex] && x.laps[lastLapIndex].isComplete);
-                    let bestTime = Math.min(...sameLapComps.map(x => x.laps[lastLapIndex].rideTime));
-                    let gap = c.laps[lastLapIndex].rideTime - bestTime;
-                    if (gap > 0) gapStr = "+" + toTimeStr(gap);
+                    
+                    if (dist === "20" || dist === "20j") {
+                        // 20km-nél az orvosi idők közötti különbség a lemaradás
+                        let bestVet = Math.min(...sameLapComps.map(x => (x.laps[lastLapIndex].vetSec > 0 ? x.laps[lastLapIndex].vetSec : 999999)));
+                        let myVet = c.laps[lastLapIndex].vetSec;
+                        if (myVet > 0 && myVet > bestVet) gapStr = "+" + toTimeStr(myVet - bestVet);
+                    } else {
+                        // Többi távnál a menetidő alapján
+                        let bestTime = Math.min(...sameLapComps.map(x => x.laps[lastLapIndex].rideTime));
+                        let gap = c.laps[lastLapIndex].rideTime - bestTime;
+                        if (gap > 0) gapStr = "+" + toTimeStr(gap);
+                    }
                 }
                 ranksInfo[c.bib] = { rank: c.isEliminated ? "Kiesett" : (index + 1), gapStr: gapStr };
             });
