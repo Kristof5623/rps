@@ -2785,7 +2785,7 @@
             </div>
             
             <p>Szkenneld be a telefonoddal, vagy írd be a böngészőbe:</p>
-            <div class="url-box">end-ride.com/div>
+            <div class="url-box">end-ride.com</div>
 
             <script>
                 // Egy pici késleltetés, hogy a QR kód képe biztosan betöltsön az internetről nyomtatás előtt
