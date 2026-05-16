@@ -1574,7 +1574,7 @@
                                 <table style="width: 100%; border-collapse: collapse; text-align: center; table-layout: fixed;">
                                     <tr style="background: #e0e0e0; font-size: 8pt; font-weight: bold;">
                                         <td style="border: 1px solid #000; padding: 1mm;">ARR</td>
-                                        <td style="border: 1px solid #000; padding: 1mm;">IN</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">VET</td>
                                         <td style="border: 1px solid #000; padding: 1mm;">REC</td>
                                     </tr>
                                     <tr style="font-size: 11pt; font-weight: bold;">
