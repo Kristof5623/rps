@@ -91,7 +91,10 @@
     <div class="container">
         
         <div id="beerkeztetes-mod" class="mode-content">
-            <h3 style="color:var(--primary); margin-bottom: 15px;">⏱️ Beérkeztetés</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <h3 style="color:var(--primary); margin:0;">⏱️ Beérkeztetés</h3>
+            <div class="clock-display liveClockText" style="background:#222; color:white; border-color:#444;">--:--:--</div>
+            </div>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Beérkezési idő rögzítése. Válaszd ki a versenyzőt:</p>
             <label style="color: var(--primary);">Versenyző:</label>
             <select id="sel-beerkeztetes" onchange="loadBeerkeztetesData()" style="border-color: var(--primary); margin-bottom:15px;">
@@ -115,7 +118,10 @@
         </div>
 
         <div id="orvosi-ido-mod" class="mode-content">
-            <h3 style="color:var(--primary); margin-bottom: 15px;">🏥 Orvosi Idő</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <h3 style="color:var(--primary); margin:0;">🏥 Orvosi Idő</h3>
+            <div class="clock-display liveClockText" style="background:#222; color:white; border-color:#444;">--:--:--</div>
+            </div>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Orvosi (Vet) vizsgálatra lépés rögzítése. Válaszd ki a versenyzőt:</p>
             <label style="color: var(--primary);">Versenyző:</label>
             <select id="sel-orvosi-ido" onchange="loadOrvosiIdoData()" style="border-color: var(--primary); margin-bottom:15px;">

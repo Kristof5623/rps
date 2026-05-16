@@ -2177,8 +2177,13 @@
 
     // --- ÉLŐ RENDSZER (ÓRA, VISSZASZÁMLÁLÁS) ---
     setInterval(() => {
+        // FRISSÍTI AZ ÖSSZES ÓRÁT A KÉPERNYŐN EGYSZERRE
+        const timeNow = new Date().toLocaleTimeString('hu-HU', { hour12: false });
+        document.querySelectorAll('.liveClockText').forEach(el => el.innerText = timeNow);
+        
+        // Visszafelé kompatibilitás a régi adatlapos órához
         const clockEl = document.getElementById('liveClockText');
-        if(clockEl) { clockEl.innerText = new Date().toLocaleTimeString('hu-HU', { hour12: false }); }
+        if(clockEl) { clockEl.innerText = timeNow; }
 
         const live = document.getElementById('liveCountdownContainer');
         if(!document.getElementById('elo-rajtok').classList.contains('active')) return;
