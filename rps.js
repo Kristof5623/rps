@@ -1696,8 +1696,23 @@
 
     // --- SÖTÉT TÉMÁJÚ ÁLLATORVOSI KARTON (TÖRTÉNET) MODAL ---
     function openVetHistory(bib) {
-        const comp = competitors.find(c => c.bib == bib);
-        if(!comp) return;
+        let comp = null;
+        
+        // 1. Először keressük az élő versenyzők között
+        if (competitors && competitors.length > 0) {
+            comp = competitors.find(c => c.bib == bib);
+        }
+        
+        // 2. Ha nincs meg, akkor keressük a jelenleg megnyitott Múltbéli versenyben!
+        if (!comp && viewingPastRaceData && viewingPastRaceData.competitors) {
+            let pastArr = Array.isArray(viewingPastRaceData.competitors) ? viewingPastRaceData.competitors : Object.values(viewingPastRaceData.competitors);
+            comp = pastArr.find(c => c.bib == bib);
+        }
+
+        if(!comp) {
+            showToast("A versenyző orvosi adatai nem találhatók!", true);
+            return;
+        }
 
         let columns = [];
         if (comp.preVet && comp.preVet.pulse) {
