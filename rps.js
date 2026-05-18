@@ -486,7 +486,7 @@
             return;
         }
 
-        localRaces.mult.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
+        localRaces.mult.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(r => {
             cont.innerHTML += `
             <div class="race-card" style="border-left-color: #217346; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <div>
@@ -505,32 +505,44 @@
         let comps = parseCompetitors(race.competitors);
         let config = mergeRaceConfig(race.raceConfig);
         
-        if(!comps || comps.length === 0) {
-            showToast("Nincs exportálható adat ebben a versenyben!", true);
-            return;
-        }
+        if(!comps || comps.length === 0) { showToast("Nincs exportálható adat ebben a versenyben!", true); return; }
 
-        let csvContent = "\uFEFF"; 
         let activeCats = getActiveCategories(comps, config);
         let ranksInfo = calculateCurrentRanks(comps, config);
+        let raceName = race.name || "Eredmenyek";
         
-        activeCats.forEach((cat, index) => {
-            let catNameStr = catNames[cat]; 
-            
-            csvContent += `"${race.name}";;;;;;;;;;;;\n`;
-            csvContent += `"${index + 1}.vrsz.-${catNameStr}-es verseny";;;;;;;;;;;;\n`;
-            csvContent += `;;;;;;;;;;;\;\n`;
-            csvContent += `"www.tavlovasok.hu";;;;;;;;;;;;\n`;
-            csvContent += `"Elbírálás: Távlovaglás";;;;;;;;;;;;\n`;
-            csvContent += `;;;;;;;;;;;\;\n`;
-            csvContent += `;;;;;;;;;;;\;\n`;
-            
-            let header1 = ["Igazolási szám", "Versenyző", "Rajtszám", "Ló", "Egyesület", "Kategória", "_", "Hely", "Végeredmény", "", "", "", ""];
-            let header2 = ["", "", "", "", "", "", "", "", "Idő", "Büntetőpont", "Megj.", "Sárgalap", "Pihenőnap"];
+        let html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head><meta charset="utf-8"></head><body>`;
 
-            csvContent += header1.map(v => `"${v}"`).join(";") + "\n";
-            csvContent += header2.map(v => `"${v}"`).join(";") + "\n";
-            
+        activeCats.forEach((cat, index) => {
+            let catNameStr = catNames[cat] || (cat+" km"); 
+
+            html += `<table border="1" style="border-collapse: collapse; font-family: Calibri, sans-serif;">`;
+            html += `<tr><td colspan="13" style="font-size: 14pt;"><b>${raceName}</b></td></tr>`;
+            html += `<tr><td colspan="13" style="font-size: 12pt;"><b>${index + 1}.vrsz.-${catNameStr}-es verseny</b></td></tr>`;
+            html += `<tr><td colspan="13"></td></tr>`;
+            html += `<tr><td colspan="13">www.tavlovasok.hu</td></tr>`;
+            html += `<tr><td colspan="13">Elbírálás: Távlovaglás</td></tr>`;
+            html += `<tr><td colspan="13"></td></tr>`;
+            html += `<tr><td colspan="13"></td></tr>`;
+
+            // LILA HÁTTERES, VASTAG FEJLÉCEK (Rajtszám az első!)
+            html += `<tr>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Rajtszám</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Igazolási szám</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Versenyző</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Ló Startszám</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Ló</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Egyesület</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Kategória</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Hely</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Végeredmény (Idő)</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Büntetőpont</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Megj. (Kiesés)</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Sárgalap</th>
+                <th style="background-color:#D9D2E9; border:1px solid #000;">Pihenőnap</th>
+            </tr>`;
+
             let catComps = comps.filter(c => c.dist === cat);
             
             catComps.sort((a,b) => {
@@ -541,11 +553,12 @@
             });
             
             catComps.forEach(c => {
-                let rankStr = ranksInfo[c.bib]?.rank || "-";
+                let rInfo = ranksInfo[c.bib] || { rank: "-" };
+                let rankStr = rInfo.rank;
                 let isKiesett = c.isEliminated || rankStr === "Kiesett";
                 
                 let totalTimeStr = "-";
-                let megjStr = isKiesett ? "WD" : "0"; 
+                let megjStr = ""; 
                 
                 let completedLaps = (c.laps || []).filter(l => l.isComplete);
                 if (completedLaps.length > 0 && !isKiesett) {
@@ -553,48 +566,54 @@
                     let s = lastLap.rideTime;
                     const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
                     totalTimeStr = String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
+                    megjStr = "0";
                 } else if (isKiesett) {
-                    totalTimeStr = "visszalépet"; 
+                    totalTimeStr = getElimText(c);
+                    let lastLap = c.laps && c.laps.length > 0 ? c.laps.slice().reverse().find(l => l.vetNotes) : null;
+                    if (lastLap && lastLap.vetNotes) {
+                        megjStr = lastLap.vetNotes;
+                    } else if (c.status === "Visszalépett" || c.status === "Retired") {
+                        megjStr = "RET";
+                    } else if (c.status === "DNS" || c.status === "Nem jelent meg") {
+                        megjStr = "DNS";
+                    } else {
+                        megjStr = "ELIM";
+                    }
                 }
 
                 let kategoria = "Nyitott";
                 if (cat.includes('j')) { kategoria = "Junior"; }
                 else if (parseInt(cat) >= 80) { kategoria = "Felnőtt"; }
 
-                let row = [
-                    "", // Igazolási szám
-                    c.name,
-                    c.bib, 
-                    c.internal || "",
-                    "", // Egyesület
-                    kategoria,
-                    "", // _
-                    isKiesett ? "0" : rankStr,
-                    totalTimeStr,
-                    "0", // Büntetőpont
-                    megjStr,
-                    "0", // Sárgalap
-                    "12" // Pihenőnap alapértelmezett
-                ];
-                
-                csvContent += row.map(v => `"${v}"`).join(";") + "\n";
+                html += `<tr>
+                    <td style="font-weight:bold; border:1px solid #000; text-align:center;">${c.bib}</td>
+                    <td style="border:1px solid #000; text-align:center;">${c.license || ''}</td>
+                    <td style="border:1px solid #000;">${c.name}</td>
+                    <td style="border:1px solid #000; text-align:center;">${c.startNum || ''}</td>
+                    <td style="border:1px solid #000;">${c.internal || ''}</td>
+                    <td style="border:1px solid #000;">${c.club || ''}</td>
+                    <td style="border:1px solid #000; text-align:center;">${kategoria}</td>
+                    <td style="border:1px solid #000; text-align:center;">${isKiesett ? '-' : rankStr}</td>
+                    <td style="font-weight:bold; border:1px solid #000; text-align:center;">${totalTimeStr}</td>
+                    <td style="border:1px solid #000; text-align:center;">0</td>
+                    <td style="border:1px solid #000; text-align:center;">${megjStr}</td>
+                    <td style="border:1px solid #000;"></td>
+                    <td style="border:1px solid #000; text-align:center;">12</td>
+                </tr>`;
             });
-            csvContent += `;;;;;;;;;;;\;\n`; 
-            csvContent += `;;;;;;;;;;;\;\n`; 
+            
+            html += `<tr><td colspan="13"></td></tr>`;
+            html += `</table><br><br>`;
         });
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        
-        let safeName = (race.name || "Eredmenyek").replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        link.setAttribute("download", safeName + "_hivatalos_export.csv");
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
+
+        html += `</body></html>`;
+
+        let blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = raceName.replace(/ /g, '_') + '_Hivatalos_Eredmenyek.xls';
+        a.click();
         showToast("Eredmények sikeresen exportálva!");
     }
 
@@ -622,7 +641,7 @@
             jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>';
         }
 
-        localRaces.mult.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
+        localRaces.mult.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(r => {
             multCont.innerHTML += `
             <div class="race-card" style="border-left-color: #666;">
                 <div class="race-card-title">${r.name}</div>
@@ -727,7 +746,8 @@
 
             catComps.forEach(c => {
                 let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
-                let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; let rankDisplay = rankStr === "Kiesett" ? "Kiesett" : rankStr + "º";
+                let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; 
+                let rankDisplay = rankStr === "Kiesett" ? getElimText(c) : rankStr + "º";
                 let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás: ${info.gapStr}</div>` : '';
                 let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
                 if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
@@ -1114,8 +1134,8 @@
         document.getElementById('rm-totalDist').value = comp.dist;
         autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true);
 
-        document.getElementById('rm-compStatusToggle').checked = !comp.isEliminated;
-        updateStatusLabel('rm-compStatusToggle', 'rm-compStatusLabel');
+        if (comp.status) document.getElementById('rm-compStatusSelect').value = comp.status;
+        else document.getElementById('rm-compStatusSelect').value = comp.isEliminated ? 'Kiesett' : 'Active';
 
         const baseDist = comp.dist.replace('j', '');
         const cfg = modalRaceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
@@ -1148,7 +1168,9 @@
         let comp = modalCompetitors.find(c => c.bib == bib);
         if (comp) {
             comp.startTime = { h: document.getElementById('rm-vhR').value, m: document.getElementById('rm-vmR').value, s: document.getElementById('rm-vsR').value };
-            comp.isEliminated = !document.getElementById('rm-compStatusToggle').checked; 
+            const statusVal = document.getElementById('rm-compStatusSelect').value;
+            comp.status = statusVal;
+            comp.isEliminated = (statusVal !== 'Active');
             for(let i=0; i<count; i++) {
                 if(!comp.laps) comp.laps = [];
                 if(!comp.laps[i]) comp.laps[i] = {};
@@ -1476,9 +1498,19 @@
         document.getElementById('orv-vet-name').value = l.vetName || '';
         document.getElementById('orv-notes').value = l.vetNotes || '';
         
-        const isQualified = l.vetDecision !== 'Eliminated';
-        document.getElementById('orvStatusToggle').checked = isQualified;
-        updateStatusLabel('orvStatusToggle', 'orvStatusLabel');
+        function adjustVetDecisionColors(sel) {
+            const val = sel.value;
+            if(val === 'Passed') sel.style.color = 'var(--success)';
+            else if(val === 'Eliminated') sel.style.color = 'var(--danger)';
+            else if(val === 'Retired') sel.style.color = 'var(--warning)';
+            else sel.style.color = '#aaa';
+        }
+
+        if (comp.status === 'Visszalépett') document.getElementById('orvStatusSelect').value = 'Retired';
+        else if (comp.status === 'DNS') document.getElementById('orvStatusSelect').value = 'DNS';
+        else if (comp.isEliminated) document.getElementById('orvStatusSelect').value = 'Eliminated';
+        else document.getElementById('orvStatusSelect').value = 'Passed';
+        adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
         
         form.style.display = 'block';
     }
@@ -1514,9 +1546,18 @@
         targetObj.vetName = document.getElementById('orv-vet-name').value;
         targetObj.vetNotes = document.getElementById('orv-notes').value;
         
-        const isQualified = document.getElementById('orvStatusToggle').checked;
-        targetObj.vetDecision = isQualified ? "Továbbengedve" : "Eliminated";
-        comp.isEliminated = !isQualified;
+        const decision = document.getElementById('orvStatusSelect').value;
+        if (decision === 'Passed') {
+            comp.isEliminated = false;
+            comp.status = 'Active';
+            targetObj.vetDecision = "Továbbengedve";
+        } else {
+            comp.isEliminated = true;
+            if (decision === 'Eliminated') comp.status = 'Kiesett';
+            else if (decision === 'Retired') comp.status = 'Visszalépett';
+            else if (decision === 'DNS') comp.status = 'DNS';
+            targetObj.vetDecision = decision;
+        }
 
         comp = recalcCompetitorData(comp, raceConfig);
         db.ref('competitors/' + comp.bib).set(comp).then(() => {
@@ -2033,8 +2074,8 @@
         document.getElementById('totalDist').value = comp.dist;
         autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v', false);
 
-        document.getElementById('compStatusToggle').checked = !comp.isEliminated;
-        updateStatusLabel('compStatusToggle', 'compStatusLabel');
+        if (comp.status) document.getElementById('compStatusSelect').value = comp.status;
+        else document.getElementById('compStatusSelect').value = comp.isEliminated ? 'Kiesett' : 'Active';
 
         const baseDist = comp.dist.replace('j', '');
         const cfg = raceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
@@ -2067,7 +2108,9 @@
         let comp = competitors.find(c => c.bib == bib);
         if (comp) {
             comp.startTime = { h: document.getElementById('vhR').value, m: document.getElementById('vmR').value, s: document.getElementById('vsR').value };
-            comp.isEliminated = !document.getElementById('compStatusToggle').checked; 
+            const statusVal = document.getElementById('compStatusSelect').value;
+            comp.status = statusVal;
+            comp.isEliminated = (statusVal !== 'Active'); 
 
             for(let i=0; i<count; i++) {
                 if(!comp.laps) comp.laps = [];
@@ -2520,7 +2563,8 @@
 
         filtered.forEach(c => {
             let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
-            let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; let rankDisplay = rankStr === "Kiesett" ? "Kiesett" : rankStr + "º";
+            let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; 
+            let rankDisplay = rankStr === "Kiesett" ? getElimText(c) : rankStr + "º";
             let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by ${info.gapStr}</div>` : '';
             let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
             if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
@@ -2874,6 +2918,14 @@
         if (found) {
             selectEl.dispatchEvent(new Event('change'));
         }
+    }
+
+    // --- KIESÉSI STÁTUSZ SZÖVEGGÉ ALAKÍTÁSA ---
+    function getElimText(c) {
+        if (!c || !c.isEliminated) return "";
+        if (c.status === "Visszalépett" || c.status === "Retired") return "VISSZALÉPETT";
+        if (c.status === "DNS" || c.status === "Nem jelent meg") return "NEM JELENT MEG";
+        return "KIESETT"; 
     }
     
     window.onload = function() {

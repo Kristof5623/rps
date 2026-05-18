@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v89</title>
+    <title>Verseny Kalkulátor v90</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -181,14 +181,13 @@
                 <label>Állatorvos:</label>
                 <select id="orv-vet-name"></select>
 
-                <label>Orvosi Döntés:</label>
-                <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
-                    <label class="switch">
-                        <input type="checkbox" id="orvStatusToggle" checked onchange="updateStatusLabel('orvStatusToggle', 'orvStatusLabel')">
-                        <span class="slider"></span>
-                    </label>
-                    <span id="orvStatusLabel" class="status-label" style="color: var(--success);">Továbbengedve</span>
-                </div>
+                <label>Orvosi Döntés / Státusz:</label>
+                <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;" onchange="adjustVetDecisionColors(this)">
+                    <option value="Passed" style="color:var(--success);">Továbbengedve (Bent van)</option>
+                    <option value="Eliminated" style="color:var(--danger);">Kiesett (ELIM)</option>
+                    <option value="Retired" style="color:var(--warning);">Visszalépett (RET)</option>
+                    <option value="DNS" style="color:#aaa;">Nem jelent meg (DNS)</option>
+                </select>
 
                 <label>Megjegyzés:</label>
                 <input type="text" id="orv-notes" placeholder="pl. OK">
@@ -327,13 +326,12 @@
                 
                 <div id="verseny-form-container" style="display:none;">
                     <label>Versenyző státusza:</label>
-                    <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
-                        <label class="switch">
-                            <input type="checkbox" id="compStatusToggle" checked onchange="updateStatusLabel('compStatusToggle', 'compStatusLabel')">
-                            <span class="slider"></span>
-                        </label>
-                        <span id="compStatusLabel" class="status-label" style="color: var(--success);">Versenyben</span>
-                    </div>
+                    <select id="compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;">
+                        <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
+                        <option value="Kiesett" style="color:var(--danger);">Kiesett (ELIM)</option>
+                        <option value="Visszalépett" style="color:var(--warning);">Visszalépett (RET)</option>
+                        <option value="DNS" style="color:#aaa;">Nem jelent meg (DNS)</option>
+                    </select>
 
                     <label>Össztáv & Körök:</label>
                     <select id="totalDist" onchange="autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v')">
@@ -480,13 +478,12 @@
             
             <div id="rm-verseny-form-container" style="display:none;">
                 <label>Versenyző státusza:</label>
-                <div style="display: flex; align-items: center; margin-top:5px; margin-bottom: 15px; background: #222; padding: 10px; border-radius: 10px;">
-                    <label class="switch">
-                        <input type="checkbox" id="rm-compStatusToggle" checked onchange="updateStatusLabel('rm-compStatusToggle', 'rm-compStatusLabel')">
-                        <span class="slider"></span>
-                    </label>
-                    <span id="rm-compStatusLabel" class="status-label" style="color: var(--success);">Versenyben</span>
-                </div>
+                <select id="rm-compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;">
+                    <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
+                    <option value="Kiesett" style="color:var(--danger);">Kiesett (ELIM)</option>
+                    <option value="Visszalépett" style="color:var(--warning);">Visszalépett (RET)</option>
+                    <option value="DNS" style="color:#aaa;">Nem jelent meg (DNS)</option>
+                </select>
 
                 <label>Össztáv & Körök:</label>
                 <select id="rm-totalDist" onchange="autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true)">

@@ -138,7 +138,7 @@
         .adatlap-card:hover { background: #d5d5d5; }
         
         .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
-        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; }
+        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; width: auto; padding: 0 12px; border-radius: 20px; white-space: nowrap; }
         
         .adatlap-info { flex: 1; min-width: 150px; display: flex; flex-direction: column; overflow: hidden; }
         .adatlap-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
