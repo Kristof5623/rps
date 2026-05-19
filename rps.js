@@ -563,9 +563,13 @@
                 let completedLaps = (c.laps || []).filter(l => l.isComplete);
                 if (completedLaps.length > 0 && !isKiesett) {
                     let lastLap = completedLaps[completedLaps.length - 1];
-                    let s = lastLap.rideTime;
-                    const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
-                    totalTimeStr = String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
+                    if ((c.dist === "20" || c.dist === "20j") && lastLap.vetSec > 0) {
+                        totalTimeStr = toTimeStr(lastLap.loopSec + lastLap.pulzusSec);
+                    } else {
+                        let s = lastLap.rideTime;
+                        const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
+                        totalTimeStr = String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
+                    }
                     megjStr = "0";
                 } else if (isKiesett) {
                     totalTimeStr = getElimText(c);
@@ -746,8 +750,8 @@
 
             catComps.forEach(c => {
                 let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
-                let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; 
-                let rankDisplay = rankStr === "Kiesett" ? getElimText(c) : rankStr + "º";
+                let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
+                let rankDisplay = c.isEliminated ? "ELIM" : rankStr + "º";
                 let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás: ${info.gapStr}</div>` : '';
                 let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
                 if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
@@ -1214,9 +1218,10 @@
             if (lastComplete) {
                 let hasSpeeding = comp.laps.some(l => l.isComplete && (l.loopSpd >= 16 || l.phaseSpd >= 16));
                 let avgColor = (hasSpeeding || lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
+                let totalTime = ((comp.dist === "20" || comp.dist === "20j") && lastComplete.vetSec > 0) ? (lastComplete.loopSec + lastComplete.pulzusSec) : lastComplete.rideTime;
                 html += `<div class="summary-total">
                     <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(lastComplete.rideTime)}</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalTime)}</b></div>
                     <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${lastComplete.rideSpd.toFixed(2)} km/h</b></div>
                 </div>`;
             }
@@ -2158,14 +2163,14 @@
             if(lastComplete) {
                 let hasSpeeding = comp.laps.some(l => l.isComplete && (l.loopSpd >= 16 || l.phaseSpd >= 16));
                 let avgColor = (hasSpeeding || lastComplete.rideSpd >= 16) ? 'var(--warning)' : 'var(--success)';
+                let totalTime = ((comp.dist === "20" || comp.dist === "20j") && lastComplete.vetSec > 0) ? (lastComplete.loopSec + lastComplete.pulzusSec) : lastComplete.rideTime;
                 html += `<div class="summary-total">
                     <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(lastComplete.rideTime)}</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalTime)}</b></div>
                     <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${lastComplete.rideSpd.toFixed(2)} km/h</b></div>
                 </div>`;
             }
         }
-
         document.getElementById('res2').style.display='block'; document.getElementById('res2').innerHTML = html;
 
         if (saveToDb && comp) {
@@ -2376,7 +2381,7 @@
     }
 
     function getCompLiveStatus(c, config) {
-        if (c.isEliminated) return { text: "Kiesett", color: "var(--danger)", textCol: "#fff" };
+        if (c.isEliminated) return { text: getElimText(c), color: "var(--danger)", textCol: "#fff" };
 
         let baseDist = c.dist ? c.dist.replace('j', '') : '20';
         let expected = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 1;
@@ -2406,7 +2411,7 @@
 
         if (completed >= expected) {
             if (!last.vetSec || last.vetSec === 0) return { text: "Célban (Orvosira vár)", color: "var(--warning)", textCol: "#000" };
-            return { text: "Finished", color: "var(--success)", textCol: "#000" };
+            return { text: "Beérkezett", color: "var(--success)", textCol: "#000" };
         }
 
         if (last.arrSec > 0 && (!last.vetSec || last.vetSec === 0)) {
@@ -2563,8 +2568,8 @@
 
         filtered.forEach(c => {
             let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
-            let rankStr = info.rank; let rankClass = rankStr === "Kiesett" ? "kiesett" : ""; 
-            let rankDisplay = rankStr === "Kiesett" ? getElimText(c) : rankStr + "º";
+            let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
+            let rankDisplay = c.isEliminated ? "ELIM" : rankStr + "º";
             let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by ${info.gapStr}</div>` : '';
             let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
             if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
@@ -2594,15 +2599,28 @@
         const c = ctx.comps.find(comp => comp.bib == bib); if(!c) return;
         let phases = (c.laps || []).filter(l => l.isComplete);
         let sameCatComps = ctx.comps.filter(x => x.dist === c.dist);
+        let is20km = c.dist === '20' || c.dist === '20j';
         
         let ranks = [];
         let gaps = [];
         
+        const getPhaseRankTime = (comp, idx) => {
+            const lap = comp.laps && comp.laps[idx] ? comp.laps[idx] : null;
+            if (!lap) return Number.MAX_SAFE_INTEGER;
+            let time = lap.rideTime;
+            if (is20km && idx === (comp.laps || []).filter(l => l.isComplete).length - 1 && lap.vetSec > 0) {
+                time = lap.loopSec + lap.pulzusSec;
+            }
+            return time;
+        };
+
         phases.forEach((l, i) => {
             let phaseComps = sameCatComps.filter(x => x.laps && x.laps[i] && x.laps[i].isComplete);
-            phaseComps.sort((a, b) => a.laps[i].rideTime - b.laps[i].rideTime);
+            phaseComps.sort((a, b) => getPhaseRankTime(a, i) - getPhaseRankTime(b, i));
             let rank = phaseComps.findIndex(x => x.bib == c.bib) + 1;
-            let gap = l.rideTime - phaseComps[0].laps[i].rideTime; 
+            let bestTime = phaseComps.length > 0 ? getPhaseRankTime(phaseComps[0], i) : 0;
+            let currentTime = getPhaseRankTime(c, i);
+            let gap = currentTime - bestTime;
             ranks.push(rank);
             gaps.push(gap === 0 ? '-' : '+' + toTimeStr(gap));
         });
@@ -2639,10 +2657,21 @@
         html += renderDataRow('Beérkezés', l => toTimeStr(l.arrSec));
         html += renderDataRow('Kör idő', l => toTimeStr(l.loopSec || 0));
         html += renderDataRow('Kör átlag km/h', l => `<span style="${l.loopSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.loopSpd.toFixed(2)}</span>`);
-        html += renderDataRow('Orvosi (Vet)', l => l.vetSec > 0 ? toTimeStr(l.vetSec) : "-");
+        html += renderDataRow('Orvosi (Vet)', l => {
+            if (is20km && l.vetSec > 0) {
+                return toTimeStr(l.loopSec + l.pulzusSec);
+            }
+            return l.vetSec > 0 ? toTimeStr(l.vetSec) : "-";
+        });
         html += renderDataRow('Pulzus idő', l => l.pulzusSec > 0 ? toTimeStr(l.pulzusSec) : "-");
         html += renderDataRow('Orvosi átlag km/h', l => l.phaseSpd ? `<span style="${l.phaseSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.phaseSpd.toFixed(2)}</span>` : "-");
-        html += renderDataRow('Össz. menetidő', l => `<b style="color:#fff;">${toTimeStr(l.rideTime)}</b>`);
+        html += renderDataRow('Össz. menetidő', (l, i) => {
+            let finalLap = i === phases.length - 1;
+            if (is20km && finalLap && l.vetSec > 0) {
+                return `<b style="color:#fff;">${toTimeStr(l.loopSec + l.pulzusSec)}</b>`;
+            }
+            return `<b style="color:#fff;">${toTimeStr(l.rideTime)}</b>`;
+        });
         html += renderDataRow('Össz. átlag km/h', (l, i) => {
             let anySpeedingSoFar = phases.slice(0, i + 1).some(p => p.loopSpd >= 16 || p.phaseSpd >= 16);
             let isWarning = anySpeedingSoFar || l.rideSpd >= 16;
@@ -2923,9 +2952,9 @@
     // --- KIESÉSI STÁTUSZ SZÖVEGGÉ ALAKÍTÁSA ---
     function getElimText(c) {
         if (!c || !c.isEliminated) return "";
-        if (c.status === "Visszalépett" || c.status === "Retired") return "VISSZALÉPETT";
-        if (c.status === "DNS" || c.status === "Nem jelent meg") return "NEM JELENT MEG";
-        return "KIESETT"; 
+        if (c.status === "Visszalépett" || c.status === "Retired") return "Visszalépett";
+        if (c.status === "DNS" || c.status === "Nem jelent meg") return "Nem jelent meg";
+        return "Kiesett";
     }
     
     window.onload = function() {
