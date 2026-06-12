@@ -345,6 +345,43 @@
             if(role === 'printer') roleNameHu = "Nyomtató";
             document.getElementById('logged-in-role-text').innerText = "✅ " + roleNameHu.toUpperCase() + " mód";
             
+            // --- GOMBOK LÁTHATÓSÁGÁNAK KÉZI FELÜLÍRÁSA A SZEREPKÖRÖK SZERINT ---
+            let btnBk = document.getElementById('btn-menu-beerkeztetes');
+            let btnOrvIdo = document.getElementById('btn-menu-orvosi-ido');
+            let btnOrv = document.getElementById('btn-menu-orvosi');
+            let btnNyom = document.getElementById('btn-menu-nyomtatas');
+
+            // Alaphelyzet: Hagyjuk a CSS-t dolgozni (Pl. az Admin mindent lát)
+            if(btnBk) btnBk.style.display = '';
+            if(btnOrvIdo) btnOrvIdo.style.display = '';
+            if(btnOrv) btnOrv.style.display = '';
+            if(btnNyom) btnNyom.style.display = '';
+
+            // 1. BEÉRKEZTETŐ JOGOSULTSÁG
+            if (role === 'checkin') {
+                if(btnBk) btnBk.style.setProperty('display', 'flex', 'important');
+                if(btnOrvIdo) btnOrvIdo.style.setProperty('display', 'flex', 'important');
+                if(btnOrv) btnOrv.style.setProperty('display', 'none', 'important');
+                if(btnNyom) btnNyom.style.setProperty('display', 'none', 'important');
+                switchSidebarMode('beerkeztetes-mod', btnBk);
+            } 
+            // 2. ÁLLATORVOS JOGOSULTSÁG
+            else if (role === 'doctor') {
+                if(btnBk) btnBk.style.setProperty('display', 'flex', 'important');
+                if(btnOrvIdo) btnOrvIdo.style.setProperty('display', 'flex', 'important');
+                if(btnOrv) btnOrv.style.setProperty('display', 'flex', 'important');
+                if(btnNyom) btnNyom.style.setProperty('display', 'flex', 'important');
+                switchSidebarMode('orvosi-mod', btnOrv);
+            }
+            // 3. NYOMTATÓ JOGOSULTSÁG
+            else if (role === 'printer') {
+                if(btnBk) btnBk.style.setProperty('display', 'none', 'important');
+                if(btnOrvIdo) btnOrvIdo.style.setProperty('display', 'none', 'important');
+                if(btnOrv) btnOrv.style.setProperty('display', 'none', 'important');
+                if(btnNyom) btnNyom.style.setProperty('display', 'flex', 'important');
+                switchSidebarMode('nyomtatas-mod', btnNyom);
+            }
+
             if(role === 'judge') { switchSubMode('verseny', document.getElementById('btn-verseny')); }
             
         } else {
