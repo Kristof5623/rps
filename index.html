@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v92</title>
+    <title>Verseny Kalkulátor v93</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
@@ -326,12 +326,22 @@
                 
                 <div id="verseny-form-container" style="display:none;">
                     <label>Versenyző státusza:</label>
-                    <select id="compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;">
-                        <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
-                        <option value="Kiesett" style="color:var(--danger);">Kiesett (ELIM)</option>
-                        <option value="Visszalépett" style="color:var(--warning);">Visszalépett (RET)</option>
-                        <option value="DNS" style="color:#aaa;">Nem jelent meg (DNS)</option>
-                    </select>
+                    <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;" onchange="adjustVetDecisionColors(this)">
+                    <option value="Passed" style="color:var(--success);">Továbbengedve (Bent van)</option>
+                    <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
+                    <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
+                    <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
+                    <option value="FNR" style="color:#aaa;">Helyezés nélkül (FNR)</option>
+                    <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
+                    <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
+                    <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
+                    <option value="FTQ-MI" style="color:var(--danger);">Kiesés: Kisebb sérülés (MI)</option>
+                    <option value="FTQ-SIMUSCO" style="color:var(--danger);">Kiesés: Súlyos mozgásszervi (SI MUSCO)</option>
+                    <option value="FTQ-SIMETA" style="color:var(--danger);">Kiesés: Súlyos metabolikus (SI META)</option>
+                    <option value="FTQ-CI" style="color:var(--danger);">Kiesés: Végzetes sérülés (CI)</option>
+                    <option value="FTQ-OT" style="color:var(--danger);">Kiesés: Időtúllépés (OT)</option>
+                    <option value="FTQ-FTC" style="color:var(--danger);">Kiesés: Befejezetlen verseny (FTC)</option>
+                </select>
 
                     <label>Össztáv & Körök:</label>
                     <select id="totalDist" onchange="autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v')">

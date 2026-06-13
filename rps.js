@@ -611,14 +611,21 @@
                 } else if (isKiesett) {
                     totalTimeStr = getElimText(c);
                     let lastLap = c.laps && c.laps.length > 0 ? c.laps.slice().reverse().find(l => l.vetNotes) : null;
-                    if (lastLap && lastLap.vetNotes) {
-                        megjStr = lastLap.vetNotes;
-                    } else if (c.status === "Visszalépett" || c.status === "Retired") {
-                        megjStr = "RET";
-                    } else if (c.status === "DNS" || c.status === "Nem jelent meg") {
-                        megjStr = "DNS";
+                    
+                    // ÚJ EXPORT LOGIKA: Közvetlenül a kód kiírása (FTQ- előtag eltávolításával)
+                    if (c.status && c.status.startsWith('FTQ-')) {
+                        megjStr = c.status.replace('FTQ-', ''); // Pl. "FTQ-GA" -> "GA"
+                    } else if (['WD', 'RET', 'DSQ', 'FNR'].includes(c.status)) {
+                        megjStr = c.status;
+                    } else if (c.status === "Visszalépett" || c.status === "Retired" || c.status === "DNS") {
+                        megjStr = "WD";
                     } else {
                         megjStr = "ELIM";
+                    }
+
+                    // Ha a doki beírt valami extra megjegyzést, hozzáfűzzük a kód mellé
+                    if (lastLap && lastLap.vetNotes) {
+                        megjStr += " (" + lastLap.vetNotes + ")";
                     }
                 }
 
@@ -1542,16 +1549,23 @@
         
         function adjustVetDecisionColors(sel) {
             const val = sel.value;
-            if(val === 'Passed') sel.style.color = 'var(--success)';
-            else if(val === 'Eliminated') sel.style.color = 'var(--danger)';
-            else if(val === 'Retired') sel.style.color = 'var(--warning)';
-            else sel.style.color = '#aaa';
+            if(val === 'Passed' || val === 'Active') sel.style.color = 'var(--success)';
+            else if(['WD', 'RET', 'FNR'].includes(val)) sel.style.color = 'var(--warning)';
+            else sel.style.color = 'var(--danger)';
         }
 
-        if (comp.status === 'Visszalépett') document.getElementById('orvStatusSelect').value = 'Retired';
-        else if (comp.status === 'DNS') document.getElementById('orvStatusSelect').value = 'DNS';
-        else if (comp.isEliminated) document.getElementById('orvStatusSelect').value = 'Eliminated';
-        else document.getElementById('orvStatusSelect').value = 'Passed';
+        if (comp.isEliminated || comp.status !== 'Active') {
+            let s = comp.status;
+            // Régi adatok megfeleltetése az újakra
+            if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
+            else if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME'; // Alap kiesés
+            
+            // Ha létezik a kód a listában, kiválasztja, ha nem, ad egy alapértelmezettet
+            let exists = Array.from(document.getElementById('orvStatusSelect').options).some(opt => opt.value === s);
+            document.getElementById('orvStatusSelect').value = exists ? s : 'FTQ-ME';
+        } else {
+            document.getElementById('orvStatusSelect').value = 'Passed';
+        }
         adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
         
         form.style.display = 'block';
@@ -1595,9 +1609,7 @@
             targetObj.vetDecision = "Továbbengedve";
         } else {
             comp.isEliminated = true;
-            if (decision === 'Eliminated') comp.status = 'Kiesett';
-            else if (decision === 'Retired') comp.status = 'Visszalépett';
-            else if (decision === 'DNS') comp.status = 'DNS';
+            comp.status = decision; // Mentjük a pontos kódot (WD, FTQ-GA, stb.)
             targetObj.vetDecision = decision;
         }
 
@@ -2338,7 +2350,12 @@
         if(clockEl) { clockEl.innerText = timeNow; }
 
         const live = document.getElementById('liveCountdownContainer');
-        if(!document.getElementById('elo-rajtok').classList.contains('active')) return;
+        
+        // ÚJ: Az óra frissül, ha az Élő fülön vagyunk VAGY ha nyitva van a TV mód!
+        const isEloRajtokActive = document.getElementById('elo-rajtok').classList.contains('active');
+        const isFullscreenActive = document.getElementById('fullscreenLiveOverlay')?.classList.contains('active');
+        if (!isEloRajtokActive && !isFullscreenActive) return;
+        
         const now = new Date(); const nowS = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
 
         let liveData = [];
@@ -2438,12 +2455,10 @@
 
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.shiftKey && e.code === 'KeyA') {
-            const activeMode = document.querySelector('.mode-content.active');
-            if (activeMode?.id === 'elo-rajtok') {
-                enterLiveFullscreen();
-                e.preventDefault();
-                return;
-            }
+            // Most már BÁRMELYIK fülről azonnal kirakja a nagyképernyőt!
+            enterLiveFullscreen();
+            e.preventDefault();
+            return;
         }
 
         if (e.key === 'Escape' && document.getElementById('fullscreenLiveOverlay')?.classList.contains('active')) {
@@ -3036,9 +3051,21 @@
     // --- KIESÉSI STÁTUSZ SZÖVEGGÉ ALAKÍTÁSA ---
     function getElimText(c) {
         if (!c || !c.isEliminated) return "";
-        if (c.status === "Visszalépett" || c.status === "Retired") return "Visszalépett";
-        if (c.status === "DNS" || c.status === "Nem jelent meg") return "Nem jelent meg";
-        return "Kiesett";
+        const s = c.status;
+        if (s === "WD" || s === "Visszalépett" || s === "DNS") return "Visszalépett (WD)";
+        if (s === "RET" || s === "Retired") return "Feladta (RET)";
+        if (s === "DSQ") return "Kizárva (DSQ)";
+        if (s === "FNR") return "Hely. nélkül (FNR)";
+        if (s === "FTQ-SP") return "Kiesett: Sebesség (SP)";
+        if (s === "FTQ-GA") return "Kiesett: Sántaság (GA)";
+        if (s === "FTQ-ME") return "Kiesett: Metabolikus (ME)";
+        if (s === "FTQ-MI") return "Kiesett: Kisebb sérülés (MI)";
+        if (s === "FTQ-SIMUSCO") return "Kiesett: Súlyos mozgásszervi (SI MUSCO)";
+        if (s === "FTQ-SIMETA") return "Kiesett: Súlyos metabolikus (SI META)";
+        if (s === "FTQ-CI") return "Kiesett: Végzetes (CI)";
+        if (s === "FTQ-OT") return "Kiesett: Időtúllépés (OT)";
+        if (s === "FTQ-FTC") return "Kiesett: Befejezetlen (FTC)";
+        return "Kiesett (ELIM)";
     }
     
     window.onload = function() {
