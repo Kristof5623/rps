@@ -1391,6 +1391,7 @@
         db.ref('competitors/' + comp.bib).set(comp).then(() => {
             showAnimatedBtn('btn-bk-mentes');
             document.getElementById('sel-beerkeztetes').value = '';
+            document.getElementById('bk-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
             document.getElementById('beerkeztetes-form').style.display = 'none';
             refreshVersenyTabIfNeeded(comp.bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
@@ -1441,6 +1442,7 @@
         db.ref('competitors/' + comp.bib).set(comp).then(() => {
             showAnimatedBtn('btn-bk-vet-mentes');
             document.getElementById('sel-orvosi-ido').value = '';
+            document.getElementById('oi-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
             document.getElementById('orvosi-ido-form').style.display = 'none';
             refreshVersenyTabIfNeeded(comp.bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
@@ -1618,6 +1620,7 @@
             showAnimatedBtn('btn-orv-mentes');
             setTimeout(() => {
                 document.getElementById('sel-orvosi').value = '';
+                document.getElementById('orv-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
                 document.getElementById('orvosi-form').style.display = 'none';
             }, 1000);
         }).catch(e => showToast("Hiba: " + e.message, true));
@@ -1716,7 +1719,7 @@
                                         <td style="border: 1px solid #000; padding: 1mm;">KÖR ÁTL.</td>
                                         <td style="border: 1px solid #000; padding: 1mm;">ÖSSZ ÁTL.</td>
                                     </tr>
-                                    <tr style="font-size: 10pt; font-weight: bold;">
+                                    <tr style="font-size: 9pt; font-weight: bold;">
                                         <td style="border: 1px solid #000; padding: 1mm;">${lapTimeStr}</td>
                                         <td style="border: 1px solid #000; padding: 1mm;">${lapSpeed}</td>
                                         <td style="border: 1px solid #000; padding: 1mm;">${avgSpeed}</td>
