@@ -2175,29 +2175,155 @@
         document.getElementById('totalDist').value = comp.dist;
         autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v', false);
 
-        if (comp.status) document.getElementById('compStatusSelect').value = comp.status;
-        else document.getElementById('compStatusSelect').value = comp.isEliminated ? 'Kiesett' : 'Active';
+        // --- HIBATŰRŐ STÁTUSZ BEÁLLÍTÁS ---
+        let s = comp.status || (comp.isEliminated ? 'FTQ-ME' : 'Active');
+        if (s === 'Passed') s = 'Active';
+        if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME';
+        if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
+        let sel = document.getElementById('compStatusSelect');
+        if (sel) {
+            let exists = Array.from(sel.options).some(opt => opt.value === s);
+            sel.value = exists ? s : 'Active';
+        }
+        // ----------------------------------
 
         const baseDist = comp.dist.replace('j', '');
         const cfg = raceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
 
-        document.getElementById('vhR').value = comp.startTime.h || cfg.h;
-        document.getElementById('vmR').value = comp.startTime.m || cfg.m;
-        document.getElementById('vsR').value = comp.startTime.s || cfg.s;
+        // HIÁNYZÓ IDŐK PÓTLÁSA A VERSENYKIÍRÁSBÓL
+        if (comp.startTime && comp.startTime.h !== undefined && comp.startTime.h !== '') {
+            document.getElementById('vhR').value = comp.startTime.h;
+            document.getElementById('vmR').value = comp.startTime.m || '00';
+            document.getElementById('vsR').value = comp.startTime.s || '00';
+        } else {
+            document.getElementById('vhR').value = cfg.h || '';
+            document.getElementById('vmR').value = cfg.m || '';
+            document.getElementById('vsR').value = cfg.s || '';
+        }
 
         const lapsArr = comp.laps || [];
         lapsArr.forEach((l, i) => {
             const idx = i + 1;
             if(document.getElementById(`vd${idx}`)) {
-                document.getElementById(`vd${idx}`).value = l.d || '';
+                if(l.d) document.getElementById(`vd${idx}`).value = l.d; 
                 document.getElementById(`vh${idx}`).value = l.h || ''; document.getElementById(`vm${idx}`).value = l.m || ''; document.getElementById(`vs${idx}`).value = l.s || '';
                 document.getElementById(`voh${idx}`).value = l.oh || ''; document.getElementById(`vom${idx}`).value = l.om || ''; document.getElementById(`vos${idx}`).value = l.os || '';
             }
         });
-        if(lapsArr.length === 0) {
-            (cfg.laps || []).forEach((ld, i) => { if(document.getElementById(`vd${i+1}`)) document.getElementById(`vd${i+1}`).value = ld; });
-        }
+        
         calcVerseny(false);
+    }
+
+    function loadCompetitorData() {
+        const bib = document.getElementById('selectCompetitor').value;
+        const formCont = document.getElementById('verseny-form-container');
+        if (!bib) {
+            formCont.style.display = 'none';
+            document.querySelectorAll('#verseny-form-container input').forEach(i => i.value = '');
+            document.getElementById('res2').style.display = 'none';
+            return;
+        }
+        formCont.style.display = 'block';
+
+        const comp = competitors.find(c => c.bib == bib);
+        if(!comp) return;
+
+        document.getElementById('totalDist').value = comp.dist;
+        autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v', false);
+
+        // --- HIBATŰRŐ STÁTUSZ BEÁLLÍTÁS ---
+        let s = comp.status || (comp.isEliminated ? 'FTQ-ME' : 'Active');
+        if (s === 'Passed') s = 'Active';
+        if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME';
+        if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
+        let sel = document.getElementById('compStatusSelect');
+        if (sel) {
+            let exists = Array.from(sel.options).some(opt => opt.value === s);
+            sel.value = exists ? s : 'Active';
+        }
+        // ----------------------------------
+
+        const baseDist = comp.dist.replace('j', '');
+        const cfg = raceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
+
+        // HIÁNYZÓ IDŐK PÓTLÁSA A VERSENYKIÍRÁSBÓL
+        if (comp.startTime && comp.startTime.h !== undefined && comp.startTime.h !== '') {
+            document.getElementById('vhR').value = comp.startTime.h;
+            document.getElementById('vmR').value = comp.startTime.m || '00';
+            document.getElementById('vsR').value = comp.startTime.s || '00';
+        } else {
+            document.getElementById('vhR').value = cfg.h || '';
+            document.getElementById('vmR').value = cfg.m || '';
+            document.getElementById('vsR').value = cfg.s || '';
+        }
+
+        const lapsArr = comp.laps || [];
+        lapsArr.forEach((l, i) => {
+            const idx = i + 1;
+            if(document.getElementById(`vd${idx}`)) {
+                if(l.d) document.getElementById(`vd${idx}`).value = l.d; 
+                document.getElementById(`vh${idx}`).value = l.h || ''; document.getElementById(`vm${idx}`).value = l.m || ''; document.getElementById(`vs${idx}`).value = l.s || '';
+                document.getElementById(`voh${idx}`).value = l.oh || ''; document.getElementById(`vom${idx}`).value = l.om || ''; document.getElementById(`vos${idx}`).value = l.os || '';
+            }
+        });
+        
+        calcVerseny(false);
+    }
+
+    function loadRmCompetitorData() {
+        const bib = document.getElementById('rm-selectCompetitor').value;
+        const formCont = document.getElementById('rm-verseny-form-container');
+        if (!bib) {
+            formCont.style.display = 'none';
+            document.querySelectorAll('#rm-verseny-form-container input').forEach(i => i.value = '');
+            document.getElementById('rm-res2').style.display = 'none';
+            return;
+        }
+        formCont.style.display = 'block';
+        
+        const comp = modalCompetitors.find(c => c.bib == bib);
+        if(!comp) return;
+
+        document.getElementById('rm-totalDist').value = comp.dist;
+        autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true);
+
+        // --- HIBATŰRŐ STÁTUSZ BEÁLLÍTÁS ---
+        let s = comp.status || (comp.isEliminated ? 'FTQ-ME' : 'Active');
+        if (s === 'Passed') s = 'Active';
+        if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME';
+        if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
+        let sel = document.getElementById('rm-compStatusSelect');
+        if (sel) {
+            let exists = Array.from(sel.options).some(opt => opt.value === s);
+            sel.value = exists ? s : 'Active';
+        }
+        // ----------------------------------
+
+        const baseDist = comp.dist.replace('j', '');
+        const cfg = modalRaceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
+        
+        // HIÁNYZÓ IDŐK PÓTLÁSA A VERSENYKIÍRÁSBÓL
+        if (comp.startTime && comp.startTime.h !== undefined && comp.startTime.h !== '') {
+            document.getElementById('rm-vhR').value = comp.startTime.h;
+            document.getElementById('rm-vmR').value = comp.startTime.m || '00';
+            document.getElementById('rm-vsR').value = comp.startTime.s || '00';
+        } else {
+            document.getElementById('rm-vhR').value = cfg.h || '';
+            document.getElementById('rm-vmR').value = cfg.m || '';
+            document.getElementById('rm-vsR').value = cfg.s || '';
+        }
+
+        const lapsArr = comp.laps || [];
+        lapsArr.forEach((l, i) => {
+            const idx = i + 1;
+            if(document.getElementById(`rm-vd${idx}`)) {
+                if(l.d) document.getElementById(`rm-vd${idx}`).value = l.d;
+                document.getElementById(`rm-vh${idx}`).value = l.h || ''; document.getElementById(`rm-vm${idx}`).value = l.m || ''; document.getElementById(`rm-vs${idx}`).value = l.s || '';
+                document.getElementById(`rm-voh${idx}`).value = l.oh || ''; document.getElementById(`rm-vom${idx}`).value = l.om || ''; document.getElementById(`rm-vos${idx}`).value = l.os || '';
+            }
+        });
+        
+        calcRmVerseny(false);
     }
  
  
