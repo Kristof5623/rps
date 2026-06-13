@@ -2696,7 +2696,25 @@
     function openAdatlap(bib, isPast = false) {
         const ctx = getAdatlapContext();
         const c = ctx.comps.find(comp => comp.bib == bib); if(!c) return;
-        let phases = (c.laps || []).filter(l => l.isComplete);
+        
+        let baseDist = c.dist ? c.dist.replace('j', '') : '20';
+        let distName = catNames[c.dist] || (c.dist + " km");
+        let cfg = ctx.config[baseDist] || { h: '00', m: '00', s: '00', laps: [] };
+        
+        let startH = (c.startTime && c.startTime.h !== undefined && c.startTime.h !== "") ? c.startTime.h : (cfg.h || '00');
+        let startM = (c.startTime && c.startTime.m !== undefined && c.startTime.m !== "") ? c.startTime.m : (cfg.m || '00');
+        let startS = (c.startTime && c.startTime.s !== undefined && c.startTime.s !== "") ? c.startTime.s : (cfg.s || '00');
+        let rajTidoStr = String(startH).padStart(2, '0') + ":" + String(startM).padStart(2, '0') + ":" + String(startS).padStart(2, '0');
+
+        // ÚJ: Minden tervezett kört megjelenítünk, nem csak a befejezetteket!
+        let expectedLapsCount = cfg.laps && cfg.laps.length > 0 ? cfg.laps.length : 1;
+        let phases = [];
+        for (let i = 0; i < expectedLapsCount; i++) {
+            let lapObj = (c.laps && c.laps[i]) ? c.laps[i] : {};
+            lapObj.d = lapObj.d || (cfg.laps && cfg.laps[i] ? cfg.laps[i] : '-');
+            phases.push(lapObj);
+        }
+
         let sameCatComps = ctx.comps.filter(x => x.dist === c.dist);
         let is20km = c.dist === '20' || c.dist === '20j';
         
@@ -2705,7 +2723,7 @@
         
         const getPhaseRankTime = (comp, idx) => {
             const lap = comp.laps && comp.laps[idx] ? comp.laps[idx] : null;
-            if (!lap) return Number.MAX_SAFE_INTEGER;
+            if (!lap || !lap.isComplete) return Number.MAX_SAFE_INTEGER;
             let time = lap.rideTime;
             if (is20km && idx === (comp.laps || []).filter(l => l.isComplete).length - 1 && lap.vetSec > 0) {
                 time = lap.loopSec + lap.pulzusSec;
@@ -2714,6 +2732,9 @@
         };
 
         phases.forEach((l, i) => {
+            if (!l.isComplete) {
+                ranks.push(null); gaps.push(null); return;
+            }
             let phaseComps = sameCatComps.filter(x => x.laps && x.laps[i] && x.laps[i].isComplete);
             phaseComps.sort((a, b) => getPhaseRankTime(a, i) - getPhaseRankTime(b, i));
             let rank = phaseComps.findIndex(x => x.bib == c.bib) + 1;
@@ -2724,16 +2745,24 @@
             gaps.push(gap === 0 ? '-' : '+' + toTimeStr(gap));
         });
 
-        if (c.isEliminated && phases.length > 0) {
-            ranks[phases.length - 1] = `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>`;
+        if (c.isEliminated) {
+            let lastCompletedIdx = phases.map(p => p.isComplete).lastIndexOf(true);
+            if (lastCompletedIdx >= 0) {
+                ranks[lastCompletedIdx] = `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>`;
+            }
         }
 
         let html = `
             <div style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 900px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
                 
-                <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
+                <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center; position: relative;">
                     <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
                     <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${c.internal || "Ló neve hiányzik"}</div>
+                    
+                    <div style="margin-top: 15px; display: inline-block; background: rgba(0,0,0,0.25); padding: 6px 18px; border-radius: 8px; font-size: 1rem; color: #fff;">
+                        <span style="margin-right:20px;">🏁 <b>Táv:</b> ${distName}</span>
+                        <span>⏱ <b>Rajtidő:</b> ${rajTidoStr}</span>
+                    </div>
                 </div>
                 
                 <div style="padding: 20px; overflow-x: auto;">
@@ -2751,33 +2780,34 @@
             row += `</tr>`; return row;
         };
 
-        html += renderDataRow('Táv (km)', l => `<b style="background:#242426; color:#fff; padding:2px 6px; border:1px solid #3a3a3c; border-radius:4px;">${l.d}</b>`);
-        html += renderDataRow('Rajt', l => toTimeStr(l.startSec));
-        html += renderDataRow('Beérkezés', l => toTimeStr(l.arrSec));
-        html += renderDataRow('Kör idő', l => toTimeStr(l.loopSec || 0));
-        html += renderDataRow('Kör átlag km/h', l => `<span style="${l.loopSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.loopSpd.toFixed(2)}</span>`);
+        html += renderDataRow('Táv (km)', l => `<b style="background:#242426; color:#fff; padding:2px 6px; border:1px solid #3a3a3c; border-radius:4px;">${l.d || '-'}</b>`);
+        html += renderDataRow('Rajt', l => l.startSec > 0 ? toTimeStr(l.startSec) : "-");
+        html += renderDataRow('Beérkezés', l => l.arrSec > 0 ? toTimeStr(l.arrSec) : "-");
+        html += renderDataRow('Kör idő', l => l.loopSec > 0 ? toTimeStr(l.loopSec) : "-");
+        html += renderDataRow('Kör átlag km/h', l => l.loopSpd > 0 ? `<span style="${l.loopSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.loopSpd.toFixed(2)}</span>` : "-");
         html += renderDataRow('Orvosi (Vet)', l => {
-            if (is20km && l.vetSec > 0) {
-                return toTimeStr(l.loopSec + l.pulzusSec);
-            }
+            if (!l.isComplete) return "-";
+            if (is20km && l.vetSec > 0) return toTimeStr(l.loopSec + l.pulzusSec);
             return l.vetSec > 0 ? toTimeStr(l.vetSec) : "-";
         });
         html += renderDataRow('Pulzus idő', l => l.pulzusSec > 0 ? toTimeStr(l.pulzusSec) : "-");
-        html += renderDataRow('Orvosi átlag km/h', l => l.phaseSpd ? `<span style="${l.phaseSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.phaseSpd.toFixed(2)}</span>` : "-");
+        html += renderDataRow('Orvosi átlag km/h', l => l.phaseSpd > 0 ? `<span style="${l.phaseSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.phaseSpd.toFixed(2)}</span>` : "-");
         html += renderDataRow('Össz. menetidő', (l, i) => {
+            if (!l.isComplete) return "-";
             let finalLap = i === phases.length - 1;
             if (is20km && finalLap && l.vetSec > 0) {
                 return `<b style="color:#fff;">${toTimeStr(l.loopSec + l.pulzusSec)}</b>`;
             }
-            return `<b style="color:#fff;">${toTimeStr(l.rideTime)}</b>`;
+            return l.rideTime > 0 ? `<b style="color:#fff;">${toTimeStr(l.rideTime)}</b>` : "-";
         });
         html += renderDataRow('Össz. átlag km/h', (l, i) => {
+            if (!l.isComplete) return "-";
             let anySpeedingSoFar = phases.slice(0, i + 1).some(p => p.loopSpd >= 16 || p.phaseSpd >= 16);
             let isWarning = anySpeedingSoFar || l.rideSpd >= 16;
-            return `<b style="${isWarning ? 'color:var(--danger);' : 'color:#fff;'}">${l.rideSpd.toFixed(2)}</b>`;
+            return l.rideSpd > 0 ? `<b style="${isWarning ? 'color:var(--danger);' : 'color:#fff;'}">${l.rideSpd.toFixed(2)}</b>` : "-";
         });
-        html += renderDataRow('Helyezés', (l, i) => ranks[i] === `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>` ? ranks[i] : `<b style="color:#fff;">${ranks[i]}.</b>`);
-        html += renderDataRow('Lemaradás', (l, i) => `<span style="color:#ddd;">${gaps[i]}</span>`);
+        html += renderDataRow('Helyezés', (l, i) => ranks[i] === `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>` ? ranks[i] : (ranks[i] ? `<b style="color:#fff;">${ranks[i]}.</b>` : "-"));
+        html += renderDataRow('Lemaradás', (l, i) => gaps[i] ? `<span style="color:#ddd;">${gaps[i]}</span>` : "-");
 
         html += `
                     </table>
@@ -3065,6 +3095,7 @@
         if (s === "FTQ-CI") return "Kiesett: Végzetes (CI)";
         if (s === "FTQ-OT") return "Kiesett: Időtúllépés (OT)";
         if (s === "FTQ-FTC") return "Kiesett: Befejezetlen (FTC)";
+        if (s === "DNS") return "Nem jelent meg (DNS)";
         return "Kiesett (ELIM)";
     }
     
