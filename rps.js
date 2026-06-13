@@ -1558,15 +1558,14 @@
 
         if (comp.isEliminated || comp.status !== 'Active') {
             let s = comp.status;
-            // Régi adatok megfeleltetése az újakra
             if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
-            else if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME'; // Alap kiesés
+            else if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME'; 
             
-            // Ha létezik a kód a listában, kiválasztja, ha nem, ad egy alapértelmezettet
             let exists = Array.from(document.getElementById('orvStatusSelect').options).some(opt => opt.value === s);
             document.getElementById('orvStatusSelect').value = exists ? s : 'FTQ-ME';
         } else {
-            document.getElementById('orvStatusSelect').value = 'Passed';
+            // ÚJ: Alapértelmezetten a zöld "Active" (Továbbengedve) opciót kapja meg!
+            document.getElementById('orvStatusSelect').value = 'Active';
         }
         adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
         
@@ -1582,17 +1581,14 @@
         let targetObj;
         
         if (idx === -1) {
-            // Előzetes orvosi mentése a preVet objektumba
             if (!comp.preVet) comp.preVet = {};
             targetObj = comp.preVet;
         } else {
-            // Aktuális kör mentése
             if(!comp.laps) comp.laps = [];
             if(!comp.laps[idx]) comp.laps[idx] = {};
             targetObj = comp.laps[idx];
         }
         
-        // Adatok mentése
         targetObj.pulse = document.getElementById('orv-pulse').value;
         targetObj.hrri = document.getElementById('orv-hrri').value;
         targetObj.nyalka = document.getElementById('orv-nyalka').value;
@@ -1605,13 +1601,14 @@
         targetObj.vetNotes = document.getElementById('orv-notes').value;
         
         const decision = document.getElementById('orvStatusSelect').value;
-        if (decision === 'Passed') {
+        // JAVÍTÁS: Itt is az 'Active' a zöld utat jelentő kód!
+        if (decision === 'Active' || decision === 'Passed') {
             comp.isEliminated = false;
             comp.status = 'Active';
             targetObj.vetDecision = "Továbbengedve";
         } else {
             comp.isEliminated = true;
-            comp.status = decision; // Mentjük a pontos kódot (WD, FTQ-GA, stb.)
+            comp.status = decision; 
             targetObj.vetDecision = decision;
         }
 
@@ -1620,7 +1617,7 @@
             showAnimatedBtn('btn-orv-mentes');
             setTimeout(() => {
                 document.getElementById('sel-orvosi').value = '';
-                document.getElementById('orv-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
+                document.getElementById('orv-bibInput').value = ''; 
                 document.getElementById('orvosi-form').style.display = 'none';
             }, 1000);
         }).catch(e => showToast("Hiba: " + e.message, true));
