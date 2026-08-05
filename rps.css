@@ -1,234 +1,399 @@
 /* CSS FIX: Megakadályozza a jobbra-balra mozgást mobilon + Sötét görgetősávok */
-        *, *::before, *::after { box-sizing: border-box; }
-        
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #111111; }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #0A84FF; }
-        * { scrollbar-width: thin; scrollbar-color: #444 #111111; }
+*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-        html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a3a3e; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+* { scrollbar-width: thin; scrollbar-color: #3a3a3e transparent; }
 
-        :root {
-            --bg: #000000;
-            --card: #1c1c1e;
-            --primary: #0A84FF;
-            --success: #32D74B;
-            --warning: #FF9F0A;
-            --danger: #FF453A;
-            --text: #ffffff;
-            --text-dim: #8e8e93;
-            --sidebar-bg: #111111;
-            --teal: #137A7F;
-        }
+html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0; overscroll-behavior: none; }
 
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: row; }
-        
-        /* --- JOGOSULTSÁG ALAPÚ ELREJTÉS --- */
-        .admin-only, .doctor-only, .checkin-only, .judge-only, .printer-only { display: none !important; }
-        
-        /* ADMIN LÁT MINDENT */
-        .role-admin .admin-only, .role-admin .doctor-only, .role-admin .checkin-only, .role-admin .judge-only, .role-admin .printer-only { display: block !important; } 
-        .role-admin #szerepkor-menu, .role-admin #admin-menu, .role-admin #logout-section { display: flex !important; }
-        
-        /* BÍRÓ LÁTÁSA */
-        .role-judge #admin-menu, .role-judge #logout-section { display: flex !important; }
-        .role-judge #btn-kiiras, .role-judge #btn-versenyzok, .role-judge #kiiras, .role-judge #versenyzok { display: none !important; }
-        .role-judge #btn-verseny { display: block !important; width: 100%; border-radius: 10px; background: var(--primary); color: white;}
+:root {
+    /* --- eredeti névterek megtartva, csak finomítva --- */
+    --bg: #000000;
+    --card: #1c1c1e;
+    --primary: #0A84FF;
+    --success: #32D74B;
+    --warning: #FF9F0A;
+    --danger: #FF453A;
+    --text: #ffffff;
+    --text-dim: #8e8e93;
+    --sidebar-bg: #0c0c0e;
+    --teal: #14a3a8;
 
-        /* EGYÉB SZEREPKÖRÖK */
-        .role-doctor .doctor-only, .role-doctor #szerepkor-menu, .role-doctor #logout-section { display: flex !important; display: block !important; }
-        .role-checkin .checkin-only, .role-checkin #szerepkor-menu, .role-checkin #logout-section { display: flex !important; display: block !important; }
-        .role-printer .printer-only, .role-printer #szerepkor-menu, .role-printer #logout-section { display: flex !important; display: block !important; }
-        /* ---------------------------------- */
+    /* --- új rétegek a mélyebb, letisztultabb designhoz --- */
+    --card-2: #232326;
+    --card-3: #2c2c2e;
+    --border: #2f2f33;
+    --border-soft: #232326;
+    --text-dim-2: #636366;
+    --primary-dim: rgba(10, 132, 255, .16);
+    --success-dim: rgba(50, 215, 75, .14);
+    --warning-dim: rgba(255, 159, 10, .14);
+    --danger-dim: rgba(255, 69, 58, .16);
 
-        .sidebar { width: 250px; background: var(--sidebar-bg); padding: 20px; border-right: 1px solid #333; height: 100%; overflow-y: auto; flex-shrink: 0; -webkit-overflow-scrolling: touch; }
-        .main-wrapper { flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden; padding: 20px; display: flex; justify-content: center; align-items: flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-        
-        .container { width: 100%; max-width: 550px; background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #333; }
-        
-        .mobile-header { display: none; background: #1c1c1e; padding: 15px; text-align: left; border-bottom: 1px solid #333; position: relative; z-index: 1000; width: 100%; flex-shrink: 0; }
-        .hamburger-btn { background: none; border: none; color: var(--primary); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 10px; font-weight: bold; padding: 0; }
-        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 998; }
+    --radius-sm: 8px;
+    --radius: 14px;
+    --radius-lg: 22px;
+    --shadow-sm: 0 2px 10px rgba(0,0,0,.28);
+    --shadow: 0 8px 24px rgba(0,0,0,.38);
+    --shadow-lg: 0 18px 46px rgba(0,0,0,.55);
+    --ease: cubic-bezier(.4,0,.2,1);
 
-        .menu-title { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 15px; margin-top: 20px; letter-spacing: 1px; }
-        .sidebar-btn { width: 100%; text-align: left; background: transparent; border: none; color: var(--text); padding: 12px 10px; border-radius: 8px; cursor: pointer; font-size: 1rem; margin-bottom: 5px; transition: 0.2s; }
-        .sidebar-btn:hover { background: #222; }
-        .sidebar-btn.active { background: #2c2c2e; color: var(--primary); border-left: 4px solid var(--primary); }
+    color-scheme: dark;
+}
 
-        .sidebar-input { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 6px; background: #222; border: 1px solid #444; color: white; font-size: 0.9rem; }
-        .sidebar-submit { width: 100%; padding: 10px; border-radius: 6px; background: #333; color: white; border: 1px solid #444; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .sidebar-submit:hover { background: var(--primary); border-color: var(--primary); }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(ellipse 1200px 700px at 50% -10%, #131316 0%, #000000 62%);
+    color: var(--text);
+    display: flex;
+    flex-direction: row;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
+}
 
-        .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
-        .tab-btn { flex: 1 1 21%; padding: 10px 4px; border: none; border-radius: 10px; cursor: pointer; background: #333; color: var(--text-dim); font-weight: bold; font-size: 0.75rem; margin-bottom:5px; transition: 0.2s; }
-        .tab-btn.active { background: var(--primary); color: white; }
+button, input, select, textarea { font-family: inherit; }
 
-        .mode-content { display: none; }
-        .mode-content.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* --- JOGOSULTSÁG ALAPÚ ELREJTÉS --- */
+.admin-only, .doctor-only, .checkin-only, .judge-only, .printer-only { display: none !important; }
 
-        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="number"] { -moz-appearance: textfield; min-width: 0; }
-        input[type="text"] { width: 100%; }
+/* ADMIN LÁT MINDENT */
+.role-admin .admin-only, .role-admin .doctor-only, .role-admin .checkin-only, .role-admin .judge-only, .role-admin .printer-only { display: block !important; }
+.role-admin #szerepkor-menu, .role-admin #admin-menu, .role-admin #logout-section { display: flex !important; }
 
-        label { display: block; margin-top: 15px; font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
-        select, input { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; font-size: 1rem; margin-top: 5px; }
-        select { width: 100%; }
-        .time-group { display: flex; align-items: center; gap: 5px; margin-top: 5px; width: 100%; }
-        .time-group input { text-align: center; flex: 1; }
+/* BÍRÓ LÁTÁSA */
+.role-judge #admin-menu, .role-judge #logout-section { display: flex !important; }
+.role-judge #btn-kiiras, .role-judge #btn-versenyzok, .role-judge #kiiras, .role-judge #versenyzok { display: none !important; }
+.role-judge #btn-verseny { display: block !important; width: 100%; border-radius: var(--radius-sm); background: var(--primary); color: white;}
 
-        button.calc-btn { width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.1rem; text-transform: uppercase; transition: 0.2s; }
-        button.calc-btn:hover { background: #4ade80; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        button.calc-btn:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        button.add-btn { background: var(--primary); color: white; }
-        
-        .edit-btn { background: #444; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
-        .edit-btn:hover { background: var(--primary); color: white !important; }
-        .cancel-btn { background: #444; color: white; padding: 15px; border: none; border-radius: 12px; cursor: pointer; font-weight: 800; margin-top: 10px; width: 100%; text-transform: uppercase; display: none; }
+/* EGYÉB SZEREPKÖRÖK */
+.role-doctor .doctor-only, .role-doctor #szerepkor-menu, .role-doctor #logout-section { display: flex !important; display: block !important; }
+.role-checkin .checkin-only, .role-checkin #szerepkor-menu, .role-checkin #logout-section { display: flex !important; display: block !important; }
+.role-printer .printer-only, .role-printer #szerepkor-menu, .role-printer #logout-section { display: flex !important; display: block !important; }
+/* ---------------------------------- */
 
-        .race-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
-        .race-card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; color: white; }
-        .race-card-date { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px; }
-        .race-admin-controls { margin-top: 10px; padding-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;}
+.sidebar {
+    width: 250px; background: linear-gradient(180deg, var(--sidebar-bg), #000 90%);
+    padding: 20px; border-right: 1px solid var(--border-soft); height: 100%; overflow-y: auto;
+    flex-shrink: 0; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+.main-wrapper {
+    flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden; padding: 28px 20px;
+    display: flex; justify-content: center; align-items: flex-start;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
+}
 
-        .result-box { margin-top: 20px; padding: 15px; background: #2c2c2e; border-radius: 14px; border-left: 6px solid var(--primary); line-height: 1.6; }
-        .lap-card { background: #3a3a3c; padding: 12px; border-radius: 14px; margin-top: 15px; border: 1px solid #48484a; }
-        
-        .plan-box { background: #1a1a1a; border-left: 4px solid var(--success); padding: 12px; margin-top: 10px; border-radius: 8px; margin-bottom: 10px; }
-        .plan-header { color: var(--success); font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; display: block; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .plan-data-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; align-items: center; }
-        .plan-data-label { color: var(--text-dim); }
-        .summary-total { background: #1c1c1e; color: var(--text); padding: 15px; border-radius: 12px; margin-top: 15px; border: 1px solid var(--primary); }
+.container {
+    width: 100%; max-width: 550px; background: linear-gradient(180deg, var(--card), #191919);
+    padding: 22px; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow);
+}
 
-        .kiiras-card { background: #2c2c2e; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 4px solid var(--warning); }
+.mobile-header {
+    display: none; background: rgba(18,18,20,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: 14px 18px; padding-top: max(14px, env(safe-area-inset-top));
+    text-align: left; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 1000; width: 100%; flex-shrink: 0;
+}
+.hamburger-btn {
+    background: none; border: none; color: var(--primary); font-size: 1.05rem; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 6px 2px; transition: opacity .2s var(--ease);
+}
+.hamburger-btn:active { opacity: .55; }
+.overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(2px); z-index: 998; transition: opacity .3s var(--ease);
+}
 
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
-        .modal-content { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #444; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; }
-        .close-btn { position: absolute; top: 15px; right: 20px; color: var(--text-dim); font-size: 1.8rem; cursor: pointer; }
-        
-        .confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; padding: 15px; }
-        .confirm-box { background: #1c1c1e; padding: 25px; border-radius: 12px; border: 1px solid #444; width: 100%; max-width: 350px; text-align: center; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+.panel-header h3 { margin: 0; }
 
-        /* TOAST NOTIFICATION STÍLUS */
-        #toastMessage { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: bold; z-index: 9999; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; font-size: 0.95rem; }
+.menu-title { color: var(--text-dim-2); font-size: 0.72rem; text-transform: uppercase; margin-bottom: 14px; margin-top: 22px; letter-spacing: 1.2px; font-weight: 700; }
+.sidebar-btn {
+    width: 100%; text-align: left; background: transparent; border: none; color: var(--text);
+    padding: 12px 12px; border-radius: 10px; cursor: pointer; font-size: 0.95rem; margin-bottom: 4px;
+    transition: background .18s var(--ease), color .18s var(--ease), transform .1s var(--ease);
+    border-left: 3px solid transparent;
+}
+.sidebar-btn:hover { background: var(--card-2); }
+.sidebar-btn:active { transform: scale(.98); }
+.sidebar-btn.active { background: var(--primary-dim); color: var(--primary); border-left: 3px solid var(--primary); font-weight: 600; }
 
-        .table-responsive { overflow-x: auto; margin-top: 20px; width: 100%; }
-        .ttrack-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
-        .ttrack-table th, .ttrack-table td { border: 1px solid #444; padding: 10px 6px; white-space: nowrap; }
-        .ttrack-table th.row-header { background: #222; color: var(--text-dim); text-align: left; font-weight: 600; width: 30%; }
-        .ttrack-table th.col-header { background: #2c2c2e; color: var(--primary); font-weight: bold; }
-        
-        .competitor-item { background: #2c2c2e; padding: 12px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: 0.2s; flex-wrap: wrap; gap: 10px;}
-        
-        .stats-header-container { display: flex; flex-direction: column; align-items: center; background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #444; width: 100%; }
-        .stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; }
-        .stat-box { background: #fff; color: #000; border-radius: 8px; padding: 8px 12px; text-align: center; font-weight: bold; border: 1px solid #aaa; display: flex; flex-direction: column; justify-content: center;}
-        .stat-box.large { font-size: 1.1rem; padding: 8px 20px; display: flex; flex-direction: row; align-items: center;}
-        .stat-box.small { font-size: 0.75rem; }
-        .stat-val { font-size: 1rem; font-weight: 900; margin-top:2px; }
-        .stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-wrap: wrap;}
-        .stat-btn { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;}
-        .stat-btn:hover { background: #eee; }
-        .clock-display { background: #fff; color: #000; border: 1px solid #aaa; border-radius: 6px; padding: 6px 15px; font-weight: bold; font-family: monospace; font-size: 1rem; display: flex; align-items: center;}
-        .mobile-break { display: none; }
+.sidebar-input {
+    width: 100%; padding: 11px 12px; margin-bottom: 8px; border-radius: var(--radius-sm);
+    background: var(--card-2); border: 1px solid var(--border); color: white; font-size: 0.9rem;
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.sidebar-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+.sidebar-submit {
+    width: 100%; padding: 12px; border-radius: var(--radius-sm); background: var(--card-3); color: white;
+    border: 1px solid var(--border); cursor: pointer; font-weight: 700; transition: background .18s var(--ease), border-color .18s var(--ease), transform .1s var(--ease);
+}
+.sidebar-submit:hover { background: var(--primary); border-color: var(--primary); }
+.sidebar-submit:active { transform: scale(.98); }
 
-        /* --- MOBILRA OPTIMALIZÁLT ADATLAP-CARD --- */
-        .adatlap-card { position: relative; background: #c5c5c5; color: #000; padding: 15px; border-radius: 8px; margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; border: 1px solid #888; width: 100%; box-sizing: border-box; }
-        .adatlap-card:hover { background: #d5d5d5; }
-        
-        .adatlap-rank { background: var(--teal); color: white; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border-radius: 6px; font-weight: bold; font-size: 1.1rem; flex-shrink: 0; }
-        .adatlap-rank.kiesett { background: var(--danger); font-size: 0.75rem; width: 40px; height: 40px; padding: 0; border-radius: 6px; white-space: normal; }
-        
-        .adatlap-info { flex: 1; min-width: 150px; display: flex; flex-direction: column; overflow: hidden; }
-        .adatlap-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-        .adatlap-bib { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; border: 1px solid #555; flex-shrink:0;}
-        .adatlap-name { font-weight: bold; font-size: 1.1rem; color: #000; word-break: break-word; }
-        .adatlap-horse { font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic; font-weight: bold; white-space: normal; }
-        
-        .adatlap-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
-        .adatlap-arrow { color: #555; font-size: 1.2rem; }
-        
-        .adatlap-badges { width: 100%; display: flex; justify-content: flex-end; gap: 5px; margin-top: 5px; }
-        .adatlap-gap { background: #777; color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
-        .adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
-        .adatlap-live-status { padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+.tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab-btn {
+    flex: 1 1 21%; padding: 11px 4px; border: none; border-radius: var(--radius-sm); cursor: pointer;
+    background: var(--card-2); color: var(--text-dim); font-weight: 700; font-size: 0.75rem; margin-bottom: 5px;
+    transition: background .18s var(--ease), color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 14px rgba(10,132,255,.35); }
 
-        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--danger); transition: .4s; border-radius: 26px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--success); }
-        input:checked + .slider:before { transform: translateX(24px); }
-        .status-label { font-size: 0.95rem; font-weight: bold; margin-left: 10px; }
+.mode-content { display: none; }
+.mode-content.active { display: block; animation: fadeIn .35s var(--ease); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-        .live-item { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; width: 100%;}
-        .live-time { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
-        .live-time.warning { color: var(--danger); animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.3; } }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; min-width: 0; }
+input[type="text"] { width: 100%; }
 
-        #fullscreenLiveOverlay { display: none; position: fixed; inset: 0; background: #000; color: #fff; z-index: 99999; overflow-y: auto; padding: 20px; }
-        #fullscreenLiveOverlay.active { display: flex; justify-content: center; align-items: flex-start; padding: 40px 20px; }
-        #fullscreenLiveOverlay .fullscreen-panel { width: 100%; max-width: 960px; }
-        #fullscreenLiveOverlay .fullscreen-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; font-size: 1rem; color: var(--text); }
-        #fullscreenLiveOverlay .fullscreen-hint { color: var(--text-dim); font-size: 0.95rem; }
-        body.fullscreen-active { overflow: hidden !important; }
-        body.fullscreen-active .sidebar, body.fullscreen-active .mobile-header, body.fullscreen-active .overlay, body.fullscreen-active .confirm-modal, body.fullscreen-active .modal { display: none !important; }
-        body.fullscreen-active .main-wrapper { overflow: hidden !important; }
-        body.fullscreen-active .container { border-radius: 0 !important; padding: 0 !important; width: 100vw !important; max-width: 100vw !important; min-height: 100vh !important; border: none !important; background: transparent !important; box-shadow: none !important; }
-        body.fullscreen-active .mode-content { display: none !important; }
-        body.fullscreen-active #elo-rajtok { display: block !important; }
-        body.fullscreen-active #elo-rajtok h3, body.fullscreen-active #btn-fullscreen-live { display: none !important; }
-        body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
+label { display: block; margin-top: 15px; font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: .3px; }
+select, input {
+    padding: 12px 13px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--card-2);
+    color: white; font-size: 1rem; margin-top: 6px; transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+select:focus, input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+select { width: 100%; }
+input::placeholder { color: var(--text-dim-2); }
+.time-group { display: flex; align-items: center; gap: 6px; margin-top: 6px; width: 100%; }
+.time-group input { text-align: center; flex: 1; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
 
-        /* NYOMTATÁS STÍLUS */
-        @media print {
-            body { background: white !important; color: black !important; display: block; overflow: visible; height: auto;}
-            .sidebar, .mobile-header, .overlay, #toastMessage, #customConfirm, #infoModal, #adatlapModal, #catSwapModal { display: none !important; }
-            .main-wrapper { padding: 0 !important; overflow: visible !important; height: auto !important; display: block !important; }
-            .container { border: none !important; background: transparent !important; padding: 0 !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important;}
-            .mode-content { display: none !important; }
-            #nyomtatas-mod { display: block !important; }
-            
-            #nyomtatas-mod h3, #nyomtatas-mod p, #sel-nyomtatas, #nyom-bibInput, label[for="sel-nyomtatas"], #btn-nyomtatas-indit { display: none !important; }
-            #print-sticker { display: block !important; border: none !important; padding: 0 !important; width: 100%; font-size: 14pt; page-break-inside: avoid; }
-        }
+button.calc-btn {
+    width: 100%; padding: 15px; background: var(--success); color: black; border: none; border-radius: var(--radius-sm);
+    cursor: pointer; font-weight: 800; margin-top: 20px; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .3px;
+    transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s var(--ease); box-shadow: var(--shadow-sm);
+}
+button.calc-btn:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+button.calc-btn:active { transform: translateY(0) scale(.99); box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+button.add-btn { background: var(--primary); color: white; }
 
-        @media (max-width: 800px) {
-            body { flex-direction: column; }
-            .stats-header-container { align-items: center; }
-            .stats-top-row { justify-content: center; }
-            .stats-ctrl-row { justify-content: center; }
-            .mobile-break { display: block; flex-basis: 100%; height: 0; margin: 0; }
-            .main-wrapper { padding: 10px; height: auto; flex: 1; overflow-y: auto; }
-            .container { max-width: 100%; border-radius: 0 0 20px 20px; margin-bottom: 20px; }
-            .mode-content { padding-bottom: 30px; }
-            .mobile-header { display: block; }
-            .sidebar { position: fixed; left: -100%; top: 0; bottom: 0; width: 100%; max-width: 320px; z-index: 999; transition: left 0.3s ease; height: 100%; }
-            .sidebar.open { left: 0; }
-            .overlay.open { display: block; }
-            .live-item { flex-direction: column; align-items: flex-start; gap: 12px; }
-            .live-time { font-size: 1.5rem; }
-            #btn-fullscreen-live { display: none !important; }
-            .tab-btn { width: auto; }
-        }
-        
-        /* MOBIL NÉZET ADATLAP KÁRTYÁRA (TELÓ ESETÉN EGYMÁS ALÁ TÖRIK) */
-        @media (max-width: 600px) {
-            .adatlap-card { flex-direction: column; align-items: flex-start; padding: 15px; }
-            .adatlap-info { width: 100%; margin-right: 0; }
-            .adatlap-right { width: 100%; justify-content: space-between; margin-top: 10px; border-top: 1px solid #aaa; padding-top: 10px; margin-left: 0; }
-            .adatlap-badges { justify-content: flex-start; margin-top: 10px; }
-        }
-        
-        @media (max-width: 520px) {
-            .sidebar { width: 100%; max-width: 100%; }
-            .container { border-radius: 0; }
-        }
+.edit-btn {
+    background: var(--card-3); border: 1px solid var(--border); color: white; padding: 7px 13px; border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: background .18s var(--ease), border-color .18s var(--ease);
+}
+.edit-btn:hover { background: var(--primary); border-color: var(--primary); color: white !important; }
+.cancel-btn {
+    background: var(--card-3); color: white; padding: 15px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    cursor: pointer; font-weight: 800; margin-top: 10px; width: 100%; text-transform: uppercase; display: none;
+    transition: background .18s var(--ease);
+}
+.cancel-btn:hover { background: #3a3a3e; }
 
-       /* --- TV / KIVETÍTŐ MÓD EXTRA STÍLUSOK --- */
-#fullscreenLiveOverlay .fullscreen-header { font-size: 1.8rem; border-bottom: 3px solid #333; padding-bottom: 15px; margin-bottom: 25px; color: var(--danger); font-weight: 900; text-transform: uppercase; text-align: center; justify-content: center; width: 100%; }
-#fullscreenLiveOverlay .live-item { padding: 18px 25px; margin-bottom: 15px; border-radius: 14px; background: #18181a; border: 2px solid #333; width: 100%; }
+.race-card { background: var(--card-2); padding: 16px; border-radius: var(--radius); margin-bottom: 10px; border-left: 4px solid var(--primary); box-shadow: var(--shadow-sm); }
+.race-card-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 5px; color: white; }
+.race-card-date { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px; }
+.race-admin-controls { margin-top: 10px; padding-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px dashed var(--border); }
+
+.result-box { margin-top: 20px; padding: 16px; background: var(--card-2); border-radius: var(--radius); border-left: 6px solid var(--primary); line-height: 1.65; box-shadow: var(--shadow-sm); }
+.lap-card { background: var(--card-3); padding: 14px; border-radius: var(--radius); margin-top: 15px; border: 1px solid var(--border); }
+
+.plan-box { background: #161616; border-left: 4px solid var(--success); padding: 12px 14px; margin-top: 10px; border-radius: var(--radius-sm); margin-bottom: 10px; }
+.plan-header { color: var(--success); font-weight: 800; font-size: 0.95rem; margin-bottom: 8px; display: block; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.plan-data-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; align-items: center; gap: 10px; }
+.plan-data-label { color: var(--text-dim); }
+.summary-total { background: var(--card-2); color: var(--text); padding: 16px; border-radius: var(--radius); margin-top: 15px; border: 1px solid var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+
+.kiiras-card { background: var(--card-2); padding: 16px; border-radius: var(--radius); margin-bottom: 15px; border-left: 4px solid var(--warning); box-shadow: var(--shadow-sm); }
+
+.modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    z-index: 2000; justify-content: center; align-items: center; padding: 15px;
+}
+.modal-content {
+    background: var(--card); padding: 22px; border-radius: var(--radius-lg); border: 1px solid var(--border);
+    width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative;
+    box-shadow: var(--shadow-lg); animation: modalIn .22s var(--ease);
+}
+@keyframes modalIn { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.close-btn {
+    position: absolute; top: 12px; right: 14px; color: var(--text-dim); font-size: 1.6rem; cursor: pointer;
+    width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    transition: background .18s var(--ease), color .18s var(--ease);
+}
+.close-btn:hover { background: var(--card-3); color: white; }
+
+.confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); backdrop-filter: blur(6px); z-index: 3000; justify-content: center; align-items: center; padding: 15px; }
+.confirm-box { background: var(--card); padding: 26px; border-radius: var(--radius-lg); border: 1px solid var(--border); width: 100%; max-width: 350px; text-align: center; box-shadow: var(--shadow-lg); animation: modalIn .22s var(--ease); }
+
+/* TOAST NOTIFICATION STÍLUS */
+#toastMessage {
+    position: fixed; bottom: max(30px, calc(env(safe-area-inset-bottom) + 16px)); left: 50%; transform: translateX(-50%);
+    color: #fff; padding: 13px 26px; border-radius: 30px; font-weight: 700; z-index: 9999; display: none;
+    box-shadow: var(--shadow-lg); text-align: center; font-size: 0.92rem; max-width: calc(100vw - 40px);
+}
+
+.table-responsive { overflow-x: auto; margin-top: 20px; width: 100%; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }
+.ttrack-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
+.ttrack-table th, .ttrack-table td { border: 1px solid var(--border); padding: 10px 8px; white-space: nowrap; }
+.ttrack-table th.row-header { background: var(--card-2); color: var(--text-dim); text-align: left; font-weight: 700; width: 30%; }
+.ttrack-table th.col-header { background: var(--card-3); color: var(--primary); font-weight: 800; }
+.ttrack-table tr:nth-child(even) td:not(.row-header) { background: rgba(255,255,255,.02); }
+
+.competitor-item {
+    background: var(--card-2); padding: 13px 14px; border-radius: var(--radius-sm); margin-top: 10px; display: flex;
+    justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: background .18s var(--ease);
+    flex-wrap: wrap; gap: 10px;
+}
+.competitor-item:hover { background: var(--card-3); }
+.competitor-bib { background: var(--card-3); color: var(--text); padding: 2px 8px; border-radius: 6px; font-weight: 800; border: 1px solid var(--border); font-size: 0.85rem; }
+
+.stats-header-container { display: flex; flex-direction: column; align-items: center; background: var(--card-2); padding: 16px; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--border); width: 100%; }
+.stats-top-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; }
+.stat-box { background: #fff; color: #000; border-radius: var(--radius-sm); padding: 8px 14px; text-align: center; font-weight: 700; border: none; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: center; }
+.stat-box.large { font-size: 1.1rem; padding: 9px 22px; display: flex; flex-direction: row; align-items: center; }
+.stat-box.small { font-size: 0.72rem; }
+.stat-val { font-size: 1rem; font-weight: 900; margin-top: 2px; }
+.stats-ctrl-row { display: flex; gap: 8px; justify-content: center; width: 100%; flex-wrap: wrap; }
+.stat-btn { background: #fff; color: #000; border: none; border-radius: var(--radius-sm); padding: 7px 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.88rem; box-shadow: var(--shadow-sm); transition: transform .12s var(--ease); }
+.stat-btn:hover { transform: translateY(-1px); }
+.clock-display { background: #fff; color: #000; border: none; border-radius: var(--radius-sm); padding: 7px 16px; font-weight: 800; font-family: 'SF Mono', 'Courier New', monospace; font-size: 1rem; display: flex; align-items: center; box-shadow: var(--shadow-sm); font-variant-numeric: tabular-nums; }
+.mobile-break { display: none; }
+
+/* --- ADATLAP KÁRTYA: EGYSÉGES SÖTÉT DESIGN --- */
+.adatlap-card {
+    position: relative; background: linear-gradient(180deg, var(--card-2), var(--card-3)); color: var(--text);
+    padding: 16px; border-radius: var(--radius); margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 12px; cursor: pointer; transition: transform .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
+    border: 1px solid var(--border); width: 100%; box-sizing: border-box; box-shadow: var(--shadow-sm);
+}
+.adatlap-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow); }
+
+.adatlap-rank { background: var(--teal); color: white; width: 42px; height: 42px; display: flex; justify-content: center; align-items: center; border-radius: 50%; font-weight: 800; font-size: 1.05rem; flex-shrink: 0; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.adatlap-rank.kiesett { background: var(--danger); font-size: 0.68rem; width: 42px; height: 42px; padding: 0; border-radius: 50%; white-space: normal; text-align: center; line-height: 1.05; }
+
+.adatlap-info { flex: 1; min-width: 150px; display: flex; flex-direction: column; overflow: hidden; }
+.adatlap-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.adatlap-bib { background: var(--card-3); color: var(--text); padding: 2px 7px; border-radius: 5px; font-weight: 800; font-size: 0.85rem; border: 1px solid var(--border); flex-shrink: 0; }
+.adatlap-name { font-weight: 800; font-size: 1.08rem; color: var(--text); word-break: break-word; }
+.adatlap-horse { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; font-style: italic; font-weight: 600; white-space: normal; }
+
+.adatlap-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+.adatlap-arrow { color: var(--text-dim); font-size: 1.2rem; }
+
+.adatlap-badges { width: 100%; display: flex; justify-content: flex-end; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+.adatlap-gap { background: var(--card-3); border: 1px solid var(--border); color: var(--text-dim); font-size: 0.72rem; font-weight: 700; padding: 4px 9px; border-radius: 20px; }
+.adatlap-speed-badge { background: var(--teal); color: white; font-size: 0.72rem; font-weight: 700; padding: 4px 9px; border-radius: 20px; }
+.adatlap-live-status { padding: 4px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+
+/* --- ÚJ: FIGYELMEZTETŐ JELVÉNYEK ÉS SÁVOK (szabálymegfelelési audit) --- */
+.field-hint { font-size: 0.76rem; margin-top: 6px; color: var(--text-dim); line-height: 1.5; }
+.warning-banner {
+    display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-radius: var(--radius-sm);
+    font-weight: 700; font-size: 0.85rem; margin-top: 12px; border: 1px solid transparent; line-height: 1.4;
+}
+.warning-banner .wb-icon { font-size: 1.1rem; flex-shrink: 0; }
+.warning-banner.level-ok { background: var(--success-dim); color: var(--success); border-color: rgba(50,215,75,.35); }
+.warning-banner.level-warn { background: var(--warning-dim); color: var(--warning); border-color: rgba(255,159,10,.4); }
+.warning-banner.level-danger { background: var(--danger-dim); color: var(--danger); border-color: rgba(255,69,58,.45); animation: pulseWarn 1.7s infinite; }
+@keyframes pulseWarn { 0%,100% { box-shadow: 0 0 0 0 rgba(255,69,58,.35); } 50% { box-shadow: 0 0 0 7px rgba(255,69,58,0); } }
+
+.inline-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
+.inline-flag.danger { background: var(--danger); color: #fff; }
+.inline-flag.warning { background: var(--warning); color: #000; }
+
+.switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--danger); transition: .3s; border-radius: 26px; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--success); }
+input:checked + .slider:before { transform: translateX(24px); }
+.status-label { font-size: 0.95rem; font-weight: 700; margin-left: 10px; }
+
+.live-item { background: var(--card-2); padding: 16px; border-radius: var(--radius); margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); width: 100%; box-shadow: var(--shadow-sm); transition: border-color .2s var(--ease); }
+.live-time { font-size: 1.8rem; font-weight: 800; font-family: 'SF Mono', 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+.live-time.warning { color: var(--danger); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+
+#fullscreenLiveOverlay { display: none; position: fixed; inset: 0; background: #000; color: #fff; z-index: 99999; overflow-y: auto; padding: 20px; }
+#fullscreenLiveOverlay.active { display: flex; justify-content: center; align-items: flex-start; padding: 40px 20px; }
+#fullscreenLiveOverlay .fullscreen-panel { width: 100%; max-width: 960px; }
+#fullscreenLiveOverlay .fullscreen-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; font-size: 1rem; color: var(--text); }
+#fullscreenLiveOverlay .fullscreen-hint { color: var(--text-dim); font-size: 0.95rem; }
+body.fullscreen-active { overflow: hidden !important; }
+body.fullscreen-active .sidebar, body.fullscreen-active .mobile-header, body.fullscreen-active .overlay, body.fullscreen-active .confirm-modal, body.fullscreen-active .modal { display: none !important; }
+body.fullscreen-active .main-wrapper { overflow: hidden !important; }
+body.fullscreen-active .container { border-radius: 0 !important; padding: 0 !important; width: 100vw !important; max-width: 100vw !important; min-height: 100vh !important; border: none !important; background: transparent !important; box-shadow: none !important; }
+body.fullscreen-active .mode-content { display: none !important; }
+body.fullscreen-active #elo-rajtok { display: block !important; }
+body.fullscreen-active #elo-rajtok h3, body.fullscreen-active #btn-fullscreen-live { display: none !important; }
+body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
+
+/* NYOMTATÁS STÍLUS (nem módosítva – hőnyomtató / A4 kimenet) */
+@media print {
+    body { background: white !important; color: black !important; display: block; overflow: visible; height: auto;}
+    .sidebar, .mobile-header, .overlay, #toastMessage, #customConfirm, #infoModal, #adatlapModal, #catSwapModal { display: none !important; }
+    .main-wrapper { padding: 0 !important; overflow: visible !important; height: auto !important; display: block !important; }
+    .container { border: none !important; background: transparent !important; padding: 0 !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important;}
+    .mode-content { display: none !important; }
+    #nyomtatas-mod { display: block !important; }
+
+    #nyomtatas-mod h3, #nyomtatas-mod p, #sel-nyomtatas, #nyom-bibInput, label[for="sel-nyomtatas"], #btn-nyomtatas-indit { display: none !important; }
+    #print-sticker { display: block !important; border: none !important; padding: 0 !important; width: 100%; font-size: 14pt; page-break-inside: avoid; }
+}
+
+/* --- NAGYOBB KÉPERNYŐK: kicsit tágasabb elrendezés --- */
+@media (min-width: 1000px) {
+    .container { max-width: 620px; padding: 26px; }
+    .main-wrapper { padding: 40px 24px; }
+}
+
+@media (max-width: 800px) {
+    body { flex-direction: column; }
+    .stats-header-container { align-items: center; }
+    .stats-top-row { justify-content: center; }
+    .stats-ctrl-row { justify-content: center; }
+    .mobile-break { display: block; flex-basis: 100%; height: 0; margin: 0; }
+    .main-wrapper { padding: 14px; height: auto; flex: 1; overflow-y: auto; }
+    .container { max-width: 100%; border-radius: 0 0 var(--radius-lg) var(--radius-lg); margin-bottom: 20px; }
+    .mode-content { padding-bottom: 30px; }
+    .mobile-header { display: block; }
+    .sidebar { position: fixed; left: -100%; top: 0; bottom: 0; width: 100%; max-width: 320px; z-index: 999; transition: left 0.32s var(--ease); height: 100%; box-shadow: none; }
+    .sidebar.open { left: 0; box-shadow: var(--shadow-lg); }
+    .overlay.open { display: block; }
+    .live-item { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .live-time { font-size: 1.5rem; }
+    #btn-fullscreen-live { display: none !important; }
+    .tab-btn { width: auto; }
+
+    /* nagyobb érintési felület mobilon */
+    button.calc-btn, .cancel-btn, .sidebar-submit { padding: 15px; min-height: 48px; }
+    select, input, .edit-btn, .stat-btn { min-height: 44px; }
+    .close-btn { width: 40px; height: 40px; }
+}
+
+/* MOBIL NÉZET ADATLAP KÁRTYÁRA (TELÓ ESETÉN EGYMÁS ALÁ TÖRIK) */
+@media (max-width: 600px) {
+    .adatlap-card { flex-direction: column; align-items: flex-start; padding: 15px; }
+    .adatlap-info { width: 100%; margin-right: 0; }
+    .adatlap-right { width: 100%; justify-content: space-between; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 10px; margin-left: 0; }
+    .adatlap-badges { justify-content: flex-start; margin-top: 8px; }
+}
+
+@media (max-width: 520px) {
+    .sidebar { width: 100%; max-width: 100%; }
+    .container { border-radius: 0; }
+    .modal-content { padding: 16px; border-radius: var(--radius); }
+    .stat-box.large { font-size: 1rem; padding: 8px 16px; }
+    button.calc-btn { font-size: 0.98rem; }
+}
+
+@media (max-width: 380px) {
+    .container { padding: 15px; }
+    label { font-size: 0.7rem; }
+    .live-time { font-size: 1.3rem; }
+    .stat-box { padding: 7px 10px; }
+    .stat-box.large { font-size: 0.92rem; }
+    .adatlap-name { font-size: 1rem; }
+}
+
+/* --- TV / KIVETÍTŐ MÓD EXTRA STÍLUSOK --- */
+#fullscreenLiveOverlay .fullscreen-header { font-size: 1.8rem; border-bottom: 3px solid var(--border); padding-bottom: 15px; margin-bottom: 25px; color: var(--danger); font-weight: 900; text-transform: uppercase; text-align: center; justify-content: center; width: 100%; }
+#fullscreenLiveOverlay .live-item { padding: 18px 25px; margin-bottom: 15px; border-radius: var(--radius); background: #18181a; border: 2px solid var(--border); width: 100%; }
 #fullscreenLiveOverlay .live-item b { font-size: 1.5rem; display: block; margin-bottom: 5px; }
 #fullscreenLiveOverlay .live-item small { font-size: 1.1rem; color: var(--text-dim); }
 #fullscreenLiveOverlay .live-time { font-size: 2.6rem; text-shadow: 0 0 10px rgba(0,0,0,0.5); }

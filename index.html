@@ -2,9 +2,17 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verseny Kalkulátor v97</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Verseny Kalkulátor v98</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
@@ -91,7 +99,7 @@
     <div class="container">
         
         <div id="beerkeztetes-mod" class="mode-content">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <div class="panel-header">
             <h3 style="color:var(--primary); margin:0;">⏱️ Beérkeztetés</h3>
             <div class="clock-display liveClockText" style="background:#222; color:white; border-color:#444;">--:--:--</div>
             </div>
@@ -103,17 +111,18 @@
                     <option value="">-- Válassz --</option>
                 </select>
             </div>
-            
+
             <div id="beerkeztetes-form" style="display:none;">
                 <div style="background:#2c2c2e; padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
                     <h4 id="bk-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
-                    
+
                     <label>Beérkezés ideje:</label>
                     <div class="time-group">
-                        <input type="number" id="bk-h" placeholder="00" oninput="jump(this, 'bk-m')"> :
-                        <input type="number" id="bk-m" placeholder="00" oninput="jump(this, 'bk-s')"> :
-                        <input type="number" id="bk-s" placeholder="00">
+                        <input type="number" id="bk-h" placeholder="00" oninput="jump(this, 'bk-m'); checkBeerkeztetesSpeed();"> :
+                        <input type="number" id="bk-m" placeholder="00" oninput="jump(this, 'bk-s'); checkBeerkeztetesSpeed();"> :
+                        <input type="number" id="bk-s" placeholder="00" oninput="checkBeerkeztetesSpeed();">
                     </div>
+                    <div id="bk-speed-warning"></div>
 
                     <button id="btn-bk-mentes" class="calc-btn" onclick="saveBeerkeztetesData()">Idő Mentése</button>
                 </div>
@@ -121,7 +130,7 @@
         </div>
 
         <div id="orvosi-ido-mod" class="mode-content">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <div class="panel-header">
             <h3 style="color:var(--primary); margin:0;">🏥 Orvosi Idő</h3>
             <div class="clock-display liveClockText" style="background:#222; color:white; border-color:#444;">--:--:--</div>
             </div>
@@ -133,18 +142,19 @@
                     <option value="">-- Válassz --</option>
                 </select>
             </div>
-            
+
             <div id="orvosi-ido-form" style="display:none;">
                 <div style="background:#2c2c2e; padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
                     <h4 id="bk-vet-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
                     <div style="font-size:0.9rem; font-weight:bold; margin-bottom:15px; color:var(--success);" id="orv-ido-arr-time">Beérkezett: --:--:--</div>
-                    
+
                     <label>Orvosi (Vet) ideje:</label>
                     <div class="time-group">
-                        <input type="number" id="bk-v-h" placeholder="00" oninput="jump(this, 'bk-v-m')"> :
-                        <input type="number" id="bk-v-m" placeholder="00" oninput="jump(this, 'bk-v-s')"> :
-                        <input type="number" id="bk-v-s" placeholder="00">
+                        <input type="number" id="bk-v-h" placeholder="00" oninput="jump(this, 'bk-v-m'); checkOrvosiIdoRecovery();"> :
+                        <input type="number" id="bk-v-m" placeholder="00" oninput="jump(this, 'bk-v-s'); checkOrvosiIdoRecovery();"> :
+                        <input type="number" id="bk-v-s" placeholder="00" oninput="checkOrvosiIdoRecovery();">
                     </div>
+                    <div id="orv-ido-recovery-warning"></div>
 
                     <button id="btn-bk-vet-mentes" class="calc-btn" onclick="saveOrvosiIdoData()">Orvosi Idő Mentése</button>
                 </div>
@@ -165,10 +175,11 @@
             <div id="orvosi-form" style="display:none; background:#2c2c2e; padding:15px; border-radius:12px; margin-top:15px; border-left:4px solid var(--success);">
                 <h4 id="orv-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-arr-time">Beérkezett: --:--:--</div>
-                <div style="font-size:0.9rem; font-weight:bold; margin-bottom:20px;" id="orv-vet-time">Orvosi: --:--:--</div>
-                
+                <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-vet-time">Orvosi: --:--:--</div>
+                <div id="orv-recovery-warning" style="margin-bottom:15px;"></div>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><label>Pulzus:</label><input type="text" id="orv-pulse" placeholder="pl. 56"></div>
+                    <div><label>Pulzus:</label><input type="text" id="orv-pulse" placeholder="pl. 56" oninput="checkPulseWarning()"><div id="orv-pulse-warning"></div></div>
                     <div><label>HRRI:</label><input type="text" id="orv-hrri" placeholder="pl. 59"></div>
                     <div><label>Nyálkahártya:</label><input type="text" id="orv-nyalka" placeholder="pl. A/B/C"></div>
                     <div><label>Kapilláris telítődés:</label><input type="text" id="orv-crt" placeholder="pl. 1/2/3"></div>
@@ -274,6 +285,18 @@
             </div>
 
             <div id="kiiras" class="sub-mode-content" style="display:block;">
+                <div class="kiiras-card admin-only" style="border-left-color: var(--danger);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div style="flex:1; min-width:200px;">
+                            <h4 style="margin:0; color:white;">⚠️ Sebességhatár figyelmeztetések</h4>
+                            <p style="font-size:0.78rem; color:var(--text-dim); margin:6px 0 0 0;">Ha be van kapcsolva, a beérkeztetésnél és az eredménylistán (Adatlapok) is figyelmeztetést kapnak a 16 km/h fölötti köridőkre (139. § (2)). Alapból ki van kapcsolva, minden eszközön ugyanaz az állapot érvényes.</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="speedWarningToggle" onchange="toggleSpeedWarnings(this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
                 <h4 style="color:var(--warning); margin-bottom:5px;">ÉLŐ: Hivatalos adatok beállítása</h4>
                 <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt add meg a távok rajtidejét és a köröket a futó versenyhez.</p>
                 <div id="kiirasContainer"></div>

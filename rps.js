@@ -17,9 +17,10 @@
 
     // --- GLOBÁLIS VÁLTOZÓK ---
     const CALC_LIMIT = 15.99;
-    let currentAdatlapFilter = null; 
-    let dbListenersActive = false; 
+    let currentAdatlapFilter = null;
+    let dbListenersActive = false;
     let liveVets = [];
+    let speedWarningsEnabled = false; // 139. § (2) figyelmeztetés - alapból KI, csak admin kapcsolhatja be
     
     let viewingPastRaceData = null; 
     let pastAdatlapFilter = null; 
@@ -309,7 +310,17 @@
             liveVets = snap.val() ? Object.values(snap.val()) : [];
             renderVetList();
             updateVetDropdowns();
-        });  
+        });
+
+        // 139. § (2) sebesség-figyelmeztetés admin kapcsoló - alapból KI, minden eszközön szinkronban
+        db.ref('settings/speedWarningsEnabled').on('value', snap => {
+            speedWarningsEnabled = !!snap.val();
+            const toggle = document.getElementById('speedWarningToggle');
+            if (toggle) toggle.checked = speedWarningsEnabled;
+            checkBeerkeztetesSpeed();
+            if (document.getElementById('adatlapok')?.classList.contains('active')) renderAdatlapList();
+            if (document.getElementById('past-race-view')?.classList.contains('active')) renderPastAdatlapList();
+        });
 
     }
 
@@ -797,8 +808,12 @@
                 let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
                 let rankDisplay = c.isEliminated ? "ELIM" : rankStr + "º";
                 let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás: ${info.gapStr}</div>` : '';
-                let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
-                if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
+                let speedStr = ""; let speedFlagHtml = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
+                if (completedLaps.length > 0) {
+                    let lastLap = completedLaps[completedLaps.length - 1];
+                    speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
+                    if (speedWarningsEnabled && completedLaps.some(l => l.speedFlag || l.loopSpd >= 16 || l.phaseSpd >= 16)) speedFlagHtml = `<span class="inline-flag danger">⚠ SP</span>`;
+                }
                 let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
                 
                 let statusObj = getCompLiveStatus(c, config);
@@ -815,7 +830,7 @@
                         <button class="calc-btn" onclick="event.stopPropagation(); openVetHistory('${c.bib}')" style="background:var(--success); color:black; padding:6px 12px; margin:0; font-size:0.85rem; width:auto; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🩺 Karton</button>
                         <div class="adatlap-arrow">❯</div>
                     </div>
-                    <div class="adatlap-badges">${gapHtml}${speedHtml}</div>
+                    <div class="adatlap-badges">${gapHtml}${speedHtml}${speedFlagHtml}</div>
                 </div>`;
             });
         }
@@ -1323,17 +1338,19 @@
             }
             
             l.loopSec = loopTime;
-            l.phaseSec = phaseTime; 
+            l.phaseSec = phaseTime;
             l.pulzusSec = pulzusTime;
-            l.loopSpd = l.d / (loopTime/3600); 
+            l.loopSpd = l.d / (loopTime/3600);
             l.phaseSpd = l.d / (phaseTime/3600);
-            
+            l.speedFlag = (l.loopSpd >= 16 || l.phaseSpd >= 16); // 139. § (2): egyetlen kör sem lépheti túl a sebességhatárt
+
             totalPure += phaseTime;
             totalD += l.d;
-            l.rideTime = totalPure; 
+            l.rideTime = totalPure;
             l.rideSpd = totalD / (totalPure/3600);
-            l.nextStart = (vet > 0 ? vet : arr) + 2400; 
-            
+            // normalizálva 0-86399 közé, hogy éjfél körül ne "24:xx:xx"-ként jelenjen meg és a várakozó-státusz ne ragadjon be (P0/2)
+            l.nextStart = ((vet > 0 ? vet : arr) + 2400) % 86400;
+
             curStart = l.nextStart;
             comp.laps[i] = l;
         }
@@ -1401,7 +1418,7 @@
     function loadOrvosiIdoData() {
         const bib = document.getElementById('sel-orvosi-ido').value;
         const form = document.getElementById('orvosi-ido-form');
-        if(!bib) { form.style.display = 'none'; return; }
+        if(!bib) { form.style.display = 'none'; renderWarningBanner('orv-ido-recovery-warning', null); return; }
         
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
@@ -1421,8 +1438,9 @@
         document.getElementById('bk-v-h').value = l.oh || '';
         document.getElementById('bk-v-m').value = l.om || '';
         document.getElementById('bk-v-s').value = l.os || '';
-        
+
         form.style.display = 'block';
+        checkOrvosiIdoRecovery();
     }
 
     function saveOrvosiIdoData() {
@@ -1500,7 +1518,7 @@
     function loadOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
         const form = document.getElementById('orvosi-form');
-        if(!bib) { form.style.display = 'none'; return; }
+        if(!bib) { form.style.display = 'none'; renderWarningBanner('orv-recovery-warning', null); return; }
         
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
@@ -1515,11 +1533,12 @@
             document.getElementById('orv-arr-time').style.color = 'var(--primary)';
             document.getElementById('orv-vet-time').innerText = `-`;
             l = comp.preVet || {};
+            renderWarningBanner('orv-recovery-warning', null);
         } else {
             // MÁR VAN KÖR
             l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
             document.getElementById('orv-lap-title').innerText = `${idx + 1}. Kör Orvosi Vizsgálata`;
-            
+
             if(l.h && l.h !== '') {
                 document.getElementById('orv-arr-time').innerText = `Beérkezés: ${toTimeStr(toSec(l.h, l.m, l.s))} (Rögzítve)`;
                 document.getElementById('orv-arr-time').style.color = 'var(--success)';
@@ -1535,6 +1554,12 @@
                 document.getElementById('orv-vet-time').innerText = `Orvosi idő még nincs rögzítve!`;
                 document.getElementById('orv-vet-time').style.color = 'var(--warning)';
             }
+
+            const baseDist = comp.dist.replace('j', '');
+            const cfg = raceConfig[baseDist] || { laps: [] };
+            const expectedLaps = cfg.laps ? cfg.laps.length : 1;
+            const isFinalLap = (idx === expectedLaps - 1);
+            renderWarningBanner('orv-recovery-warning', getRecoveryWarning(toSec(l.h, l.m, l.s), toSec(l.oh, l.om, l.os), isFinalLap));
         }
 
         // Adatok betöltése
@@ -1568,8 +1593,9 @@
             document.getElementById('orvStatusSelect').value = 'Active';
         }
         adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
-        
+
         form.style.display = 'block';
+        checkPulseWarning();
     }
 
     function saveOrvosiData() {
@@ -1846,8 +1872,11 @@
         }
         
         // 2. Ha nincs meg, akkor keressük a jelenleg megnyitott Múltbéli versenyben!
+        // (parseCompetitors-t használjuk, mert a Firebase néha "lyukas" tömbként adja vissza
+        // a competitors objektumot, és egy nyers Object.values/Array.isArray simán undefined
+        // elemeket is beengedett volna -> emiatt nem nyílt meg a karton egyes versenyzőknél)
         if (!comp && viewingPastRaceData && viewingPastRaceData.competitors) {
-            let pastArr = Array.isArray(viewingPastRaceData.competitors) ? viewingPastRaceData.competitors : Object.values(viewingPastRaceData.competitors);
+            let pastArr = parseCompetitors(viewingPastRaceData.competitors);
             comp = pastArr.find(c => c.bib == bib);
         }
 
@@ -2035,6 +2064,13 @@
             showAnimatedBtn('saveKiirasBtn');
             showToast('Kiírás sikeresen mentve!');
         }).catch(e => showToast('Hiba a mentéskor: ' + e.message, true));
+    }
+
+    // Csak admin kapcsolhatja - minden eszközön (beérkeztető, orvos tabletek) egyszerre él/hal
+    function toggleSpeedWarnings(val) {
+        db.ref('settings/speedWarningsEnabled').set(!!val).then(() => {
+            showToast(val ? 'Sebesség-figyelmeztetések bekapcsolva.' : 'Sebesség-figyelmeztetések kikapcsolva.');
+        }).catch(e => showToast('Hiba: ' + e.message, true));
     }
 
     function editCompetitor(bib) {
@@ -2423,11 +2459,118 @@
     });
 
     function toSec(h, m, s) { return (parseInt(h) || 0) * 3600 + (parseInt(m) || 0) * 60 + (parseInt(s) || 0); }
-    function toTimeStr(s) { 
-        if(s<=0) return '-'; 
+    function toTimeStr(s) {
+        if(s<=0) return '-';
         const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
         return (h>0 ? h+":" : "0:") + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
     }
+
+    // --- SZABÁLYMEGFELELÉSI FIGYELMEZTETÉSEK (audit P0/3, P0/4, P0/5) ---
+    // Ezek kizárólag vizuális jelzések a beérkeztető/orvos felé; a döntést (LP, recheck, FTQ-SP)
+    // mindig az orvos/bíró hozza meg, a rendszer nem állít be automatikusan státuszt.
+    function renderWarningBanner(containerId, warningObj) {
+        const cont = document.getElementById(containerId);
+        if (!cont) return;
+        if (!warningObj) { cont.innerHTML = ''; return; }
+        const icon = warningObj.level === 'danger' ? '🚨' : (warningObj.level === 'warn' ? '⚠️' : '✅');
+        cont.innerHTML = `<div class="warning-banner level-${warningObj.level}"><span class="wb-icon">${icon}</span><span>${warningObj.text}</span></div>`;
+    }
+
+    // 97. § (2): normál körnél max 15, célban max 20 perc regenerációs (pulzus) idő -> LP javaslat felette.
+    // 101. §: 10 percnél hosszabb pulzusidő esetén a következő kör előtt kötelező ismételt állatorvosi vizsgálat.
+    function getRecoveryWarning(arrSec, vetSec, isFinalLap) {
+        if (!(arrSec > 0) || !(vetSec > 0)) return null;
+        let rec = vetSec - arrSec;
+        if (rec < 0) rec += 86400;
+        const limitSec = isFinalLap ? 1200 : 900;
+        const limitMin = isFinalLap ? 20 : 15;
+        if (rec > limitSec) {
+            return { level: 'danger', text: `Pulzusidő: ${toTimeStr(rec)} — túllépte a ${limitMin} perces limitet (97. § (2)). LP kód megfontolandó.` };
+        }
+        if (rec > 600) {
+            return { level: 'warn', text: `Pulzusidő: ${toTimeStr(rec)} — 10 percnél hosszabb, a következő kör előtt kötelező ismételt állatorvosi vizsgálat (101. §).` };
+        }
+        return { level: 'ok', text: `Pulzusidő: ${toTimeStr(rec)} — rendben.` };
+    }
+
+    // 97. § (2): max. 64/perc pulzushatár.
+    function checkPulseWarning() {
+        const input = document.getElementById('orv-pulse');
+        const cont = document.getElementById('orv-pulse-warning');
+        if (!input || !cont) return;
+        const val = parseFloat((input.value || '').replace(',', '.'));
+        if (isNaN(val)) { cont.innerHTML = ''; return; }
+        if (val > 64) {
+            cont.innerHTML = `<div class="warning-banner level-danger" style="margin-top:8px; font-size:0.75rem; padding:8px 10px;"><span class="wb-icon">🚨</span><span>64 felett! (97. § (2)) Max. 2 bemutatás engedélyezett (100. §).</span></div>`;
+        } else {
+            cont.innerHTML = '';
+        }
+    }
+
+    // Orvosi Idő (Vet gate) képernyő: élőben mutatja a pulzusidőt, ahogy gépelik.
+    function checkOrvosiIdoRecovery() {
+        const bib = document.getElementById('sel-orvosi-ido').value;
+        const comp = competitors.find(c => c.bib == bib);
+        if (!comp) { renderWarningBanner('orv-ido-recovery-warning', null); return; }
+
+        const idx = getActiveLapIndex(comp, raceConfig);
+        const l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
+        const arrSec = toSec(l.h, l.m, l.s);
+        const vetSec = toSec(document.getElementById('bk-v-h').value, document.getElementById('bk-v-m').value, document.getElementById('bk-v-s').value);
+
+        const baseDist = comp.dist.replace('j', '');
+        const cfg = raceConfig[baseDist] || { laps: [] };
+        const expectedLaps = cfg.laps ? cfg.laps.length : 1;
+        const isFinalLap = (idx === expectedLaps - 1);
+
+        renderWarningBanner('orv-ido-recovery-warning', getRecoveryWarning(arrSec, vetSec, isFinalLap));
+    }
+
+    // Beérkeztetés képernyő: élőben megbecsüli a kör átlagsebességét, ahogy az időt gépelik.
+    // 139. § (2): a sebességhatárt egyetlen kör sem lépheti túl.
+    function checkBeerkeztetesSpeed() {
+        const cont = document.getElementById('bk-speed-warning');
+        if (!cont) return;
+        if (!speedWarningsEnabled) { cont.innerHTML = ''; return; }
+
+        const bib = document.getElementById('sel-beerkeztetes').value;
+        const comp = competitors.find(c => c.bib == bib);
+        if (!comp) { cont.innerHTML = ''; return; }
+
+        const idx = getActiveLapIndex(comp, raceConfig);
+        const baseDist = comp.dist.replace('j', '');
+        const cfg = raceConfig[baseDist] || { laps: [] };
+        const savedLap = comp.laps && comp.laps[idx];
+        const lapDist = parseFloat((savedLap && savedLap.d) || (cfg.laps && cfg.laps[idx]) || 0);
+
+        let startSec;
+        if (idx === 0) {
+            startSec = toSec(
+                comp.startTime && comp.startTime.h !== "" ? comp.startTime.h : cfg.h,
+                comp.startTime && comp.startTime.m !== "" ? comp.startTime.m : cfg.m,
+                comp.startTime && comp.startTime.s !== "" ? comp.startTime.s : cfg.s
+            );
+        } else {
+            const prev = comp.laps && comp.laps[idx - 1];
+            startSec = prev ? prev.nextStart : 0;
+        }
+
+        const arrSec = toSec(document.getElementById('bk-h').value, document.getElementById('bk-m').value, document.getElementById('bk-s').value);
+        if (!(startSec > 0) || !(arrSec > 0) || !(lapDist > 0)) { cont.innerHTML = ''; return; }
+
+        let loopTime = arrSec - startSec;
+        if (loopTime <= 0) loopTime += 86400;
+        const spd = lapDist / (loopTime / 3600);
+
+        if (spd >= 16) {
+            cont.innerHTML = `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Becsült kör átlag: ${spd.toFixed(2)} km/h — 16 km/h fölött (139. § (2)), sebesség miatti kiesés (FTQ-SP) megfontolandó.</span></div>`;
+        } else if (spd >= 15) {
+            cont.innerHTML = `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Becsült kör átlag: ${spd.toFixed(2)} km/h — közel a sebességhatárhoz.</span></div>`;
+        } else {
+            cont.innerHTML = '';
+        }
+    }
+
  function autoSetLaps(countId, distId, contId, prefix, isModal = false) {
         const d = document.getElementById(distId).value;
         const baseDist = d.replace('j', '');
@@ -2643,8 +2786,13 @@
             return { text: "Megérkezett", color: "var(--warning)", textCol: "#000" };
         }
 
-        if (last.nextStart && last.nextStart > nowSec) {
-            return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
+        if (last.nextStart) {
+            // Éjfél körüli forduló-biztos összevetés (P0/2): a nyers nagyobb/kisebb reláció
+            // önmagában hibás lenne, ha a virradat előtti/utáni idő keveredik.
+            let diff = last.nextStart - nowSec;
+            if (diff < -43200) diff += 86400;
+            if (diff > 43200) diff -= 86400;
+            if (diff > 0) return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
         }
 
         return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
@@ -2796,8 +2944,14 @@
             let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
             let rankDisplay = c.isEliminated ? "ELIM" : rankStr + "º";
             let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by ${info.gapStr}</div>` : '';
-            let speedStr = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
-            if (completedLaps.length > 0) { speedStr = `Avg. ${completedLaps[completedLaps.length - 1].rideSpd.toFixed(2)} km/h`; }
+            let speedStr = ""; let speedFlagHtml = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
+            if (completedLaps.length > 0) {
+                let lastLap = completedLaps[completedLaps.length - 1];
+                speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
+                // 139. § (2): jelzés, ha bármelyik kör elérte/túllépte a sebességhatárt (nem automatikus kiesés, csak figyelmeztetés)
+                // Admin kapcsolja be (settings/speedWarningsEnabled) - alapból nem látszik.
+                if (speedWarningsEnabled && completedLaps.some(l => l.speedFlag || l.loopSpd >= 16 || l.phaseSpd >= 16)) speedFlagHtml = `<span class="inline-flag danger">⚠ SP</span>`;
+            }
             let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
 
             let statusObj = getCompLiveStatus(c, ctx.config);
@@ -2814,7 +2968,7 @@
                     <button class="calc-btn" onclick="event.stopPropagation(); openVetHistory('${c.bib}')" style="background:var(--success); color:black; padding:6px 12px; margin:0; font-size:0.85rem; width:auto; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🩺 Karton</button>
                     <div class="adatlap-arrow">❯</div>
                 </div>
-                <div class="adatlap-badges">${gapHtml}${speedHtml}</div>
+                <div class="adatlap-badges">${gapHtml}${speedHtml}${speedFlagHtml}</div>
             </div>`;
         });
     }
@@ -2956,7 +3110,7 @@
         const t2 = toSec(document.getElementById('rh2').value, document.getElementById('rm2').value, document.getElementById('rs2').value);
         if(!d || t1 === 0 || t2 === 0) return;
         let diff = t2 - t1; if(diff <= 0) diff += 86400;
-        const spd = d / (diff / 3600); const nextStart = t2 + 2400;
+        const spd = d / (diff / 3600); const nextStart = (t2 + 2400) % 86400;
         document.getElementById('res1').style.display = 'block';
         document.getElementById('res1').innerHTML = `Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
     }
