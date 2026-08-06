@@ -30,7 +30,9 @@
         { key: 'default', label: 'Alap (kék)', colors: ['#0A84FF', '#000000'] },
         { key: 'alt', label: 'Meleg', colors: ['#E8A33D', '#0f0b08'] },
         { key: 'forest', label: 'Erdő', colors: ['#34C77B', '#070f0c'] },
-        { key: 'violet', label: 'Ibolya', colors: ['#B968F0', '#0d0a14'] },
+        { key: 'violet', label: 'Ibolya', colors: ['#9B7FD4', '#0e0b16'] },
+        { key: 'graphite', label: 'Grafit', colors: ['#6C99C4', '#0a0b0d'] },
+        { key: 'wine', label: 'Bordó', colors: ['#C1626E', '#120a0c'] },
     ];
 
     // Villanás-mentes indulás: amíg a Firebase beállítás betöltődik, a legutóbb ismert témát használjuk
@@ -128,8 +130,11 @@
 
         function render(items) {
             if (!items.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
-            list.innerHTML = items.map((it, i) => `<div class="ac-item" data-idx="${i}">${it.label}</div>`).join('');
+            // textContent-tel épül, nem innerHTML-lel - ha egy név/egyesület valaha < vagy > karaktert
+            // tartalmazna, ne szakítsa meg vagy értelmezze HTML-ként a listát.
+            list.innerHTML = items.map((it, i) => `<div class="ac-item" data-idx="${i}"></div>`).join('');
             Array.from(list.children).forEach((el, i) => {
+                el.textContent = items[i].label;
                 el.onmousedown = (e) => { e.preventDefault(); onSelect(items[i]); list.style.display = 'none'; };
             });
             list.style.display = 'block';
@@ -230,9 +235,10 @@
     function forceMoveRace(fromType, toType, id) {
         let msg = fromType === 'mult' && toType === 'jovo' ? "Biztosan áthelyezed a Jövőbeli versenyek közé?" : "Biztosan áthelyezed?";
         showConfirm("Verseny áthelyezése", msg, () => {
-            db.ref('/').once('value').then(snap => {
-                let data = snap.val() || {};
-                let sourceRace = data.races && data.races[fromType] && data.races[fromType][id];
+            // Célzott olvasás a konkrét versenyre - a "/" gyökér beolvasása a szigorúbb
+            // Firebase szabályok mellett permission_denied hibát dobna (nincs .read a gyökéren).
+            db.ref('races/' + fromType + '/' + id).once('value').then(snap => {
+                let sourceRace = snap.val();
                 if (sourceRace) {
                     let updates = {};
                     updates['races/' + toType + '/' + id] = sourceRace;
@@ -241,78 +247,98 @@
                         showToast("Verseny sikeresen áthelyezve!");
                     }).catch(e => showToast("Hiba az áthelyezéskor: " + e.message, true));
                 }
-            });
+            }).catch(e => showToast("Hiba az áthelyezéskor: " + e.message, true));
         });
     }
 
     function forceMoveToLive(sourceType, id) {
         showConfirm("Verseny Élesítése", "Biztosan ÉLŐ-be teszed ezt a versenyt?\n(A jelenlegi élő futam automatikusan lezárul és átkerül a múltba!)", () => {
-            db.ref('/').once('value').then(snap => {
-                let data = snap.val() || {};
+            // Célzott olvasások a "/" gyökér helyett - lásd forceMoveRace megjegyzését.
+            Promise.all([
+                db.ref('liveRaceMeta').once('value'),
+                db.ref('raceConfig').once('value'),
+                db.ref('competitors').once('value'),
+                db.ref('races/' + sourceType + '/' + id).once('value')
+            ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, sourceSnap]) => {
                 let updates = {};
-                
-                if (data.liveRaceMeta) {
-                    let oldId = data.liveRaceMeta.id || Date.now().toString();
+                let curLiveMeta = liveMetaSnap.val();
+                let curRaceConfig = raceConfigSnap.val();
+                let curCompetitors = competitorsSnap.val();
+
+                if (curLiveMeta) {
+                    let oldId = curLiveMeta.id || Date.now().toString();
                     updates['races/mult/' + oldId] = {
-                        id: oldId, name: data.liveRaceMeta.name, loc: data.liveRaceMeta.loc, date: data.liveRaceMeta.date, desc: data.liveRaceMeta.desc || "",
-                        raceConfig: data.raceConfig || getEmptyRaceConfig(),
-                        competitors: data.competitors || null
+                        id: oldId, name: curLiveMeta.name, loc: curLiveMeta.loc, date: curLiveMeta.date, desc: curLiveMeta.desc || "",
+                        raceConfig: curRaceConfig || getEmptyRaceConfig(),
+                        competitors: curCompetitors || null
                     };
                 }
-                
-                let sourceRace = data.races && data.races[sourceType] && data.races[sourceType][id];
+
+                let sourceRace = sourceSnap.val();
                 if (sourceRace) {
                     updates['liveRaceMeta'] = { id: sourceRace.id, name: sourceRace.name, loc: sourceRace.loc, date: sourceRace.date, desc: sourceRace.desc || "" };
                     updates['raceConfig'] = sourceRace.raceConfig || getEmptyRaceConfig();
                     updates['competitors'] = sourceRace.competitors || null;
                     updates['races/' + sourceType + '/' + id] = null;
                 }
-                
-                db.ref('/').update(updates).then(() => { 
+
+                db.ref('/').update(updates).then(() => {
                     showToast("🚀 Verseny sikeresen ÉLŐ-be mozgatva!");
                     switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'));
                 }).catch(e => showToast("Hiba a mozgatáskor: " + e.message, true));
-            });
+            }).catch(e => showToast("Hiba a mozgatáskor: " + e.message, true));
         });
     }
 
     function forceMoveToPastFromLive() {
         showConfirm("Verseny Lezárása", "Biztosan a Múltbéli versenyek közé rakod a jelenlegi ÉLŐ versenyt?", () => {
-            db.ref('/').once('value').then(snap => {
-                let data = snap.val() || {};
-                if (!data.liveRaceMeta) return;
-                
-                let oldId = data.liveRaceMeta.id || Date.now().toString();
+            // Célzott olvasások a "/" gyökér helyett - lásd forceMoveRace megjegyzését.
+            Promise.all([
+                db.ref('liveRaceMeta').once('value'),
+                db.ref('raceConfig').once('value'),
+                db.ref('competitors').once('value')
+            ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap]) => {
+                let curLiveMeta = liveMetaSnap.val();
+                if (!curLiveMeta) return;
+
+                let oldId = curLiveMeta.id || Date.now().toString();
                 let updates = {};
-                
+
                 updates['races/mult/' + oldId] = {
-                    id: oldId, name: data.liveRaceMeta.name, loc: data.liveRaceMeta.loc, date: data.liveRaceMeta.date, desc: data.liveRaceMeta.desc || "",
-                    raceConfig: data.raceConfig || getEmptyRaceConfig(),
-                    competitors: data.competitors || null
+                    id: oldId, name: curLiveMeta.name, loc: curLiveMeta.loc, date: curLiveMeta.date, desc: curLiveMeta.desc || "",
+                    raceConfig: raceConfigSnap.val() || getEmptyRaceConfig(),
+                    competitors: competitorsSnap.val() || null
                 };
-                
+
                 updates['liveRaceMeta'] = null;
                 updates['raceConfig'] = getEmptyRaceConfig();
                 updates['competitors'] = null;
-                
-                db.ref('/').update(updates).then(() => { 
-                    showToast("Verseny sikeresen lezárva és átmozgatva a Múltba!"); 
+
+                db.ref('/').update(updates).then(() => {
+                    showToast("Verseny sikeresen lezárva és átmozgatva a Múltba!");
                     switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
                 }).catch(e => showToast("Hiba a lezáráskor: " + e.message, true));
-            });
+            }).catch(e => showToast("Hiba a lezáráskor: " + e.message, true));
         });
     }
 
     function runAutoMigration() {
-        db.ref('/').once('value').then(snap => {
-            let data = snap.val() || {};
-            
+        // Célzott olvasások a "/" gyökér helyett - lásd forceMoveRace megjegyzését.
+        Promise.all([
+            db.ref('liveRaceMeta').once('value'),
+            db.ref('raceConfig').once('value'),
+            db.ref('competitors').once('value'),
+            db.ref('races/jovo').once('value')
+        ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, jovoSnap]) => {
+            let curRaceConfig = raceConfigSnap.val();
+            let curCompetitors = competitorsSnap.val();
+
             // Helyi időzóna szerinti pontos dátum (Magyar idő)
             let d = new Date();
             let today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-            let meta = data.liveRaceMeta || null;
-            let jovo = (data.races && data.races.jovo) ? data.races.jovo : {};
-            
+            let meta = liveMetaSnap.val() || null;
+            let jovo = jovoSnap.val() || {};
+
             let updates = {};
             let needsUpdate = false;
 
@@ -320,8 +346,8 @@
                 let id = meta.id || Date.now().toString();
                 updates['races/mult/' + id] = {
                     id: id, name: meta.name, loc: meta.loc, date: meta.date, desc: meta.desc || "",
-                    raceConfig: data.raceConfig || getEmptyRaceConfig(),
-                    competitors: data.competitors || {}
+                    raceConfig: curRaceConfig || getEmptyRaceConfig(),
+                    competitors: curCompetitors || {}
                 };
                 updates['raceConfig'] = getEmptyRaceConfig();
                 updates['competitors'] = {};
@@ -345,7 +371,7 @@
             if (needsUpdate) {
                 db.ref('/').update(updates).then(() => console.log("✅ Automatikus verseny migráció sikeresen lefutott!"));
             }
-        });
+        }).catch(e => console.warn("Automatikus verseny migráció kihagyva:", e.message));
     }
 
     // --- BIZTONSÁGOS FIREBASE FIGYELŐK ---
@@ -1223,16 +1249,30 @@
             existingData.isEliminated = oldComp.isEliminated || false;
         }
 
-        // ÚJ: Itt már hiba nélkül tudja menteni az összes adatot
-        const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
-
         // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz)
         const horseRiderUpdates = {};
         if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
         if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
         if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
 
-        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp).then(() => {
+        // Tranzakció: ha a célhelyen (ez a bib) időközben már van szerver-oldali adat (laps/startTime),
+        // azt tartjuk meg - a helyi existingData csak akkor esik latba, ha a hely még valóban üres.
+        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).transaction(currentComp => {
+            const base = currentComp || existingData;
+            return {
+                bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club,
+                startTime: base.startTime || { h: '', m: '', s: '' },
+                laps: base.laps || [],
+                isEliminated: base.isEliminated || false,
+                // A nevezés csak egy pillanatfelvétel - ezek nélkül a mentés törölné az orvosi
+                // döntést, ha az korábban már megvolt (idomodell-es-hibak.md, A rész).
+                // A Firebase SDK nem fogad el "undefined" mezőértéket, ezért null a biztonságos alap
+                // (null = a kulcs egyszerűen nem jön létre, pont mint eddig, ha még nem volt orvosi adat).
+                status: base.status || null,
+                extraCodes: base.extraCodes || [],
+                preVet: base.preVet || null
+            };
+        }).then(() => {
             showAnimatedBtn('rm-addCompBtn');
             cancelRmEdit();
         }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
@@ -1358,29 +1398,44 @@
         const rajt = toSec(document.getElementById('rm-vhR').value, document.getElementById('rm-vmR').value, document.getElementById('rm-vsR').value);
         if(!modalRaceId) return;
 
-        let comp = modalCompetitors.find(c => c.bib == bib);
-        if (comp) {
-            comp.startTime = { h: document.getElementById('rm-vhR').value, m: document.getElementById('rm-vmR').value, s: document.getElementById('rm-vsR').value };
-            const statusVal = document.getElementById('rm-compStatusSelect').value;
-            comp.status = statusVal;
-            comp.isEliminated = (statusVal !== 'Active');
-            for(let i=0; i<count; i++) {
-                if(!comp.laps) comp.laps = [];
-                if(!comp.laps[i]) comp.laps[i] = {};
-                comp.laps[i].d = document.getElementById(`rm-vd${i+1}`).value;
-                comp.laps[i].h = document.getElementById(`rm-vh${i+1}`).value;
-                comp.laps[i].m = document.getElementById(`rm-vm${i+1}`).value;
-                comp.laps[i].s = document.getElementById(`rm-vs${i+1}`).value;
-                comp.laps[i].oh = document.getElementById(`rm-voh${i+1}`).value;
-                comp.laps[i].om = document.getElementById(`rm-vom${i+1}`).value;
-                comp.laps[i].os = document.getElementById(`rm-vos${i+1}`).value;
-            }
+        // Előbb minden mezőt beolvasunk a DOM-ból, hogy a lenti tranzakció retry-jai (ha kellenek)
+        // ugyanazokat az értékeket alkalmazzák, bármelyik "comp" objektumon hívjuk is meg.
+        const startTime = { h: document.getElementById('rm-vhR').value, m: document.getElementById('rm-vmR').value, s: document.getElementById('rm-vsR').value };
+        const statusVal = document.getElementById('rm-compStatusSelect').value;
+        const lapValues = [];
+        for (let i = 0; i < count; i++) {
+            lapValues.push({
+                d: document.getElementById(`rm-vd${i+1}`).value,
+                h: document.getElementById(`rm-vh${i+1}`).value,
+                m: document.getElementById(`rm-vm${i+1}`).value,
+                s: document.getElementById(`rm-vs${i+1}`).value,
+                oh: document.getElementById(`rm-voh${i+1}`).value,
+                om: document.getElementById(`rm-vom${i+1}`).value,
+                os: document.getElementById(`rm-vos${i+1}`).value,
+            });
+        }
+        function applyForm(target) {
+            target.startTime = startTime;
+            target.status = statusVal;
+            target.isEliminated = (statusVal !== 'Active');
+            lapValues.forEach((lv, i) => {
+                if (!target.laps) target.laps = [];
+                if (!target.laps[i]) target.laps[i] = {};
+                Object.assign(target.laps[i], lv);
+            });
+            return target;
         }
 
+        let comp = modalCompetitors.find(c => c.bib == bib);
+        if (comp) applyForm(comp);
+
         if(rajt === 0) { document.getElementById('rm-res2').style.display='none'; return; }
-        
+
         comp = recalcCompetitorData(comp, modalRaceConfig);
         let html = "";
+        if (comp._timeWarnings && comp._timeWarnings.length) {
+            html += `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Egy vagy több beírt idő szokatlanul távolinak tűnik az előzőhöz képest — ellenőrizd, nem gépeltél-e el egy számjegyet, mielőtt mented.</span></div>`;
+        }
         let countLaps = comp.laps.length;
         for(let i=0; i<countLaps; i++) {
             let l = comp.laps[i];
@@ -1418,15 +1473,37 @@
         document.getElementById('rm-res2').style.display='block'; document.getElementById('rm-res2').innerHTML = html;
         if (comp) {
             const type = document.getElementById('rm-type').value;
-            const cleanComp = JSON.parse(JSON.stringify(comp)); 
-            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + comp.bib).set(cleanComp);
+            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + comp.bib).transaction(currentComp => {
+                if (!currentComp) return currentComp;
+                const result = recalcCompetitorData(applyForm(currentComp), modalRaceConfig);
+                delete result._timeWarnings; // ideiglenes, kijelzésre való - nem mentjük el
+                return result;
+            });
         }
         showAnimatedBtn('rm-btn-kiertel-mentes');
+    }
+
+    // --- IDŐMODELL: ÉJFÉL KÖRÜLI ÁTFORDULÁS vs. ELGÉPELÉS (idomodell-es-hibak.md, B rész) ---
+    // Egy nyers különbség (pl. vet - arr) negatív lehet, ha a második időpont éjfél után van.
+    // Eldönti: hétköznapi éjféli átfordulásról van-e szó (a felkorrigált különbség < 12 óra),
+    // vagy gyanús adatbeviteli hiba (pl. elgépelt óraérték).
+    function resolveRollover(rawDiff) {
+        if (rawDiff > 0) return { diff: rawDiff, suspicious: false };
+        const rolled = rawDiff + 86400;
+        if (rolled < 12 * 3600) return { diff: rolled, suspicious: false };
+        return { diff: rolled, suspicious: true };
     }
 
     // --- ÚJ SZEREPKÖR FUNKCIÓK (RECALC DATA KÖZÖS MOTOR) ---
     function recalcCompetitorData(comp, config) {
         if (!comp) return comp;
+        // Minden hívás elején tiszta lap - a figyelmeztetések csak az ÉPP MOST kiszámolt körökre vonatkoznak.
+        comp._timeWarnings = [];
+        function rollApply(rawDiff, tag) {
+            const r = resolveRollover(rawDiff);
+            if (r.suspicious) comp._timeWarnings.push(tag);
+            return r.diff;
+        }
         const baseDist = comp.dist.replace('j', '');
         const cfg = config[baseDist] || { h:'', m:'', s:'', laps:[] };
         let expectedLaps = cfg.laps ? cfg.laps.length : 1;
@@ -1450,21 +1527,20 @@
             l.isComplete = (l.d > 0 && arr > 0);
             if (!l.isComplete) { comp.laps[i] = l; continue; }
             
-            let loopTime = arr - curStart;
-            if (loopTime <= 0) loopTime += 86400;
-            
+            let loopTime = rollApply(arr - curStart, 'loop');
+
             let phaseTime; let pulzusTime = 0;
             if (isFinalLap) {
                 // ÚJ LOGIKA 20 KM-hez: Az idő az Orvosi kapunál (VET) áll meg!
                 if (comp.dist === "20" || comp.dist === "20j") {
-                    phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
+                    phaseTime = vet > 0 ? rollApply(vet - curStart, 'phase') : loopTime;
                 } else {
                     phaseTime = loopTime;
                 }
-                if(vet > 0) pulzusTime = vet - arr < 0 ? vet - arr + 86400 : vet - arr;
+                if(vet > 0) pulzusTime = rollApply(vet - arr, 'pulzus');
             } else {
-                phaseTime = vet > 0 ? (vet - curStart <= 0 ? vet - curStart + 86400 : vet - curStart) : loopTime;
-                pulzusTime = vet > 0 ? (vet - arr < 0 ? vet - arr + 86400 : vet - arr) : 0;
+                phaseTime = vet > 0 ? rollApply(vet - curStart, 'phase') : loopTime;
+                pulzusTime = vet > 0 ? rollApply(vet - arr, 'pulzus') : 0;
             }
             
             l.loopSec = loopTime;
@@ -1526,24 +1602,27 @@
 
     function saveBeerkeztetesData() {
         const bib = document.getElementById('sel-beerkeztetes').value;
-        let comp = competitors.find(c => c.bib == bib);
-        if(!comp) return;
+        const h = document.getElementById('bk-h').value, m = document.getElementById('bk-m').value, s = document.getElementById('bk-s').value;
 
-        let idx = getActiveLapIndex(comp, raceConfig);
-        if(!comp.laps) comp.laps = [];
-        if(!comp.laps[idx]) comp.laps[idx] = {};
-        
-        comp.laps[idx].h = document.getElementById('bk-h').value;
-        comp.laps[idx].m = document.getElementById('bk-m').value;
-        comp.laps[idx].s = document.getElementById('bk-s').value;
-        
-        comp = recalcCompetitorData(comp, raceConfig);
-        db.ref('competitors/' + comp.bib).set(comp).then(() => {
+        // Tranzakció: a szerveren lévő legfrissebb állapotot olvassa be és azon hajtja végre
+        // ugyanezt a módosítást - ha közben más (pl. az orvos) is írt, nem veszik el az ő mentése.
+        db.ref('competitors/' + bib).transaction(currentComp => {
+            if (!currentComp) return currentComp;
+            let idx = getActiveLapIndex(currentComp, raceConfig);
+            if (!currentComp.laps) currentComp.laps = [];
+            if (!currentComp.laps[idx]) currentComp.laps[idx] = {};
+            currentComp.laps[idx].h = h;
+            currentComp.laps[idx].m = m;
+            currentComp.laps[idx].s = s;
+            const result = recalcCompetitorData(currentComp, raceConfig);
+            delete result._timeWarnings; // ideiglenes, kijelzésre való (élőben már jelezve gépeléskor) - nem mentjük el
+            return result;
+        }).then(() => {
             showAnimatedBtn('btn-bk-mentes');
             document.getElementById('sel-beerkeztetes').value = '';
             document.getElementById('bk-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
             document.getElementById('beerkeztetes-form').style.display = 'none';
-            refreshVersenyTabIfNeeded(comp.bib);
+            refreshVersenyTabIfNeeded(bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
     
@@ -1578,24 +1657,25 @@
 
     function saveOrvosiIdoData() {
         const bib = document.getElementById('sel-orvosi-ido').value;
-        let comp = competitors.find(c => c.bib == bib);
-        if(!comp) return;
+        const oh = document.getElementById('bk-v-h').value, om = document.getElementById('bk-v-m').value, os = document.getElementById('bk-v-s').value;
 
-        let idx = getActiveLapIndex(comp, raceConfig);
-        if(!comp.laps) comp.laps = [];
-        if(!comp.laps[idx]) comp.laps[idx] = {};
-        
-        comp.laps[idx].oh = document.getElementById('bk-v-h').value;
-        comp.laps[idx].om = document.getElementById('bk-v-m').value;
-        comp.laps[idx].os = document.getElementById('bk-v-s').value;
-        
-        comp = recalcCompetitorData(comp, raceConfig);
-        db.ref('competitors/' + comp.bib).set(comp).then(() => {
+        db.ref('competitors/' + bib).transaction(currentComp => {
+            if (!currentComp) return currentComp;
+            let idx = getActiveLapIndex(currentComp, raceConfig);
+            if (!currentComp.laps) currentComp.laps = [];
+            if (!currentComp.laps[idx]) currentComp.laps[idx] = {};
+            currentComp.laps[idx].oh = oh;
+            currentComp.laps[idx].om = om;
+            currentComp.laps[idx].os = os;
+            const result = recalcCompetitorData(currentComp, raceConfig);
+            delete result._timeWarnings; // ideiglenes, kijelzésre való (élőben már jelezve gépeléskor) - nem mentjük el
+            return result;
+        }).then(() => {
             showAnimatedBtn('btn-bk-vet-mentes');
             document.getElementById('sel-orvosi-ido').value = '';
             document.getElementById('oi-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
             document.getElementById('orvosi-ido-form').style.display = 'none';
-            refreshVersenyTabIfNeeded(comp.bib);
+            refreshVersenyTabIfNeeded(bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
 
@@ -1651,14 +1731,14 @@
     function loadOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
         const form = document.getElementById('orvosi-form');
-        if(!bib) { form.style.display = 'none'; renderWarningBanner('orv-recovery-warning', null); return; }
-        
+        if(!bib) { form.style.display = 'none'; renderWarningBanner('orv-recovery-warning', null); renderExtraCodesCheckboxes([]); return; }
+
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
-        
+
         let idx = getVetLapIndex(comp);
         let l = {};
-        
+
         if (idx === -1) {
             // NINCS MÉG KÖR -> ELŐZETES ÁLLATORVOSI
             document.getElementById('orv-lap-title').innerText = `Előzetes Állatorvosi Vizsgálat (PRE-VET)`;
@@ -1726,57 +1806,92 @@
             document.getElementById('orvStatusSelect').value = 'Active';
         }
         adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
+        renderExtraCodesCheckboxes(comp.extraCodes);
 
         form.style.display = 'block';
         checkPulseWarning();
     }
 
+    // Kombinálható kiesési kódok checkbox-chip listája (hatralevo-javitasok_1.md, 4. pont)
+    function renderExtraCodesCheckboxes(selected) {
+        const cont = document.getElementById('orv-extra-codes');
+        if (!cont) return;
+        const sel = new Set(selected || []);
+        cont.innerHTML = EXTRA_CODES.map(ec => `
+            <label class="extra-code-chip ${sel.has(ec.code) ? 'checked' : ''}">
+                <input type="checkbox" value="${ec.code}" ${sel.has(ec.code) ? 'checked' : ''} onchange="this.parentElement.classList.toggle('checked', this.checked)">
+                ${ec.label}
+            </label>
+        `).join('');
+    }
+    function getCheckedExtraCodes() {
+        const cont = document.getElementById('orv-extra-codes');
+        if (!cont) return [];
+        return Array.from(cont.querySelectorAll('input:checked')).map(i => i.value);
+    }
+
     function saveOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
-        let comp = competitors.find(c => c.bib == bib);
-        if(!comp) return;
 
-        let idx = getVetLapIndex(comp);
-        let targetObj;
-        
-        if (idx === -1) {
-            if (!comp.preVet) comp.preVet = {};
-            targetObj = comp.preVet;
-        } else {
-            if(!comp.laps) comp.laps = [];
-            if(!comp.laps[idx]) comp.laps[idx] = {};
-            targetObj = comp.laps[idx];
-        }
-        
-        targetObj.pulse = document.getElementById('orv-pulse').value;
-        targetObj.hrri = document.getElementById('orv-hrri').value;
-        targetObj.nyalka = document.getElementById('orv-nyalka').value;
-        targetObj.crt = document.getElementById('orv-crt').value;
-        targetObj.farizom = document.getElementById('orv-farizom').value;
-        targetObj.vizhaztartas = document.getElementById('orv-vizhaztartas').value;
-        targetObj.belhang = document.getElementById('orv-belhang').value;
-        targetObj.mozgas = document.getElementById('orv-mozgas').value;
-        targetObj.vetName = document.getElementById('orv-vet-name').value;
-        targetObj.vetNotes = document.getElementById('orv-notes').value;
-        
+        const pulse = document.getElementById('orv-pulse').value;
+        const hrri = document.getElementById('orv-hrri').value;
+        const nyalka = document.getElementById('orv-nyalka').value;
+        const crt = document.getElementById('orv-crt').value;
+        const farizom = document.getElementById('orv-farizom').value;
+        const vizhaztartas = document.getElementById('orv-vizhaztartas').value;
+        const belhang = document.getElementById('orv-belhang').value;
+        const mozgas = document.getElementById('orv-mozgas').value;
+        const vetName = document.getElementById('orv-vet-name').value;
+        const vetNotes = document.getElementById('orv-notes').value;
         const decision = document.getElementById('orvStatusSelect').value;
-        // JAVÍTÁS: Itt is az 'Active' a zöld utat jelentő kód!
-        if (decision === 'Active' || decision === 'Passed') {
-            comp.isEliminated = false;
-            comp.status = 'Active';
-            targetObj.vetDecision = "Továbbengedve";
-        } else {
-            comp.isEliminated = true;
-            comp.status = decision; 
-            targetObj.vetDecision = decision;
-        }
+        const extraCodes = getCheckedExtraCodes();
 
-        comp = recalcCompetitorData(comp, raceConfig);
-        db.ref('competitors/' + comp.bib).set(comp).then(() => {
+        db.ref('competitors/' + bib).transaction(currentComp => {
+            if (!currentComp) return currentComp;
+            let idx = getVetLapIndex(currentComp);
+            let targetObj;
+
+            if (idx === -1) {
+                if (!currentComp.preVet) currentComp.preVet = {};
+                targetObj = currentComp.preVet;
+            } else {
+                if (!currentComp.laps) currentComp.laps = [];
+                if (!currentComp.laps[idx]) currentComp.laps[idx] = {};
+                targetObj = currentComp.laps[idx];
+            }
+
+            targetObj.pulse = pulse;
+            targetObj.hrri = hrri;
+            targetObj.nyalka = nyalka;
+            targetObj.crt = crt;
+            targetObj.farizom = farizom;
+            targetObj.vizhaztartas = vizhaztartas;
+            targetObj.belhang = belhang;
+            targetObj.mozgas = mozgas;
+            targetObj.vetName = vetName;
+            targetObj.vetNotes = vetNotes;
+
+            // JAVÍTÁS: Itt is az 'Active' a zöld utat jelentő kód!
+            if (decision === 'Active' || decision === 'Passed') {
+                currentComp.isEliminated = false;
+                currentComp.status = 'Active';
+                targetObj.vetDecision = "Továbbengedve";
+                currentComp.extraCodes = [];
+            } else {
+                currentComp.isEliminated = true;
+                currentComp.status = decision;
+                targetObj.vetDecision = decision;
+                currentComp.extraCodes = extraCodes;
+            }
+
+            const result = recalcCompetitorData(currentComp, raceConfig);
+            delete result._timeWarnings; // ideiglenes, kijelzésre való - nem mentjük el
+            return result;
+        }).then(() => {
             showAnimatedBtn('btn-orv-mentes');
             setTimeout(() => {
                 document.getElementById('sel-orvosi').value = '';
-                document.getElementById('orv-bibInput').value = ''; 
+                document.getElementById('orv-bibInput').value = '';
                 document.getElementById('orvosi-form').style.display = 'none';
             }, 1000);
         }).catch(e => showToast("Hiba: " + e.message, true));
@@ -2291,15 +2406,29 @@
             existingData.isEliminated = oldComp.isEliminated || false;
         }
 
-        const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
-
         // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - a nevezés csak egy pillanatfelvétel innentől
         const horseRiderUpdates = {};
         if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
         if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
         if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
 
-        db.ref('competitors/' + bib).set(newComp).then(() => {
+        // Tranzakció: ha a célhelyen (ez a bib) időközben már van szerver-oldali adat (laps/startTime,
+        // pl. a beérkeztető vagy az orvos épp most mentett), azt tartjuk meg felülírás helyett.
+        db.ref('competitors/' + bib).transaction(currentComp => {
+            const base = currentComp || existingData;
+            return {
+                bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club,
+                startTime: base.startTime || { h: '', m: '', s: '' },
+                laps: base.laps || [],
+                isEliminated: base.isEliminated || false,
+                // A nevezés csak egy pillanatfelvétel - ezek nélkül a mentés törölné az orvosi
+                // döntést, ha az korábban már megvolt (idomodell-es-hibak.md, A rész).
+                // null (nem undefined!) a biztonságos alap, mert a Firebase SDK undefined mezőértékre hibát dob.
+                status: base.status || null,
+                extraCodes: base.extraCodes || [],
+                preVet: base.preVet || null
+            };
+        }).then(() => {
             showAnimatedBtn('addCompBtn');
             cancelEdit();
         }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
@@ -2542,25 +2671,36 @@
         const bib = document.getElementById('selectCompetitor').value;
         const rajt = toSec(document.getElementById('vhR').value, document.getElementById('vmR').value, document.getElementById('vsR').value);
 
-        let comp = competitors.find(c => c.bib == bib);
-        if (comp) {
-            comp.startTime = { h: document.getElementById('vhR').value, m: document.getElementById('vmR').value, s: document.getElementById('vsR').value };
-            const statusVal = document.getElementById('compStatusSelect').value;
-            comp.status = statusVal;
-            comp.isEliminated = (statusVal !== 'Active'); 
-
-            for(let i=0; i<count; i++) {
-                if(!comp.laps) comp.laps = [];
-                if(!comp.laps[i]) comp.laps[i] = {};
-                comp.laps[i].d = document.getElementById(`vd${i+1}`).value;
-                comp.laps[i].h = document.getElementById(`vh${i+1}`).value;
-                comp.laps[i].m = document.getElementById(`vm${i+1}`).value;
-                comp.laps[i].s = document.getElementById(`vs${i+1}`).value;
-                comp.laps[i].oh = document.getElementById(`voh${i+1}`).value;
-                comp.laps[i].om = document.getElementById(`vom${i+1}`).value;
-                comp.laps[i].os = document.getElementById(`vos${i+1}`).value;
-            }
+        // Előbb minden mezőt beolvasunk a DOM-ból, hogy a lenti tranzakció retry-jai (ha kellenek)
+        // ugyanazokat az értékeket alkalmazzák, bármelyik "comp" objektumon hívjuk is meg.
+        const startTime = { h: document.getElementById('vhR').value, m: document.getElementById('vmR').value, s: document.getElementById('vsR').value };
+        const statusVal = document.getElementById('compStatusSelect').value;
+        const lapValues = [];
+        for (let i = 0; i < count; i++) {
+            lapValues.push({
+                d: document.getElementById(`vd${i+1}`).value,
+                h: document.getElementById(`vh${i+1}`).value,
+                m: document.getElementById(`vm${i+1}`).value,
+                s: document.getElementById(`vs${i+1}`).value,
+                oh: document.getElementById(`voh${i+1}`).value,
+                om: document.getElementById(`vom${i+1}`).value,
+                os: document.getElementById(`vos${i+1}`).value,
+            });
         }
+        function applyForm(target) {
+            target.startTime = startTime;
+            target.status = statusVal;
+            target.isEliminated = (statusVal !== 'Active');
+            lapValues.forEach((lv, i) => {
+                if (!target.laps) target.laps = [];
+                if (!target.laps[i]) target.laps[i] = {};
+                Object.assign(target.laps[i], lv);
+            });
+            return target;
+        }
+
+        let comp = competitors.find(c => c.bib == bib);
+        if (comp) applyForm(comp);
 
         if(rajt === 0) { document.getElementById('res2').style.display='none'; return; }
 
@@ -2568,6 +2708,9 @@
         comp = recalcCompetitorData(comp, raceConfig);
 
         let html = "";
+        if (comp._timeWarnings && comp._timeWarnings.length) {
+            html += `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Egy vagy több beírt idő szokatlanul távolinak tűnik az előzőhöz képest — ellenőrizd, nem gépeltél-e el egy számjegyet, mielőtt mented.</span></div>`;
+        }
         let countLaps = comp.laps.length;
         for(let i=0; i<countLaps; i++) {
             let l = comp.laps[i];
@@ -2606,8 +2749,12 @@
         document.getElementById('res2').style.display='block'; document.getElementById('res2').innerHTML = html;
 
         if (saveToDb && comp) {
-            const cleanComp = JSON.parse(JSON.stringify(comp)); 
-            db.ref('competitors/' + comp.bib).set(cleanComp);
+            db.ref('competitors/' + comp.bib).transaction(currentComp => {
+                if (!currentComp) return currentComp;
+                const result = recalcCompetitorData(applyForm(currentComp), raceConfig);
+                delete result._timeWarnings; // ideiglenes, kijelzésre való - nem mentjük el
+                return result;
+            });
             showAnimatedBtn('btn-kiertel-mentes');
         }
     }
@@ -2654,8 +2801,11 @@
     // 101. §: 10 percnél hosszabb pulzusidő esetén a következő kör előtt kötelező ismételt állatorvosi vizsgálat.
     function getRecoveryWarning(arrSec, vetSec, isFinalLap) {
         if (!(arrSec > 0) || !(vetSec > 0)) return null;
-        let rec = vetSec - arrSec;
-        if (rec < 0) rec += 86400;
+        const roll = resolveRollover(vetSec - arrSec);
+        if (roll.suspicious) {
+            return { level: 'warn', text: `Pulzusidő: ${toTimeStr(roll.diff)} — szokatlanul távolinak tűnik az előző eseményhez képest. Ellenőrizd, nem gépeltél-e el egy számjegyet, mielőtt mented.` };
+        }
+        let rec = roll.diff;
         const limitSec = isFinalLap ? 1200 : 900;
         const limitMin = isFinalLap ? 20 : 15;
         if (rec > limitSec) {
@@ -2711,9 +2861,6 @@
         if (!comp) { cont.innerHTML = ''; return; }
 
         const baseDist = comp.dist.replace('j', '');
-        const threshold = speedThresholds[baseDist] || {};
-        if (threshold.min == null && threshold.max == null) { cont.innerHTML = ''; return; }
-
         const idx = getActiveLapIndex(comp, raceConfig);
         const cfg = raceConfig[baseDist] || { laps: [] };
         const savedLap = comp.laps && comp.laps[idx];
@@ -2734,10 +2881,17 @@
         const arrSec = toSec(document.getElementById('bk-h').value, document.getElementById('bk-m').value, document.getElementById('bk-s').value);
         if (!(startSec > 0) || !(arrSec > 0) || !(lapDist > 0)) { cont.innerHTML = ''; return; }
 
-        let loopTime = arrSec - startSec;
-        if (loopTime <= 0) loopTime += 86400;
-        const spd = lapDist / (loopTime / 3600);
+        // A gyanús-idő ellenőrzés attól függetlenül fusson, hogy van-e beállítva sebességküszöb erre a távra.
+        const roll = resolveRollover(arrSec - startSec);
+        if (roll.suspicious) {
+            cont.innerHTML = `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Ez az idő szokatlanul távolinak tűnik az előző eseményhez képest — ellenőrizd, nem gépeltél-e el egy számjegyet, mielőtt mented.</span></div>`;
+            return;
+        }
 
+        const threshold = speedThresholds[baseDist] || {};
+        if (threshold.min == null && threshold.max == null) { cont.innerHTML = ''; return; }
+
+        const spd = lapDist / (roll.diff / 3600);
         cont.innerHTML = renderSpeedBannerHtml(spd, threshold);
     }
 
@@ -3309,10 +3463,14 @@
         const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
         const t2 = toSec(document.getElementById('rh2').value, document.getElementById('rm2').value, document.getElementById('rs2').value);
         if(!d || t1 === 0 || t2 === 0) return;
-        let diff = t2 - t1; if(diff <= 0) diff += 86400;
+        const roll = resolveRollover(t2 - t1);
+        const diff = roll.diff;
         const spd = d / (diff / 3600); const nextStart = (t2 + 2400) % 86400;
+        const warnHtml = roll.suspicious
+            ? `<div class="warning-banner level-warn" style="margin-top:0; margin-bottom:12px;"><span class="wb-icon">⚠️</span><span>Ez az idő szokatlanul távolinak tűnik - ellenőrizd, nem gépeltél-e el egy számjegyet.</span></div>`
+            : '';
         document.getElementById('res1').style.display = 'block';
-        document.getElementById('res1').innerHTML = `Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
+        document.getElementById('res1').innerHTML = `${warnHtml}Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
     }
 
     function calcMinosites() {
@@ -3559,24 +3717,41 @@
     }
 
     // --- KIESÉSI STÁTUSZ SZÖVEGGÉ ALAKÍTÁSA ---
+    // A rövid kódok (a multi-select checkbox listában is ezek szerepelnek, l. EXTRA_CODES)
+    const EXTRA_CODES = [
+        { code: "ME", label: "Metabolikus (ME)" },
+        { code: "GA", label: "Sántaság (GA)" },
+        { code: "MI", label: "Kisebb sérülés (MI)" },
+        { code: "SP", label: "Sebesség (SP)" },
+        { code: "OT", label: "Időtúllépés (OT)" },
+        { code: "SI MUSCO", label: "Súlyos mozgásszervi (SI MUSCO)" },
+        { code: "SI META", label: "Súlyos metabolikus (SI META)" },
+    ];
+
     function getElimText(c) {
         if (!c || !c.isEliminated) return "";
         const s = c.status;
-        if (s === "WD" || s === "Visszalépett" || s === "DNS") return "Visszalépett (WD)";
-        if (s === "RET" || s === "Retired") return "Feladta (RET)";
-        if (s === "DSQ") return "Kizárva (DSQ)";
-        if (s === "FNR") return "Hely. nélkül (FNR)";
-        if (s === "FTQ-SP") return "Kiesett: Sebesség (SP)";
-        if (s === "FTQ-GA") return "Kiesett: Sántaság (GA)";
-        if (s === "FTQ-ME") return "Kiesett: Metabolikus (ME)";
-        if (s === "FTQ-MI") return "Kiesett: Kisebb sérülés (MI)";
-        if (s === "FTQ-SIMUSCO") return "Kiesett: Súlyos mozgásszervi (SI MUSCO)";
-        if (s === "FTQ-SIMETA") return "Kiesett: Súlyos metabolikus (SI META)";
-        if (s === "FTQ-CI") return "Kiesett: Végzetes (CI)";
-        if (s === "FTQ-OT") return "Kiesett: Időtúllépés (OT)";
-        if (s === "FTQ-FTC") return "Kiesett: Befejezetlen (FTC)";
-        if (s === "DNS") return "Nem jelent meg (DNS)";
-        return "Kiesett (ELIM)";
+        let base = "Kiesett (ELIM)";
+        if (s === "WD" || s === "Visszalépett" || s === "DNS") base = "Visszalépett (WD)";
+        else if (s === "RET" || s === "Retired") base = "Feladta (RET)";
+        else if (s === "DSQ") base = "Kizárva (DSQ)";
+        else if (s === "FNR") base = "Hely. nélkül (FNR)";
+        else if (s === "FTQ-SP") base = "Kiesett: Sebesség (SP)";
+        else if (s === "FTQ-GA") base = "Kiesett: Sántaság (GA)";
+        else if (s === "FTQ-ME") base = "Kiesett: Metabolikus (ME)";
+        else if (s === "FTQ-MI") base = "Kiesett: Kisebb sérülés (MI)";
+        else if (s === "FTQ-SIMUSCO") base = "Kiesett: Súlyos mozgásszervi (SI MUSCO)";
+        else if (s === "FTQ-SIMETA") base = "Kiesett: Súlyos metabolikus (SI META)";
+        else if (s === "FTQ-CI") base = "Kiesett: Végzetes (CI)";
+        else if (s === "FTQ-OT") base = "Kiesett: Időtúllépés (OT)";
+        else if (s === "FTQ-FTC") base = "Kiesett: Befejezetlen (FTC)";
+        else if (s === "DNS") base = "Nem jelent meg (DNS)";
+
+        // Kombinálható kiesési kódok (pl. sántaság ÉS időtúllépés egyszerre) - additív, a fő kód mellett
+        if (c.extraCodes && c.extraCodes.length) {
+            base += " + " + c.extraCodes.join(" + ");
+        }
+        return base;
     }
     
     window.onload = function() {

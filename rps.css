@@ -95,29 +95,79 @@ html[data-theme="forest"] {
     --bg-glow: #16281f;
 }
 
-/* --- NEGYEDIK, "IBOLYA" SÖTÉT TÉMA --- */
+/* --- NEGYEDIK, "IBOLYA" SÖTÉT TÉMA (letompítva - kevésbé neon, elegánsabb pár) --- */
 html[data-theme="violet"] {
-    --bg: #0d0a14;
-    --card: #1c1626;
-    --primary: #B968F0;
-    --success: #6FDB8F;
-    --warning: #FFC062;
-    --danger: #FF6688;
-    --text: #F3ECFB;
-    --text-dim: #A997C2;
-    --sidebar-bg: #0a0710;
-    --teal: #8B7FEE;
+    --bg: #0e0b16;
+    --card: #1d1728;
+    --primary: #9B7FD4;
+    --success: #7BBF8E;
+    --warning: #DCA75E;
+    --danger: #DD6E78;
+    --text: #EEE9F6;
+    --text-dim: #A79BC0;
+    --sidebar-bg: #0b0912;
+    --teal: #7B75C4;
 
-    --card-2: #251d33;
-    --card-3: #2d233d;
-    --border: #3a2d52;
-    --border-soft: #2a2038;
-    --text-dim-2: #7a6a94;
-    --primary-dim: rgba(185, 104, 240, .18);
-    --success-dim: rgba(111, 219, 143, .16);
-    --warning-dim: rgba(255, 192, 98, .16);
-    --danger-dim: rgba(255, 102, 136, .18);
-    --bg-glow: #241a38;
+    --card-2: #251e33;
+    --card-3: #2c2440;
+    --border: #392f52;
+    --border-soft: #2a2238;
+    --text-dim-2: #756a92;
+    --primary-dim: rgba(155, 127, 212, .18);
+    --success-dim: rgba(123, 191, 142, .16);
+    --warning-dim: rgba(220, 167, 94, .16);
+    --danger-dim: rgba(221, 110, 120, .18);
+    --bg-glow: #221c36;
+}
+
+/* --- ÖTÖDIK, "GRAFIT" SÖTÉT TÉMA (visszafogott, semleges acélkék) --- */
+html[data-theme="graphite"] {
+    --bg: #0a0b0d;
+    --card: #16181c;
+    --primary: #6C99C4;
+    --success: #74B98A;
+    --warning: #D9A356;
+    --danger: #D9706B;
+    --text: #EDEFF2;
+    --text-dim: #98A0AB;
+    --sidebar-bg: #0a0b0d;
+    --teal: #5FA3A3;
+
+    --card-2: #1c1f24;
+    --card-3: #23272d;
+    --border: #2e333b;
+    --border-soft: #1f232a;
+    --text-dim-2: #667080;
+    --primary-dim: rgba(108, 153, 196, .18);
+    --success-dim: rgba(116, 185, 138, .16);
+    --warning-dim: rgba(217, 163, 86, .16);
+    --danger-dim: rgba(217, 112, 107, .18);
+    --bg-glow: #1a1d22;
+}
+
+/* --- HATODIK, "BORDÓ" SÖTÉT TÉMA (mély borvörös, tompított) --- */
+html[data-theme="wine"] {
+    --bg: #120a0c;
+    --card: #221317;
+    --primary: #C1626E;
+    --success: #7CBE7A;
+    --warning: #DCA75E;
+    --danger: #E0524F;
+    --text: #F5E9EA;
+    --text-dim: #C0A0A3;
+    --sidebar-bg: #0f090b;
+    --teal: #9C6B7A;
+
+    --card-2: #2a171b;
+    --card-3: #331c21;
+    --border: #452830;
+    --border-soft: #2c191d;
+    --text-dim-2: #8a6a6f;
+    --primary-dim: rgba(193, 98, 110, .18);
+    --success-dim: rgba(124, 190, 122, .16);
+    --warning-dim: rgba(220, 167, 94, .16);
+    --danger-dim: rgba(224, 82, 79, .18);
+    --bg-glow: #2c1a1f;
 }
 
 body {
@@ -368,6 +418,16 @@ button.add-btn { background: var(--primary); color: white; }
 .warning-banner.level-warn { background: var(--warning-dim); color: var(--warning); border-color: rgba(255,159,10,.4); }
 .warning-banner.level-danger { background: var(--danger-dim); color: var(--danger); border-color: rgba(255,69,58,.45); animation: pulseWarn 1.7s infinite; }
 @keyframes pulseWarn { 0%,100% { box-shadow: 0 0 0 0 rgba(255,69,58,.35); } 50% { box-shadow: 0 0 0 7px rgba(255,69,58,0); } }
+
+/* --- KOMBINÁLHATÓ KIESÉSI KÓDOK (checkbox chip-ek) --- */
+.extra-codes-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.extra-code-chip {
+    display: flex; align-items: center; gap: 6px; background: var(--card-3); border: 1px solid var(--border);
+    border-radius: 20px; padding: 7px 13px; font-size: 0.82rem; cursor: pointer; color: var(--text-dim);
+    transition: border-color .15s var(--ease), color .15s var(--ease), background .15s var(--ease);
+}
+.extra-code-chip input { margin: 0; width: auto; padding: 0; accent-color: var(--danger); }
+.extra-code-chip.checked { border-color: var(--danger); color: var(--text); background: var(--danger-dim); }
 
 .inline-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
 .inline-flag.danger { background: var(--danger); color: #fff; }
