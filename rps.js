@@ -21,6 +21,8 @@
     let dbListenersActive = false;
     let liveVets = [];
     let speedWarningsEnabled = false; // 139. § (2) figyelmeztetés - alapból KI, csak admin kapcsolhatja be
+    let ridersCache = {}; // riders/{license} - lo-lovas-integracio.md
+    let horsesCache = {}; // horses/{startNum}
     
     let viewingPastRaceData = null; 
     let pastAdatlapFilter = null; 
@@ -60,7 +62,105 @@
         if (!data) return [];
         return Object.values(data).filter(c => c && c.bib !== undefined);
     }
-    
+
+    // --- LÓ- ÉS LOVAS-TÖRZSADAT (docs/lo-lovas-integracio.md, P1/2) ---
+    function sanitizeKey(s) {
+        return String(s).trim().replace(/[.#$\[\]]/g, '_');
+    }
+
+    // (A fázis 1-2 egyszeri adatjavítás/migráció lefutott és leellenőrzésre került - 47 lovas, 53 ló,
+    // konfliktus/hiányzó rekord nélkül - ezért a kód innen törölve. l. docs/lo-lovas-integracio.md)
+
+    // FÁZIS 4 - Google-szerű javaslatlista: bármelyik mezőbe gépelve (név, ló, start szám,
+    // igazolási szám, egyesület) feldobja az egyező, már ismert lovakat/lovasokat, kattintásra
+    // pedig a hozzá tartozó összes mezőt kitölti.
+    function searchRiders(q) {
+        const lq = q.toLowerCase();
+        const seen = new Set();
+        return Object.values(ridersCache).filter(r => {
+            if (!r || seen.has(r.license)) return false;
+            const match = (r.name && r.name.toLowerCase().includes(lq)) || (r.license && String(r.license).toLowerCase().includes(lq));
+            if (match) seen.add(r.license);
+            return match;
+        }).map(r => ({ label: `${r.name} — ${r.license}${r.club ? ' · ' + r.club : ''}`, ...r }));
+    }
+
+    function searchHorses(q) {
+        const lq = q.toLowerCase();
+        return Object.values(horsesCache).filter(h => h && ((h.name && h.name.toLowerCase().includes(lq)) || (h.startNum && String(h.startNum).toLowerCase().includes(lq))))
+            .map(h => ({ label: `${h.name} — ${h.startNum}`, ...h }));
+    }
+
+    function searchClubs(q) {
+        const lq = q.toLowerCase();
+        const clubs = new Set();
+        Object.values(ridersCache).forEach(r => { if (r && r.club) clubs.add(r.club); });
+        return Array.from(clubs).filter(c => c.toLowerCase().includes(lq)).map(c => ({ label: c, club: c }));
+    }
+
+    // Az inputot egy pozicionált wrapperbe csomagolja és alá illeszti a javaslatlistát -
+    // a HTML-t nem kell hozzá módosítani, csak egyszer meg kell hívni induláskor.
+    function attachAutocomplete(inputId, getSuggestions, onSelect) {
+        const input = document.getElementById(inputId);
+        if (!input || input.dataset.acBound) return;
+        input.dataset.acBound = '1';
+
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+
+        const list = document.createElement('div');
+        list.className = 'ac-list';
+        wrapper.appendChild(list);
+
+        function render(items) {
+            if (!items.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
+            list.innerHTML = items.map((it, i) => `<div class="ac-item" data-idx="${i}">${it.label}</div>`).join('');
+            Array.from(list.children).forEach((el, i) => {
+                el.onmousedown = (e) => { e.preventDefault(); onSelect(items[i]); list.style.display = 'none'; };
+            });
+            list.style.display = 'block';
+        }
+
+        input.addEventListener('input', () => {
+            const q = input.value.trim();
+            if (!q) { list.style.display = 'none'; return; }
+            render(getSuggestions(q).slice(0, 8));
+        });
+        input.addEventListener('focus', () => {
+            const q = input.value.trim();
+            if (q) render(getSuggestions(q).slice(0, 8));
+        });
+        input.addEventListener('blur', () => setTimeout(() => { list.style.display = 'none'; }, 150));
+    }
+
+    function initAutocompleteFields(prefix) {
+        const p = prefix ? prefix + '-' : '';
+
+        attachAutocomplete(p + 'regName', searchRiders, (item) => {
+            document.getElementById(p + 'regName').value = item.name;
+            document.getElementById(p + 'regLicense').value = item.license;
+            if (item.club) document.getElementById(p + 'regClub').value = item.club;
+        });
+        attachAutocomplete(p + 'regLicense', searchRiders, (item) => {
+            document.getElementById(p + 'regLicense').value = item.license;
+            document.getElementById(p + 'regName').value = item.name;
+            if (item.club) document.getElementById(p + 'regClub').value = item.club;
+        });
+        attachAutocomplete(p + 'regInternal', searchHorses, (item) => {
+            document.getElementById(p + 'regInternal').value = item.name;
+            document.getElementById(p + 'regStartNum').value = item.startNum;
+        });
+        attachAutocomplete(p + 'regStartNum', searchHorses, (item) => {
+            document.getElementById(p + 'regStartNum').value = item.startNum;
+            document.getElementById(p + 'regInternal').value = item.name;
+        });
+        attachAutocomplete(p + 'regClub', searchClubs, (item) => {
+            document.getElementById(p + 'regClub').value = item.club;
+        });
+    }
+
     function mergeRaceConfig(dbConfig) {
         let safeCfg = getEmptyRaceConfig();
         if(!dbConfig) return safeCfg;
@@ -311,6 +411,10 @@
             renderVetList();
             updateVetDropdowns();
         });
+
+        // Ló/lovas törzsadat cache az autocomplete-hez (lo-lovas-integracio.md, 7. szakasz)
+        db.ref('riders').on('value', snap => { ridersCache = snap.val() || {}; });
+        db.ref('horses').on('value', snap => { horsesCache = snap.val() || {}; });
 
         // 139. § (2) sebesség-figyelmeztetés admin kapcsoló - alapból KI, minden eszközön szinkronban
         db.ref('settings/speedWarningsEnabled').on('value', snap => {
@@ -1102,6 +1206,13 @@
 
         // ÚJ: Itt már hiba nélkül tudja menteni az összes adatot
         const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
+
+        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz)
+        const horseRiderUpdates = {};
+        if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
+        if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
+        if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
+
         db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('rm-addCompBtn');
             cancelRmEdit();
@@ -2125,6 +2236,13 @@
         }
 
         const newComp = { bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club, startTime: existingData.startTime, laps: existingData.laps, isEliminated: existingData.isEliminated };
+
+        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - a nevezés csak egy pillanatfelvétel innentől
+        const horseRiderUpdates = {};
+        if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
+        if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
+        if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
+
         db.ref('competitors/' + bib).set(newComp).then(() => {
             showAnimatedBtn('addCompBtn');
             cancelEdit();
@@ -3381,6 +3499,9 @@
     
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
-        if (savedMode === 'terv') savedMode = 'versenyek'; 
+        if (savedMode === 'terv') savedMode = 'versenyek';
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
+
+        initAutocompleteFields('');   // élő nevezési form
+        initAutocompleteFields('rm'); // múltbéli/jövőbeli verseny szerkesztő modal
     };

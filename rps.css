@@ -296,6 +296,16 @@ button.add-btn { background: var(--primary); color: white; }
 .inline-flag.danger { background: var(--danger); color: #fff; }
 .inline-flag.warning { background: var(--warning); color: #000; }
 
+/* --- LÓ/LOVAS AUTOCOMPLETE JAVASLATLISTA --- */
+.ac-list {
+    display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 60;
+    background: var(--card-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: var(--shadow-lg);
+}
+.ac-item { padding: 10px 12px; font-size: 0.88rem; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border-soft); }
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover { background: var(--primary-dim); color: var(--primary); }
+
 .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--danger); transition: .3s; border-radius: 26px; }
