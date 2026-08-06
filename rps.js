@@ -20,9 +20,21 @@
     let currentAdatlapFilter = null;
     let dbListenersActive = false;
     let liveVets = [];
-    let speedWarningsEnabled = false; // 139. § (2) figyelmeztetés - alapból KI, csak admin kapcsolhatja be
+    // speedThresholds[dist] = { min, max } km/h, mindkettő opcionális (üres = nincs figyelve az a határ).
+    // min: ez alatt időtúllépés (OT) kockázat. max: efölött sebesség miatti kiesés (SP) kockázat, 139. § (2).
+    let speedThresholds = {};
     let ridersCache = {}; // riders/{license} - lo-lovas-integracio.md
     let horsesCache = {}; // horses/{startNum}
+    let uiTheme = 'default'; // 'default' / 'alt' / 'forest' / 'violet' - admin választja, mindenkinek szinkronban
+    const THEME_LIST = [
+        { key: 'default', label: 'Alap (kék)', colors: ['#0A84FF', '#000000'] },
+        { key: 'alt', label: 'Meleg', colors: ['#E8A33D', '#0f0b08'] },
+        { key: 'forest', label: 'Erdő', colors: ['#34C77B', '#070f0c'] },
+        { key: 'violet', label: 'Ibolya', colors: ['#B968F0', '#0d0a14'] },
+    ];
+
+    // Villanás-mentes indulás: amíg a Firebase beállítás betöltődik, a legutóbb ismert témát használjuk
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('uiTheme') || 'default');
     
     let viewingPastRaceData = null; 
     let pastAdatlapFilter = null; 
@@ -416,14 +428,21 @@
         db.ref('riders').on('value', snap => { ridersCache = snap.val() || {}; });
         db.ref('horses').on('value', snap => { horsesCache = snap.val() || {}; });
 
-        // 139. § (2) sebesség-figyelmeztetés admin kapcsoló - alapból KI, minden eszközön szinkronban
-        db.ref('settings/speedWarningsEnabled').on('value', snap => {
-            speedWarningsEnabled = !!snap.val();
-            const toggle = document.getElementById('speedWarningToggle');
-            if (toggle) toggle.checked = speedWarningsEnabled;
+        // Sebesség min/max távonként - alapból üres (nincs figyelve), minden eszközön szinkronban
+        db.ref('settings/speedThresholds').on('value', snap => {
+            speedThresholds = snap.val() || {};
             checkBeerkeztetesSpeed();
+            renderSpeedThresholds();
             if (document.getElementById('adatlapok')?.classList.contains('active')) renderAdatlapList();
             if (document.getElementById('past-race-view')?.classList.contains('active')) renderPastAdatlapList();
+        });
+
+        // Design téma - alapból "default", minden eszközön szinkronban
+        db.ref('settings/uiTheme').on('value', snap => {
+            uiTheme = snap.val() || 'default';
+            localStorage.setItem('uiTheme', uiTheme);
+            document.documentElement.setAttribute('data-theme', uiTheme);
+            renderThemeSwatches();
         });
 
     }
@@ -916,7 +935,7 @@
                 if (completedLaps.length > 0) {
                     let lastLap = completedLaps[completedLaps.length - 1];
                     speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
-                    if (speedWarningsEnabled && completedLaps.some(l => l.speedFlag || l.loopSpd >= 16 || l.phaseSpd >= 16)) speedFlagHtml = `<span class="inline-flag danger">⚠ SP</span>`;
+                    speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
                 }
                 let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
                 
@@ -1453,7 +1472,10 @@
             l.pulzusSec = pulzusTime;
             l.loopSpd = l.d / (loopTime/3600);
             l.phaseSpd = l.d / (phaseTime/3600);
-            l.speedFlag = (l.loopSpd >= 16 || l.phaseSpd >= 16); // 139. § (2): egyetlen kör sem lépheti túl a sebességhatárt
+            // Admin által távonként konfigurált min (időtúllépés/OT kockázat) és max (sebesség/SP kockázat, 139. § (2))
+            const speedT = speedThresholds[baseDist] || {};
+            l.speedFlagMax = speedT.max != null && (l.loopSpd >= speedT.max || l.phaseSpd >= speedT.max);
+            l.speedFlagMin = speedT.min != null && (l.loopSpd < speedT.min || l.phaseSpd < speedT.min);
 
             totalPure += phaseTime;
             totalD += l.d;
@@ -2177,11 +2199,45 @@
         }).catch(e => showToast('Hiba a mentéskor: ' + e.message, true));
     }
 
-    // Csak admin kapcsolhatja - minden eszközön (beérkeztető, orvos tabletek) egyszerre él/hal
-    function toggleSpeedWarnings(val) {
-        db.ref('settings/speedWarningsEnabled').set(!!val).then(() => {
-            showToast(val ? 'Sebesség-figyelmeztetések bekapcsolva.' : 'Sebesség-figyelmeztetések kikapcsolva.');
-        }).catch(e => showToast('Hiba: ' + e.message, true));
+    // --- BEÁLLÍTÁSOK FÜL: design téma választó (kártyák) ---
+    function setUiTheme(key) {
+        db.ref('settings/uiTheme').set(key).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function renderThemeSwatches() {
+        const cont = document.getElementById('themeSwatchRow');
+        if (!cont) return;
+        cont.innerHTML = THEME_LIST.map(t => `
+            <div class="theme-swatch ${uiTheme === t.key ? 'active' : ''}" onclick="setUiTheme('${t.key}')">
+                <div class="theme-swatch-preview" style="background:${t.colors[1]};"><div class="dot" style="background:${t.colors[0]};"></div></div>
+                <div class="theme-swatch-label">${t.label}</div>
+                <div class="theme-swatch-check">✓ Aktív</div>
+            </div>
+        `).join('');
+    }
+
+    // --- BEÁLLÍTÁSOK FÜL: sebesség min/max távonként ---
+    function saveSpeedThreshold(dist, kind, val) {
+        const num = val === '' ? null : parseFloat(val);
+        db.ref('settings/speedThresholds/' + dist + '/' + kind).set(isNaN(num) ? null : num)
+            .catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function renderSpeedThresholds() {
+        const cont = document.getElementById('speedThresholdContainer');
+        if (!cont) return;
+        const dists = ["20", "40", "60", "80", "80j", "100", "100j"];
+        let html = `<div class="speed-threshold-head"><span>Táv</span><span>Minimum</span><span>Maximum</span></div>`;
+        dists.forEach(d => {
+            const t = speedThresholds[d] || {};
+            html += `
+            <div class="speed-threshold-row">
+                <div class="std-label">${catNames[d]}</div>
+                <input type="number" step="0.1" placeholder="—" value="${t.min ?? ''}" onchange="saveSpeedThreshold('${d}','min', this.value)">
+                <input type="number" step="0.1" placeholder="—" value="${t.max ?? ''}" onchange="saveSpeedThreshold('${d}','max', this.value)">
+            </div>`;
+        });
+        cont.innerHTML = html;
     }
 
     function editCompetitor(bib) {
@@ -2649,14 +2705,16 @@
     function checkBeerkeztetesSpeed() {
         const cont = document.getElementById('bk-speed-warning');
         if (!cont) return;
-        if (!speedWarningsEnabled) { cont.innerHTML = ''; return; }
 
         const bib = document.getElementById('sel-beerkeztetes').value;
         const comp = competitors.find(c => c.bib == bib);
         if (!comp) { cont.innerHTML = ''; return; }
 
-        const idx = getActiveLapIndex(comp, raceConfig);
         const baseDist = comp.dist.replace('j', '');
+        const threshold = speedThresholds[baseDist] || {};
+        if (threshold.min == null && threshold.max == null) { cont.innerHTML = ''; return; }
+
+        const idx = getActiveLapIndex(comp, raceConfig);
         const cfg = raceConfig[baseDist] || { laps: [] };
         const savedLap = comp.laps && comp.laps[idx];
         const lapDist = parseFloat((savedLap && savedLap.d) || (cfg.laps && cfg.laps[idx]) || 0);
@@ -2680,13 +2738,24 @@
         if (loopTime <= 0) loopTime += 86400;
         const spd = lapDist / (loopTime / 3600);
 
-        if (spd >= 16) {
-            cont.innerHTML = `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Becsült kör átlag: ${spd.toFixed(2)} km/h — 16 km/h fölött (139. § (2)), sebesség miatti kiesés (FTQ-SP) megfontolandó.</span></div>`;
-        } else if (spd >= 15) {
-            cont.innerHTML = `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Becsült kör átlag: ${spd.toFixed(2)} km/h — közel a sebességhatárhoz.</span></div>`;
-        } else {
-            cont.innerHTML = '';
+        cont.innerHTML = renderSpeedBannerHtml(spd, threshold);
+    }
+
+    // Közös figyelmeztető-sáv építő a min (időtúllépés/OT kockázat) és max (sebesség/SP kockázat) határokhoz.
+    function renderSpeedBannerHtml(spd, threshold) {
+        if (threshold.max != null && spd >= threshold.max) {
+            return `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Kör átlag: ${spd.toFixed(2)} km/h — a ${threshold.max} km/h-s maximum fölött (139. § (2)), sebesség miatti kiesés (FTQ-SP) kockázata.</span></div>`;
         }
+        if (threshold.max != null && spd >= threshold.max - 1) {
+            return `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Kör átlag: ${spd.toFixed(2)} km/h — közelít a ${threshold.max} km/h-s maximumhoz.</span></div>`;
+        }
+        if (threshold.min != null && spd < threshold.min) {
+            return `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Kör átlag: ${spd.toFixed(2)} km/h — a ${threshold.min} km/h-s minimum alatt, időtúllépés (FTQ-OT) kockázata.</span></div>`;
+        }
+        if (threshold.min != null && spd < threshold.min + 1) {
+            return `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Kör átlag: ${spd.toFixed(2)} km/h — közelít a ${threshold.min} km/h-s minimumhoz.</span></div>`;
+        }
+        return '';
     }
 
  function autoSetLaps(countId, distId, contId, prefix, isModal = false) {
@@ -3045,6 +3114,20 @@
         }
     }
 
+    // Admin által (Beállítások fül) távonként beállított min/max alapján adja vissza a jelvényeket:
+    // ⚠ SP = elérte/túllépte a maximumot (139. § (2), sebesség miatti kiesés kockázata)
+    // ⚠ OT = a minimum alatt van (időtúllépés / FTQ-OT kockázata)
+    function getSpeedFlagBadgesHtml(comp, completedLaps) {
+        const baseDist = comp.dist ? comp.dist.replace('j', '') : null;
+        const t = speedThresholds[baseDist] || {};
+        const hasMax = completedLaps.some(l => l.speedFlagMax || (t.max != null && (l.loopSpd >= t.max || l.phaseSpd >= t.max)));
+        const hasMin = completedLaps.some(l => l.speedFlagMin || (t.min != null && (l.loopSpd < t.min || l.phaseSpd < t.min)));
+        let html = '';
+        if (hasMax) html += `<span class="inline-flag danger">⚠ SP</span>`;
+        if (hasMin) html += `<span class="inline-flag warning">⚠ OT</span>`;
+        return html;
+    }
+
     function renderAdatlapItems(ctx) {
         const cont = document.getElementById('adatlapItemsContainer'); if(!cont) return; cont.innerHTML = '';
         let filtered = ctx.comps.filter(c => c.dist === currentAdatlapFilter);
@@ -3066,9 +3149,8 @@
             if (completedLaps.length > 0) {
                 let lastLap = completedLaps[completedLaps.length - 1];
                 speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
-                // 139. § (2): jelzés, ha bármelyik kör elérte/túllépte a sebességhatárt (nem automatikus kiesés, csak figyelmeztetés)
-                // Admin kapcsolja be (settings/speedWarningsEnabled) - alapból nem látszik.
-                if (speedWarningsEnabled && completedLaps.some(l => l.speedFlag || l.loopSpd >= 16 || l.phaseSpd >= 16)) speedFlagHtml = `<span class="inline-flag danger">⚠ SP</span>`;
+                // Admin állítja be távonként (Beállítások fül): max -> SP kockázat, min -> OT kockázat
+                speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
             }
             let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
 

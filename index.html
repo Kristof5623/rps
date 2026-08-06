@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v99</title>
+    <title>Verseny Kalkulátor v100</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,6 +51,7 @@
     <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Fő funkciók</div>
         <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 ÉLŐ Verseny Kezelés</button>
+        <button id="btn-menu-beallitasok" class="sidebar-btn admin-only" onclick="switchMainTab('beallitasok-mod', this)">⚙️ Beállítások</button>
         <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
         <button class="sidebar-btn admin-only" onclick="printVersenyLista('nevezes')">🖨️ Nevezési Lista (A4)</button>
         <button class="sidebar-btn admin-only" onclick="printVersenyLista('rajt')">🖨️ Rajtlista (A4)</button>
@@ -275,6 +276,27 @@
             <div id="export-list-container"></div>
         </div>
 
+        <div id="beallitasok-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">⚙️ Beállítások</h3>
+            <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Ez a két beállítás mindenkinek, minden eszközön (beérkeztető, orvos, admin tabletek) egyszerre érvényes - nem személyes preferencia.</p>
+
+            <div class="kiiras-card" style="border-left-color: var(--teal);">
+                <h4 style="margin-top:0; margin-bottom:5px; color:white;">🎨 Design téma</h4>
+                <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - azonnal mindenkinél átvált.</p>
+                <div class="theme-swatch-row" id="themeSwatchRow"></div>
+            </div>
+
+            <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:15px;">
+                <h4 style="margin-top:0; margin-bottom:5px; color:white;">⚠️ Sebesség-szabályok távonként</h4>
+                <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">
+                    <b>Minimum (km/h):</b> ez alatt a lovas időtúllépés (OT) kockázatában van.<br>
+                    <b>Maximum (km/h):</b> efölött sebesség miatti kiesés (SP) kockázata áll fenn (139. § (2)).<br>
+                    Üresen hagyva az adott érték nincs figyelve. Csak figyelmeztet, a döntést mindig a bíró/orvos hozza meg.
+                </p>
+                <div id="speedThresholdContainer"></div>
+            </div>
+        </div>
+
         <div id="fo-mod" class="mode-content">
             <h3 style="color:var(--primary); margin-top:0; margin-bottom:15px;">🔴 ÉLŐ Verseny Kezelés</h3>
             <div class="tabs">
@@ -285,19 +307,6 @@
             </div>
 
             <div id="kiiras" class="sub-mode-content" style="display:block;">
-                <div class="kiiras-card admin-only" style="border-left-color: var(--danger);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                        <div style="flex:1; min-width:200px;">
-                            <h4 style="margin:0; color:white;">⚠️ Sebességhatár figyelmeztetések</h4>
-                            <p style="font-size:0.78rem; color:var(--text-dim); margin:6px 0 0 0;">Ha be van kapcsolva, a beérkeztetésnél és az eredménylistán (Adatlapok) is figyelmeztetést kapnak a 16 km/h fölötti köridőkre (139. § (2)). Alapból ki van kapcsolva, minden eszközön ugyanaz az állapot érvényes.</p>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="speedWarningToggle" onchange="toggleSpeedWarnings(this.checked)">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
                 <h4 style="color:var(--warning); margin-bottom:5px;">ÉLŐ: Hivatalos adatok beállítása</h4>
                 <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt add meg a távok rajtidejét és a köröket a futó versenyhez.</p>
                 <div id="kiirasContainer"></div>

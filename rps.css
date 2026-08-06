@@ -40,19 +40,96 @@ html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0;
     --shadow: 0 8px 24px rgba(0,0,0,.38);
     --shadow-lg: 0 18px 46px rgba(0,0,0,.55);
     --ease: cubic-bezier(.4,0,.2,1);
+    --bg-glow: #131316;
 
     color-scheme: dark;
 }
 
+/* --- MÁSODIK, "MELEG" SÖTÉT TÉMA - admin kapcsolja be, mindenkinek szinkronban (settings/uiTheme) --- */
+html[data-theme="alt"] {
+    --bg: #0f0b08;
+    --card: #1f1712;
+    --primary: #E8A33D;
+    --success: #8BC552;
+    --warning: #FFB454;
+    --danger: #FF6A4D;
+    --text: #FBF3E7;
+    --text-dim: #B8A78F;
+    --sidebar-bg: #0c0906;
+    --teal: #C97B3D;
+
+    --card-2: #251c15;
+    --card-3: #2d2219;
+    --border: #3a2c1f;
+    --border-soft: #2a2018;
+    --text-dim-2: #8a7862;
+    --primary-dim: rgba(232, 163, 61, .18);
+    --success-dim: rgba(139, 197, 82, .16);
+    --warning-dim: rgba(255, 180, 84, .16);
+    --danger-dim: rgba(255, 106, 77, .18);
+    --bg-glow: #241a10;
+}
+
+/* --- HARMADIK, "ERDŐ" SÖTÉT TÉMA --- */
+html[data-theme="forest"] {
+    --bg: #070f0c;
+    --card: #10201a;
+    --primary: #34C77B;
+    --success: #7ED957;
+    --warning: #FFB454;
+    --danger: #FF5C5C;
+    --text: #EAF6EF;
+    --text-dim: #8FB5A0;
+    --sidebar-bg: #081310;
+    --teal: #2FA88A;
+
+    --card-2: #142821;
+    --card-3: #1a3229;
+    --border: #204030;
+    --border-soft: #16281f;
+    --text-dim-2: #5f8570;
+    --primary-dim: rgba(52, 199, 123, .18);
+    --success-dim: rgba(126, 217, 87, .16);
+    --warning-dim: rgba(255, 180, 84, .16);
+    --danger-dim: rgba(255, 92, 92, .18);
+    --bg-glow: #16281f;
+}
+
+/* --- NEGYEDIK, "IBOLYA" SÖTÉT TÉMA --- */
+html[data-theme="violet"] {
+    --bg: #0d0a14;
+    --card: #1c1626;
+    --primary: #B968F0;
+    --success: #6FDB8F;
+    --warning: #FFC062;
+    --danger: #FF6688;
+    --text: #F3ECFB;
+    --text-dim: #A997C2;
+    --sidebar-bg: #0a0710;
+    --teal: #8B7FEE;
+
+    --card-2: #251d33;
+    --card-3: #2d233d;
+    --border: #3a2d52;
+    --border-soft: #2a2038;
+    --text-dim-2: #7a6a94;
+    --primary-dim: rgba(185, 104, 240, .18);
+    --success-dim: rgba(111, 219, 143, .16);
+    --warning-dim: rgba(255, 192, 98, .16);
+    --danger-dim: rgba(255, 102, 136, .18);
+    --bg-glow: #241a38;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: radial-gradient(ellipse 1200px 700px at 50% -10%, #131316 0%, #000000 62%);
+    background: radial-gradient(ellipse 1200px 700px at 50% -10%, var(--bg-glow) 0%, var(--bg) 62%);
     color: var(--text);
     display: flex;
     flex-direction: row;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     letter-spacing: -0.01em;
+    transition: background .3s var(--ease), color .3s var(--ease);
 }
 
 button, input, select, textarea { font-family: inherit; }
@@ -295,6 +372,33 @@ button.add-btn { background: var(--primary); color: white; }
 .inline-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
 .inline-flag.danger { background: var(--danger); color: #fff; }
 .inline-flag.warning { background: var(--warning); color: #000; }
+
+/* --- DESIGN TÉMA VÁLASZTÓ (kártyák, nem kapcsoló) --- */
+.theme-swatch-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.theme-swatch {
+    width: 108px; padding: 10px; border-radius: var(--radius-sm); border: 2px solid var(--border);
+    background: var(--card-3); cursor: pointer; text-align: center; transition: border-color .18s var(--ease), transform .12s var(--ease);
+}
+.theme-swatch:hover { transform: translateY(-2px); }
+.theme-swatch.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+.theme-swatch-preview { width: 100%; height: 44px; border-radius: 6px; margin-bottom: 8px; position: relative; overflow: hidden; }
+.theme-swatch-preview .dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; bottom: 6px; right: 6px; }
+.theme-swatch-label { font-size: 0.78rem; font-weight: 700; color: var(--text); }
+.theme-swatch.active .theme-swatch-label { color: var(--primary); }
+.theme-swatch-check { display: none; font-size: 0.7rem; color: var(--primary); font-weight: 800; margin-top: 2px; }
+.theme-swatch.active .theme-swatch-check { display: block; }
+
+/* --- SEBESSÉG-KÜSZÖB TÁVONKÉNTI TÁBLÁZAT --- */
+.speed-threshold-row {
+    display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border-soft);
+}
+.speed-threshold-row:last-child { border-bottom: none; }
+.speed-threshold-row .std-label { font-weight: 700; color: var(--text); font-size: 0.92rem; }
+.speed-threshold-row input { margin-top: 0; text-align: center; }
+.speed-threshold-head { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+.speed-threshold-head span { font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); font-weight: 700; letter-spacing: .3px; text-align: center; }
+.speed-threshold-head span:first-child { text-align: left; }
 
 /* --- LÓ/LOVAS AUTOCOMPLETE JAVASLATLISTA --- */
 .ac-list {
