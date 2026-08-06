@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v101</title>
+    <title>Verseny Kalkulátor v102</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,10 +25,10 @@
 
 <div id="customConfirm" class="confirm-modal">
     <div class="confirm-box">
-        <h3 id="confirmTitle" style="margin-top:0; color:white;">Biztosan?</h3>
+        <h3 id="confirmTitle" style="margin-top:0; color:var(--text);">Biztosan?</h3>
         <p id="confirmDesc" style="color:var(--text-dim); margin-bottom:20px;">Ez a művelet nem vonható vissza!</p>
         <div style="display:flex; gap:10px; justify-content:center;">
-            <button class="calc-btn" style="background:#444; color:white; margin-top:0;" onclick="closeConfirm()">Mégse</button>
+            <button class="calc-btn" style="background:var(--card-3); color:var(--text); margin-top:0;" onclick="closeConfirm()">Mégse</button>
             <button class="calc-btn" id="confirmOkBtn" style="background:var(--danger); color:white; margin-top:0;">Igen, mehet</button>
         </div>
     </div>
@@ -38,7 +38,7 @@
     <div class="modal-content" style="max-width: 450px; text-align:center;">
         <h3 id="infoModalTitle" style="color:var(--primary); margin-top:0;"></h3>
         <div id="infoModalBody" style="margin-top:15px; color:var(--text-dim); line-height: 1.6; font-size: 0.95rem; text-align: left;"></div>
-        <button class="calc-btn" style="background:#444; color:white;" onclick="document.getElementById('infoModal').style.display='none'">Bezárás</button>
+        <button class="calc-btn" style="background:var(--card-3); color:var(--text);" onclick="document.getElementById('infoModal').style.display='none'">Bezárás</button>
     </div>
 </div>
 
@@ -46,7 +46,7 @@
 <div class="overlay" onclick="toggleMenu()"></div>
 
 <div class="sidebar" id="sidebar">
-    <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: white;">⏱️ Verseny Kalkulátor</div>
+    <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: var(--text);">⏱️ Verseny Kalkulátor</div>
     
     <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Fő funkciók</div>
@@ -92,7 +92,7 @@
     <div id="logout-section" style="display: none; flex-direction: column;">
         <div class="menu-title">Fiók</div>
         <div id="logged-in-role-text" style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Szerepkör</div>
-        <button class="sidebar-submit" style="background:#440000; border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
+        <button class="sidebar-submit" style="background:var(--danger-dim); border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
     </div>
 </div>
 
@@ -102,7 +102,7 @@
         <div id="beerkeztetes-mod" class="mode-content">
             <div class="panel-header">
             <h3 style="color:var(--primary); margin:0;">⏱️ Beérkeztetés</h3>
-            <div class="clock-display liveClockText" style="background:#222; color:white; border-color:#444;">--:--:--</div>
+            <div class="clock-display liveClockText" style="background:var(--card-2); color:var(--text); border-color:#444;">--:--:--</div>
             </div>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Beérkezési idő rögzítése. Válaszd ki a versenyzőt:</p>
             <label style="color: var(--primary);">Versenyző:</label>
@@ -114,8 +114,8 @@
             </div>
 
             <div id="beerkeztetes-form" style="display:none;">
-                <div style="background:#2c2c2e; padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
-                    <h4 id="bk-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
+                <div style="background:var(--card-3); padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
+                    <h4 id="bk-lap-title" style="margin-top:0; color:var(--text);">X. Kör</h4>
 
                     <label>Beérkezés ideje:</label>
                     <div class="time-group">
@@ -133,7 +133,7 @@
         <div id="orvosi-ido-mod" class="mode-content">
             <div class="panel-header">
             <h3 style="color:var(--primary); margin:0;">🏥 Orvosi Idő</h3>
-            <div class="clock-display liveClockText" style="background:#222; color:white; border-color:#444;">--:--:--</div>
+            <div class="clock-display liveClockText" style="background:var(--card-2); color:var(--text); border-color:#444;">--:--:--</div>
             </div>
             <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Orvosi (Vet) vizsgálatra lépés rögzítése. Válaszd ki a versenyzőt:</p>
             <label style="color: var(--primary);">Versenyző:</label>
@@ -145,8 +145,8 @@
             </div>
 
             <div id="orvosi-ido-form" style="display:none;">
-                <div style="background:#2c2c2e; padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
-                    <h4 id="bk-vet-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
+                <div style="background:var(--card-3); padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
+                    <h4 id="bk-vet-lap-title" style="margin-top:0; color:var(--text);">X. Kör</h4>
                     <div style="font-size:0.9rem; font-weight:bold; margin-bottom:15px; color:var(--success);" id="orv-ido-arr-time">Beérkezett: --:--:--</div>
 
                     <label>Orvosi (Vet) ideje:</label>
@@ -173,8 +173,8 @@
                 </select>
             </div>
             
-            <div id="orvosi-form" style="display:none; background:#2c2c2e; padding:15px; border-radius:12px; margin-top:15px; border-left:4px solid var(--success);">
-                <h4 id="orv-lap-title" style="margin-top:0; color:white;">X. Kör</h4>
+            <div id="orvosi-form" style="display:none; background:var(--card-3); padding:15px; border-radius:12px; margin-top:15px; border-left:4px solid var(--success);">
+                <h4 id="orv-lap-title" style="margin-top:0; color:var(--text);">X. Kör</h4>
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-arr-time">Beérkezett: --:--:--</div>
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-vet-time">Orvosi: --:--:--</div>
                 <div id="orv-recovery-warning" style="margin-bottom:15px;"></div>
@@ -194,12 +194,12 @@
                 <select id="orv-vet-name"></select>
 
                 <label>Orvosi Döntés / Státusz:</label>
-                <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;" onchange="adjustVetDecisionColors(this)">
+                <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);" onchange="adjustVetDecisionColors(this)">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                    <option value="FNR" style="color:#aaa;">Helyezés nélkül (FNR)</option>
+                    <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
                     <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                     <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                     <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
@@ -268,7 +268,7 @@
         <div id="past-race-view" class="mode-content">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                 <h3 id="pastRaceModalTitle" style="color:var(--primary); margin:0;">Eredmények</h3>
-                <button class="calc-btn" style="width:auto; padding:8px 15px; margin:0; background:#444; color:white;" onclick="closePastRaceModal()">Bezárás</button>
+                <button class="calc-btn" style="width:auto; padding:8px 15px; margin:0; background:var(--card-3); color:var(--text);" onclick="closePastRaceModal()">Bezárás</button>
             </div>
             <div id="pastRaceAdatlapList"></div>
         </div>
@@ -281,35 +281,38 @@
 
         <div id="beallitasok-mod" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 15px;">⚙️ Beállítások</h3>
-            <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Ez a két beállítás mindenkinek, minden eszközön (beérkeztető, orvos, admin tabletek) egyszerre érvényes - nem személyes preferencia.</p>
+            <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Ez a beállítás mindenkinek, minden eszközön (beérkeztető, orvos, admin tabletek) egyszerre érvényes - nem személyes preferencia.</p>
 
             <div class="kiiras-card" style="border-left-color: var(--teal);">
-                <h4 style="margin-top:0; margin-bottom:5px; color:white;">🎨 Design téma</h4>
+                <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🎨 Design téma</h4>
                 <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - azonnal mindenkinél átvált.</p>
                 <div class="theme-swatch-row" id="themeSwatchRow"></div>
-            </div>
-
-            <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:15px;">
-                <h4 style="margin-top:0; margin-bottom:5px; color:white;">⚠️ Sebesség-szabályok távonként</h4>
-                <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">
-                    <b>Minimum (km/h):</b> ez alatt a lovas időtúllépés (OT) kockázatában van.<br>
-                    <b>Maximum (km/h):</b> efölött sebesség miatti kiesés (SP) kockázata áll fenn (139. § (2)).<br>
-                    Üresen hagyva az adott érték nincs figyelve. Csak figyelmeztet, a döntést mindig a bíró/orvos hozza meg.
-                </p>
-                <div id="speedThresholdContainer"></div>
             </div>
         </div>
 
         <div id="fo-mod" class="mode-content">
             <h3 style="color:var(--primary); margin-top:0; margin-bottom:15px;">🔴 ÉLŐ Verseny Kezelés</h3>
             <div class="tabs">
-                <button id="btn-kiiras" class="tab-btn active" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
+                <button id="btn-sebesseg" class="tab-btn active" onclick="switchSubMode('sebesseg', this)">Sebességhatár</button>
+                <button id="btn-kiiras" class="tab-btn" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
                 <button id="btn-orvosok" class="tab-btn admin-only" onclick="switchSubMode('orvosok', this)">Állatorvosok</button>
                 <button id="btn-versenyzok" class="tab-btn" onclick="switchSubMode('versenyzok', this)">Versenyzők</button>
                 <button id="btn-verseny" class="tab-btn" onclick="switchSubMode('verseny', this)">Teljes verseny</button>
             </div>
 
-            <div id="kiiras" class="sub-mode-content" style="display:block;">
+            <div id="sebesseg" class="sub-mode-content" style="display:block;">
+                <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:0;">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">⚠️ Sebesség-szabályok távonként</h4>
+                    <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">
+                        <b>Minimum (km/h):</b> ez alatt a lovas időtúllépés (OT) kockázatában van.<br>
+                        <b>Maximum (km/h):</b> efölött sebesség miatti kiesés (SP) kockázata áll fenn (139. § (2)).<br>
+                        Üresen hagyva az adott érték nincs figyelve. Csak figyelmeztet, a döntést mindig a bíró/orvos hozza meg.
+                    </p>
+                    <div id="speedThresholdContainer"></div>
+                </div>
+            </div>
+
+            <div id="kiiras" class="sub-mode-content" style="display:none;">
                 <h4 style="color:var(--warning); margin-bottom:5px;">ÉLŐ: Hivatalos adatok beállítása</h4>
                 <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt add meg a távok rajtidejét és a köröket a futó versenyhez.</p>
                 <div id="kiirasContainer"></div>
@@ -317,7 +320,7 @@
             </div>
 
             <div id="versenyzok" class="sub-mode-content" style="display:none;">
-                <h4 style="margin-bottom: 15px; color: white;">ÉLŐ: Új versenyző regisztrálása</h4>
+                <h4 style="margin-bottom: 15px; color: var(--text);">ÉLŐ: Új versenyző regisztrálása</h4>
                 <label>Rajtszám:</label> <input type="number" id="regBib" placeholder="pl. 23">
                 <label>Versenyző neve:</label> <input type="text" id="regName" placeholder="pl. Kovács János" autocomplete="off">
                 <label>Ló neve:</label> <input type="text" id="regInternal" placeholder="pl. O'Bajan Pingvin" autocomplete="off">
@@ -340,7 +343,7 @@
                 <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
                 <!-- tömeges import a versenyzők höz -->
-                <!-- <div class="admin-only" style="background: #222; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning); text-align: center;">
+                <!-- <div class="admin-only" style="background: var(--card-2); padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning); text-align: center;">
                     <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás</h4>
                     <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 15px;">Kattints a gombra, és a böngésző felugró ablakába illeszd be a kódot!</p>
                     <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromPrompt(true)">Kód beillesztése és Hozzáadás</button>
@@ -351,7 +354,7 @@
             </div>
 
             <div id="orvosok" class="sub-mode-content" style="display:none;">
-                <h4 style="margin-bottom: 15px; color: white;">ÉLŐ: Állatorvosok felvitele</h4>
+                <h4 style="margin-bottom: 15px; color: var(--text);">ÉLŐ: Állatorvosok felvitele</h4>
                 <label>Állatorvos neve (pl. Dr. Szabó János):</label>
                 <input type="text" id="regVetName" placeholder="Név megadása...">
                 <button class="calc-btn add-btn admin-only" onclick="saveVet()">Orvos Hozzáadása</button>
@@ -361,7 +364,7 @@
             </div>
             
             <div id="verseny" class="sub-mode-content" style="display:none;">
-                <h4 style="color:white; margin-bottom:15px; margin-top:0;">ÉLŐ: Eredmények bevitele</h4>
+                <h4 style="color:var(--text); margin-bottom:15px; margin-top:0;">ÉLŐ: Eredmények bevitele</h4>
                 <label style="color: var(--primary);">Versenyző kiválasztása:</label>
                 <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
                     <input type="number" id="elo-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('elo-bibInput', 'selectCompetitor')">
@@ -372,12 +375,12 @@
                 
                 <div id="verseny-form-container" style="display:none;">
                     <label>Versenyző státusza:</label>
-                    <select id="compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;">
+                    <select id="compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                    <option value="FNR" style="color:#aaa;">Helyezés nélkül (FNR)</option>
+                    <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
                     <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                     <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                     <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
@@ -469,9 +472,9 @@
             <label>Helyszín:</label>
             <input type="text" id="rm-loc" placeholder="pl. Solt">
             <label>Időpont:</label>
-            <input type="date" id="rm-date" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px;">
+            <input type="date" id="rm-date" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: var(--card-3); color: var(--text); width: 100%; box-sizing: border-box; margin-top: 5px;">
             <label>Leírás:</label>
-            <textarea id="rm-desc" rows="3" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: #2c2c2e; color: white; width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
+            <textarea id="rm-desc" rows="3" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: var(--card-3); color: var(--text); width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
 
             <button class="calc-btn admin-only" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
         </div>
@@ -484,7 +487,7 @@
         </div>
 
         <div id="rm-orvosok" class="rm-tab-content" style="display:none;">
-            <h4 style="margin-bottom: 15px; color: white;">Állatorvosok ehhez a versenyhez</h4>
+            <h4 style="margin-bottom: 15px; color: var(--text);">Állatorvosok ehhez a versenyhez</h4>
             <label>Állatorvos neve:</label>
             <input type="text" id="rm-regVetName" placeholder="pl. Dr. Kovács János">
             <button id="rm-saveVetBtn" class="calc-btn add-btn admin-only" style="margin-top:0;" onclick="saveRmVet()">Orvos hozzáadása</button>
@@ -492,7 +495,7 @@
         </div>
 
         <div id="rm-versenyzok" class="rm-tab-content" style="display:none;">
-            <h4 style="margin-bottom: 15px; color: white;">Versenyző rögzítése</h4>
+            <h4 style="margin-bottom: 15px; color: var(--text);">Versenyző rögzítése</h4>
             <label>Rajtszám:</label> <input type="number" id="rm-regBib" placeholder="pl. 23">
             <label>Versenyző neve:</label> <input type="text" id="rm-regName" placeholder="pl. Kovács János" autocomplete="off">
             <label>Ló neve:</label> <input type="text" id="rm-regInternal" placeholder="pl. O'Bajan Pingvin" autocomplete="off">
@@ -512,7 +515,7 @@
             <button id="rm-addCompBtn" class="calc-btn add-btn admin-only" onclick="saveRmCompetitor()">Hozzáadás</button>
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
             <button id="rm-deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
-            <div class="admin-only" style="background: #222; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning); text-align: center;">
+            <div class="admin-only" style="background: var(--card-2); padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning); text-align: center;">
                 <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás</h4>
                 <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 15px;">Kattints a gombra, és a böngésző felugró ablakába illeszd be a kódot!</p>
                 <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromPrompt(true)">Kód beillesztése és Hozzáadás</button>
@@ -523,7 +526,7 @@
         </div>
 
         <div id="rm-verseny" class="rm-tab-content" style="display:none;">
-            <h4 style="color:white; margin-bottom:15px; margin-top:0;">Eredmények rögzítése</h4>
+            <h4 style="color:var(--text); margin-bottom:15px; margin-top:0;">Eredmények rögzítése</h4>
             <label style="color: var(--primary);">Versenyző kiválasztása:</label>
             <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
                 <input type="number" id="rm-elo-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('rm-elo-bibInput', 'rm-selectCompetitor')">
@@ -534,12 +537,12 @@
             
             <div id="rm-verseny-form-container" style="display:none;">
                 <label>Versenyző státusza:</label>
-                <select id="rm-compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:#222;">
+                <select id="rm-compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                    <option value="FNR" style="color:#aaa;">Helyezés nélkül (FNR)</option>
+                    <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
                     <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                     <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                     <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
