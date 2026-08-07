@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v103</title>
+    <title>Verseny Kalkulátor v104</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,6 +72,10 @@
     
     <div class="menu-title">Verseny</div>
     <button id="btn-menu-versenyek" class="sidebar-btn" onclick="switchSidebarMode('versenyek', this)">🏁 Versenyek</button>
+
+    <div class="menu-title">Törzsadatok</div>
+    <button id="btn-menu-torzs-lovasok" class="sidebar-btn" onclick="switchSidebarMode('torzs-lovasok', this)">👤 Lovasok</button>
+    <button id="btn-menu-torzs-lovak" class="sidebar-btn" onclick="switchSidebarMode('torzs-lovak', this)">🐴 Lovak</button>
 
     <div class="menu-title">Bajnokság</div>
     <button id="btn-menu-bajnoksag-egyeni" class="sidebar-btn" onclick="switchSidebarMode('bajnoksag-egyeni', this)">🏆 Egyéni bajnokság</button>
@@ -271,12 +275,27 @@
             </div>
         </div>
 
+        <div id="torzs-lovasok" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">👤 Lovasok</h3>
+            <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Kattints egy névre a versenytörténet megtekintéséhez - hol indult, milyen távon, milyen lóval és mi lett az eredménye.</p>
+            <input type="text" id="torzs-lovasok-search" placeholder="Keresés név, igazolási szám vagy egyesület alapján..." autocomplete="off" oninput="renderTorzsLovasokList()">
+            <div id="torzs-lovasok-list" style="margin-top:15px;"></div>
+        </div>
+
+        <div id="torzs-lovak" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">🐴 Lovak</h3>
+            <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Kattints egy lóra a versenytörténet megtekintéséhez - hol indult, milyen távon, milyen lovassal és mi lett az eredménye.</p>
+            <input type="text" id="torzs-lovak-search" placeholder="Keresés ló neve vagy start száma alapján..." autocomplete="off" oninput="renderTorzsLovakList()">
+            <div id="torzs-lovak-list" style="margin-top:15px;"></div>
+        </div>
+
         <div id="bajnoksag-egyeni" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 15px;">🏆 Egyéni bajnokság</h3>
             <div class="tabs" id="egyeni-class-tabs">
                 <button class="tab-btn active" onclick="setEgyeniClass('tavlovas', this)">Távlovas</button>
                 <button class="tab-btn" onclick="setEgyeniClass('rovid', this)">Rövidtávú</button>
                 <button class="tab-btn" onclick="setEgyeniClass('junior', this)">Junior</button>
+                <button class="tab-btn" onclick="setEgyeniClass('osszesitett', this)">Összesített</button>
             </div>
             <div class="kiiras-card" style="border-left-color: var(--teal); display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
                 <div style="flex:1; min-width:140px;">
@@ -575,6 +594,9 @@
             <button class="tab-btn" id="rm-tab-btn-orvosok" onclick="switchRmTab('rm-orvosok', this)">Állatorvosok</button>
             <button class="tab-btn" id="rm-tab-btn-versenyzok" onclick="switchRmTab('rm-versenyzok', this)">Versenyzők</button>
             <button class="tab-btn" id="rm-tab-btn-verseny" onclick="switchRmTab('rm-verseny', this)">Eredmények</button>
+            <!-- IDEIGLENES "Gyors eredmény" fül kikapcsolva (felhasználói kérés) - l. rps.js ugyanezzel a megjegyzéssel
+            <button class="tab-btn" id="rm-tab-btn-gyors" onclick="switchRmTab('rm-gyors', this)">Gyors eredmény</button>
+            -->
         </div>
 
         <div id="rm-alap" class="rm-tab-content" style="display:block;">
@@ -698,6 +720,70 @@
                 <div id="rm-res2" style="display:none"></div>
             </div>
         </div>
+
+        <!-- IDEIGLENES: gyors eredmény-rögzítés helyezés alapján, kör-/időadatok nélkül -
+             akkor kell, ha a rendszer nem volt kint a helyszínen és utólag csak a helyezéseket
+             kapjuk meg. Kikapcsolva (felhasználói kérés) - ha kell megint, csak vedd ki a
+             komment-jelölést, ne írd újra.
+        <div id="rm-gyors" class="rm-tab-content" style="display:none;">
+            <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:0;">
+                <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">⚡ Gyors eredmény rögzítése</h4>
+                <p class="field-hint" style="margin-bottom:0;">Ha nem voltak rögzítve kör-/időadatok (pl. a rendszer nem volt kint a helyszínen), itt közvetlenül megadhatod a helyezést, a státuszt és a teljes menetidőt - kör-adatok nélkül.</p>
+            </div>
+            <label>Rajtszám:</label> <input type="number" id="rm-gy-regBib" placeholder="pl. 23">
+            <label>Versenyző neve:</label> <input type="text" id="rm-gy-regName" placeholder="pl. Kovács János" autocomplete="off">
+            <label>Ló neve:</label> <input type="text" id="rm-gy-regInternal" placeholder="pl. O'Bajan Pingvin" autocomplete="off">
+            <label>Egyesület:</label> <input type="text" id="rm-gy-regClub" placeholder="pl. Lovas SE" autocomplete="off">
+            <label>Start szám:</label> <input type="text" id="rm-gy-regStartNum" placeholder="pl. 93283" autocomplete="off">
+            <label>Igazolási szám:</label> <input type="text" id="rm-gy-regLicense" placeholder="pl. 67453" autocomplete="off">
+            <label>Versenytáv:</label>
+            <select id="rm-gy-regDist">
+                <option value="20">20 km</option>
+                <option value="40">40 km</option>
+                <option value="60">60 km</option>
+                <option value="80">80 km</option>
+                <option value="80j">80 km Junior</option>
+                <option value="100">100 km</option>
+                <option value="100j">100 km Junior</option>
+            </select>
+
+            <label>Helyezés:</label>
+            <input type="number" id="rm-gy-place" placeholder="pl. 3" min="1">
+
+            <label>Státusz:</label>
+            <select id="rm-gy-status" style="font-weight:bold;">
+                <option value="Active" style="color:var(--success);">Versenyben (Bent van / Célba ért)</option>
+                <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
+                <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
+                <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
+                <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
+                <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
+                <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
+                <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
+                <option value="FTQ-MI" style="color:var(--danger);">Kiesés: Kisebb sérülés (MI)</option>
+                <option value="FTQ-SIMUSCO" style="color:var(--danger);">Kiesés: Súlyos mozgásszervi (SI MUSCO)</option>
+                <option value="FTQ-SIMETA" style="color:var(--danger);">Kiesés: Súlyos metabolikus (SI META)</option>
+                <option value="FTQ-CI" style="color:var(--danger);">Kiesés: Végzetes sérülés (CI)</option>
+                <option value="FTQ-OT" style="color:var(--danger);">Kiesés: Időtúllépés (OT)</option>
+                <option value="FTQ-FTC" style="color:var(--danger);">Kiesés: Befejezetlen verseny (FTC)</option>
+            </select>
+
+            <label>Teljes menetidő (ha ismert):</label>
+            <div class="time-group">
+                <input type="number" id="rm-gy-h" placeholder="00"> :
+                <input type="number" id="rm-gy-m" placeholder="00"> :
+                <input type="number" id="rm-gy-s" placeholder="00">
+            </div>
+
+            <button id="rm-gy-addBtn" class="calc-btn add-btn admin-only" onclick="saveRmGyorsCompetitor()">Hozzáadás</button>
+            <button id="rm-gy-cancelBtn" class="cancel-btn" onclick="cancelRmGyorsEdit()">Mégse</button>
+            <button id="rm-gy-deleteBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmGyorsCompetitor()">Törlés</button>
+
+            <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Gyorsan rögzített eredmények:</h4>
+            <div id="rm-gyors-list"></div>
+        </div>
+        -->
+
 
     </div>
 </div>

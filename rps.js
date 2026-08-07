@@ -25,6 +25,7 @@
     let speedThresholds = {};
     let ridersCache = {}; // riders/{license} - lo-lovas-integracio.md
     let horsesCache = {}; // horses/{startNum}
+    let clubsCache = {}; // clubs/{clubKey} - önálló egyesület-törzs
     let uiTheme = 'default'; // admin választja (settings/uiTheme), mindenkinek szinkronban - l. THEME_LIST
     // colors: [primary (dot), bg, card] - a swatch előnézet ebből épül fel (renderThemeSwatches)
     const THEME_LIST = [
@@ -68,6 +69,7 @@
     let modalRaceConfig = getEmptyRaceConfig();
     let modalCompetitors = [];
     let modalEditingBib = null;
+    // let modalGyorsEditingBib = null; // IDEIGLENES "Gyors eredmény" fül szerkesztési állapota - kikapcsolva, l. lentebb
 
     const catNames = {
         "100": "100 km", "100j": "100 km Junior",
@@ -118,11 +120,28 @@
             .map(h => ({ label: `${h.name} — ${h.startNum}`, ...h }));
     }
 
+    // Elsődlegesen a saját clubs/ törzsből keres, és amíg egy frissen beírt egyesület még
+    // nincs benne, kiegészíti a riders/{license}.club
+    // mezőkből is - így nem esik ki semmi a listából. Normalizált kulccsal (kisbetűs,
+    // összevont szóközök) dedupolunk, hogy egy elgépelt szóköz ne látsszon külön klubnak.
     function searchClubs(q) {
         const lq = q.toLowerCase();
-        const clubs = new Set();
-        Object.values(ridersCache).forEach(r => { if (r && r.club) clubs.add(r.club); });
-        return Array.from(clubs).filter(c => c.toLowerCase().includes(lq)).map(c => ({ label: c, club: c }));
+        const clubs = new Map();
+        Object.values(clubsCache).forEach(c => {
+            if (!c || !c.name) return;
+            const trimmed = c.name.trim().replace(/\s+/g, ' ');
+            if (!trimmed) return;
+            const key = trimmed.toLowerCase();
+            if (!clubs.has(key)) clubs.set(key, trimmed);
+        });
+        Object.values(ridersCache).forEach(r => {
+            if (!r || !r.club) return;
+            const trimmed = r.club.trim().replace(/\s+/g, ' ');
+            if (!trimmed) return;
+            const key = trimmed.toLowerCase();
+            if (!clubs.has(key)) clubs.set(key, trimmed);
+        });
+        return Array.from(clubs.values()).filter(c => c.toLowerCase().includes(lq)).map(c => ({ label: c, club: c }));
     }
 
     // Az inputot egy pozicionált wrapperbe csomagolja és alá illeszti a javaslatlistát -
@@ -141,14 +160,35 @@
         list.className = 'ac-list';
         wrapper.appendChild(list);
 
+        // Google-kereső-szerű billentyűzetes vezérlés: nyilakkal lép a listában, Enter/Tab
+        // elfogadja a kijelöltet - ha még nem nyilazott, mindig az első elem a kijelölt alapból.
+        let currentItems = [];
+        let highlightIndex = -1;
+
+        function updateHighlight() {
+            Array.from(list.children).forEach((el, i) => el.classList.toggle('active', i === highlightIndex));
+            const activeEl = list.children[highlightIndex];
+            if (activeEl && activeEl.scrollIntoView) activeEl.scrollIntoView({ block: 'nearest' });
+        }
+
+        function selectItem(idx) {
+            const item = currentItems[idx];
+            if (!item) return;
+            onSelect(item);
+            list.style.display = 'none';
+        }
+
         function render(items) {
+            currentItems = items;
+            highlightIndex = items.length ? 0 : -1;
             if (!items.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
             // textContent-tel épül, nem innerHTML-lel - ha egy név/egyesület valaha < vagy > karaktert
             // tartalmazna, ne szakítsa meg vagy értelmezze HTML-ként a listát.
-            list.innerHTML = items.map((it, i) => `<div class="ac-item" data-idx="${i}"></div>`).join('');
+            list.innerHTML = items.map((it, i) => `<div class="ac-item${i === 0 ? ' active' : ''}" data-idx="${i}"></div>`).join('');
             Array.from(list.children).forEach((el, i) => {
                 el.textContent = items[i].label;
-                el.onmousedown = (e) => { e.preventDefault(); onSelect(items[i]); list.style.display = 'none'; };
+                el.onmousedown = (e) => { e.preventDefault(); selectItem(i); };
+                el.onmouseenter = () => { highlightIndex = i; updateHighlight(); };
             });
             list.style.display = 'block';
         }
@@ -161,6 +201,27 @@
         input.addEventListener('focus', () => {
             const q = input.value.trim();
             if (q) render(getSuggestions(q).slice(0, 8));
+        });
+        input.addEventListener('keydown', (e) => {
+            if (list.style.display !== 'block' || !currentItems.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightIndex = (highlightIndex + 1) % currentItems.length;
+                updateHighlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightIndex = (highlightIndex - 1 + currentItems.length) % currentItems.length;
+                updateHighlight();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                selectItem(highlightIndex >= 0 ? highlightIndex : 0);
+            } else if (e.key === 'Tab') {
+                // nem preventDefault-oljuk, hogy a böngésző alapértelmezett fókuszváltása is lefusson -
+                // így a Tab egyszerre fogadja el a javaslatot ÉS lép a következő mezőre.
+                selectItem(highlightIndex >= 0 ? highlightIndex : 0);
+            } else if (e.key === 'Escape') {
+                list.style.display = 'none';
+            }
         });
         input.addEventListener('blur', () => setTimeout(() => { list.style.display = 'none'; }, 150));
     }
@@ -469,8 +530,15 @@
         });
 
         // Ló/lovas törzsadat cache az autocomplete-hez (lo-lovas-integracio.md, 7. szakasz)
-        db.ref('riders').on('value', snap => { ridersCache = snap.val() || {}; });
-        db.ref('horses').on('value', snap => { horsesCache = snap.val() || {}; });
+        db.ref('riders').on('value', snap => {
+            ridersCache = snap.val() || {};
+            if (document.getElementById('torzs-lovasok')?.classList.contains('active')) renderTorzsLovasokList();
+        });
+        db.ref('horses').on('value', snap => {
+            horsesCache = snap.val() || {};
+            if (document.getElementById('torzs-lovak')?.classList.contains('active')) renderTorzsLovakList();
+        });
+        db.ref('clubs').on('value', snap => { clubsCache = snap.val() || {}; });
 
         // Sebesség min/max távonként - alapból üres (nincs figyelve), minden eszközön szinkronban
         db.ref('settings/speedThresholds').on('value', snap => {
@@ -627,6 +695,8 @@
         
         if (targetId === 'adatlapok') renderAdatlapList();
         if (targetId === 'export-mod') renderExportList();
+        if (targetId === 'torzs-lovasok') renderTorzsLovasokList();
+        if (targetId === 'torzs-lovak') renderTorzsLovakList();
         if (targetId === 'bajnoksag-egyeni') renderEgyeniBajnoksag();
         if (targetId === 'bajnoksag-lo') renderLoRanglista();
         if (targetId === 'bajnoksag-csapat') switchCsapatTab('csapat-rang', document.querySelector('#bajnoksag-csapat .tabs .tab-btn'));
@@ -1041,11 +1111,13 @@
             document.getElementById('rm-tab-btn-kiiras').style.display = 'none';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'none';
             document.getElementById('rm-tab-btn-verseny').style.display = 'none';
+            // document.getElementById('rm-tab-btn-gyors').style.display = 'none'; // IDEIGLENES "Gyors eredmény" - kikapcsolva
         } else {
             document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
             document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
-            attachModalFirebaseListeners(id, type); 
+            // document.getElementById('rm-tab-btn-gyors').style.display = type === 'jovo' ? 'none' : 'block'; // IDEIGLENES "Gyors eredmény" - kikapcsolva
+            attachModalFirebaseListeners(id, type);
         }
 
         switchRmTab('rm-alap', document.getElementById('rm-tab-btn-alap'));
@@ -1097,6 +1169,7 @@
             document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
             document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
+            // document.getElementById('rm-tab-btn-gyors').style.display = type === 'jovo' ? 'none' : 'block'; // IDEIGLENES "Gyors eredmény" - kikapcsolva
             attachModalFirebaseListeners(id, type);
             showAnimatedBtn('btn-rm-alap-mentes');
         }).catch(e => showToast("Hiba az adatok mentésekor: " + e.message, true));
@@ -1145,6 +1218,7 @@
         db.ref('races/' + type + '/' + id + '/competitors').on('value', snap => {
             modalCompetitors = parseCompetitors(snap.val());
             updateRmCompetitorDisplays();
+            // updateRmGyorsCompetitorDisplays(); // IDEIGLENES "Gyors eredmény" - kikapcsolva
             const selectedBib = document.getElementById('rm-selectCompetitor').value;
             const activeEl = document.activeElement;
             const isInputFocused = activeEl && activeEl.tagName === 'INPUT' && document.getElementById('rm-verseny').contains(activeEl);
@@ -1393,6 +1467,142 @@
             }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
         });
     }
+
+    // ============================================================================
+    // IDEIGLENES: "GYORS EREDMÉNY" - helyezés alapú rögzítés kör-/időadatok nélkül.
+    // Akkor kell, ha a rendszer nem volt kint a helyszínen, és utólag csak a
+    // helyezéseket kapjuk meg. Kikapcsolva (felhasználói kérés) - ha kell megint,
+    // csak vedd ki a /* */ jelölést, ne írd újra.
+    // ============================================================================
+    /*
+    function saveRmGyorsCompetitor() {
+        if (!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
+        const type = document.getElementById('rm-type').value;
+
+        const bib = document.getElementById('rm-gy-regBib').value;
+        const name = document.getElementById('rm-gy-regName').value;
+        const startNum = document.getElementById('rm-gy-regStartNum').value;
+        const license = document.getElementById('rm-gy-regLicense').value;
+        const club = document.getElementById('rm-gy-regClub').value;
+        const dist = document.getElementById('rm-gy-regDist').value;
+        const internal = document.getElementById('rm-gy-regInternal').value;
+        const status = document.getElementById('rm-gy-status').value;
+        const place = parseInt(document.getElementById('rm-gy-place').value, 10);
+        const timeSec = toSec(document.getElementById('rm-gy-h').value, document.getElementById('rm-gy-m').value, document.getElementById('rm-gy-s').value);
+
+        if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
+
+        if (modalGyorsEditingBib && modalGyorsEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalGyorsEditingBib).remove(); }
+
+        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - ugyanaz a minta, mint a normál nevezésnél.
+        const horseRiderUpdates = {};
+        if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
+        if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
+        if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
+
+        const compData = {
+            bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club,
+            status: status, isEliminated: status !== 'Active',
+            manualEntry: true,
+            manualPlace: isNaN(place) ? null : place,
+            totalTimeSec: timeSec > 0 ? timeSec : null,
+            laps: []
+        };
+
+        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(compData).then(() => {
+            showAnimatedBtn('rm-gy-addBtn');
+            cancelRmGyorsEdit();
+        }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
+    }
+
+    function editRmGyorsCompetitor(bib) {
+        const comp = modalCompetitors.find(c => c.bib == bib);
+        if (!comp) return;
+        document.getElementById('rm-gy-regBib').value = comp.bib;
+        document.getElementById('rm-gy-regName').value = comp.name;
+        document.getElementById('rm-gy-regStartNum').value = comp.startNum || '';
+        document.getElementById('rm-gy-regLicense').value = comp.license || '';
+        document.getElementById('rm-gy-regClub').value = comp.club || '';
+        document.getElementById('rm-gy-regDist').value = comp.dist;
+        document.getElementById('rm-gy-regInternal').value = comp.internal || '';
+        document.getElementById('rm-gy-status').value = comp.status || 'Active';
+        document.getElementById('rm-gy-place').value = comp.manualPlace || '';
+        if (comp.totalTimeSec) {
+            const t = comp.totalTimeSec;
+            document.getElementById('rm-gy-h').value = Math.floor(t / 3600);
+            document.getElementById('rm-gy-m').value = Math.floor((t % 3600) / 60);
+            document.getElementById('rm-gy-s').value = t % 60;
+        } else {
+            document.getElementById('rm-gy-h').value = '';
+            document.getElementById('rm-gy-m').value = '';
+            document.getElementById('rm-gy-s').value = '';
+        }
+        modalGyorsEditingBib = comp.bib;
+        document.getElementById('rm-gy-addBtn').innerText = "Mentés";
+        document.getElementById('rm-gy-cancelBtn').style.display = "block";
+        document.getElementById('rm-gy-deleteBtn').style.display = "block";
+        document.getElementById('rm-gyors').scrollIntoView({ behavior: "smooth" });
+    }
+
+    function cancelRmGyorsEdit() {
+        modalGyorsEditingBib = null;
+        document.getElementById('rm-gy-regBib').value = '';
+        document.getElementById('rm-gy-regName').value = '';
+        document.getElementById('rm-gy-regStartNum').value = '';
+        document.getElementById('rm-gy-regLicense').value = '';
+        document.getElementById('rm-gy-regClub').value = '';
+        document.getElementById('rm-gy-regInternal').value = '';
+        document.getElementById('rm-gy-status').value = 'Active';
+        document.getElementById('rm-gy-place').value = '';
+        document.getElementById('rm-gy-h').value = '';
+        document.getElementById('rm-gy-m').value = '';
+        document.getElementById('rm-gy-s').value = '';
+        document.getElementById('rm-gy-addBtn').innerText = "Hozzáadás";
+        document.getElementById('rm-gy-cancelBtn').style.display = "none";
+        document.getElementById('rm-gy-deleteBtn').style.display = "none";
+    }
+
+    function deleteRmGyorsCompetitor() {
+        if (!modalGyorsEditingBib || !modalRaceId) return;
+        const type = document.getElementById('rm-type').value;
+        showConfirm("Eredmény törlése", "Biztosan törlöd ezt a gyorsan rögzített eredményt?", () => {
+            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalGyorsEditingBib).remove().then(() => {
+                cancelRmGyorsEdit();
+            }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
+        });
+    }
+
+    function deleteRmGyorsCompetitorDirect(bib) {
+        if (!modalRaceId) return;
+        const type = document.getElementById('rm-type').value;
+        showConfirm("Eredmény törlése", "Biztosan törlöd ezt a gyorsan rögzített eredményt?", () => {
+            db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).remove().then(() => {
+                if (modalGyorsEditingBib === bib) cancelRmGyorsEdit();
+            }).catch(e => showToast("Hiba a törléskor: " + e.message, true));
+        });
+    }
+
+    function updateRmGyorsCompetitorDisplays() {
+        const cont = document.getElementById('rm-gyors-list');
+        if (!cont) return;
+        const gyorsComps = modalCompetitors.filter(c => c.manualEntry).sort((a, b) => (a.manualPlace || 999) - (b.manualPlace || 999));
+        if (gyorsComps.length === 0) { cont.innerHTML = '<div style="color:var(--text-dim);">Még nincs gyorsan rögzített eredmény.</div>'; return; }
+        cont.innerHTML = gyorsComps.map(c => {
+            const placeStr = c.isEliminated ? getElimText(c) : (c.manualPlace ? c.manualPlace + '. hely' : 'nincs helyezés');
+            const timeStr = c.totalTimeSec ? ' · ' + toTimeStr(c.totalTimeSec) : '';
+            return `<div class="competitor-item">
+                <div style="flex:1;">
+                    <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist] || c.dist}</b>
+                    <br><span style="color:var(--text-dim); font-size:0.85rem;">${placeStr}${timeStr}</span>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <button class="edit-btn admin-only" onclick="editRmGyorsCompetitor('${c.bib}')">Módosítás</button>
+                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteRmGyorsCompetitorDirect('${c.bib}')">Törlés</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+    */
 
     // --- MODAL: TELJES VERSENY (EREDMÉNYEK) ---
     function loadRmCompetitorData() {
@@ -3191,6 +3401,13 @@
             catComps.sort((a, b) => {
                 if (a.isEliminated && !b.isEliminated) return 1;
                 if (!a.isEliminated && b.isEliminated) return -1;
+
+                // IDEIGLENES: "Gyors eredmény" (kör-/időadatok nélküli, kézzel megadott helyezés) -
+                // ha van manuálisan megadott helyezés, az dönt a lap-alapú összehasonlítás helyett.
+                if (a.manualEntry && a.manualPlace && b.manualEntry && b.manualPlace) return a.manualPlace - b.manualPlace;
+                if (a.manualEntry && a.manualPlace) return -1;
+                if (b.manualEntry && b.manualPlace) return 1;
+
                 let aLaps = (a.laps || []).filter(l => l.isComplete).length;
                 let bLaps = (b.laps || []).filter(l => l.isComplete).length;
                 if (aLaps !== bLaps) return bLaps - aLaps;
@@ -3229,7 +3446,10 @@
                         if (gap > 0) gapStr = "+" + toTimeStr(gap);
                     }
                 }
-                ranksInfo[c.bib] = { rank: c.isEliminated ? "Kiesett" : (index + 1), gapStr: gapStr };
+                // IDEIGLENES: "Gyors eredmény" esetén a kézzel megadott helyezés jelenik meg rangként,
+                // nem a tömbindex - így pontosan azt mutatja, amit a felhasználó rögzített.
+                let rank = c.isEliminated ? "Kiesett" : (c.manualEntry && c.manualPlace ? c.manualPlace : (index + 1));
+                ranksInfo[c.bib] = { rank: rank, gapStr: gapStr };
             });
         });
         return ranksInfo;
@@ -3375,7 +3595,35 @@
     function openAdatlap(bib, isPast = false) {
         const ctx = getAdatlapContext();
         const c = ctx.comps.find(comp => comp.bib == bib); if(!c) return;
-        
+
+        // IDEIGLENES: "Gyors eredmény" (kör-/időadatok nélküli, kézzel rögzített helyezés) esetén
+        // nincs kör-bontás amit meg lehetne jeleníteni - helyette egy egyszerű összefoglaló kártya.
+        if (c.manualEntry) {
+            const placeStr = c.isEliminated ? getElimText(c) : (c.manualPlace ? c.manualPlace + '. hely' : 'nincs rögzített helyezés');
+            document.getElementById('modalBody').innerHTML = `
+                <div style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
+                    <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
+                        <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${c.internal || "Ló neve hiányzik"}</div>
+                        <div style="margin-top: 15px; display: inline-block; background: rgba(0,0,0,0.25); padding: 6px 18px; border-radius: 8px; font-size: 1rem; color: #fff;">
+                            🏁 <b>Táv:</b> ${catNames[c.dist] || (c.dist + ' km')}
+                        </div>
+                    </div>
+                    <div style="padding: 24px; text-align:center;">
+                        <p style="color:#aaa; font-size:0.82rem; margin-bottom:18px;">⚡ Gyorsan rögzített eredmény - nincsenek részletes kör-/időadatok.</p>
+                        <div style="font-size:2rem; font-weight:900; color:#fff; margin-bottom:8px;">${placeStr}</div>
+                        ${c.totalTimeSec ? `<div style="color:#ddd; font-size:1.1rem;">Teljes menetidő: <b>${toTimeStr(c.totalTimeSec)}</b></div>` : ''}
+                        ${c.club ? `<div style="color:#888; font-size:0.9rem; margin-top:10px;">${c.club}</div>` : ''}
+                    </div>
+                    <div style="text-align:center; padding: 15px 20px 20px 20px; background: #111; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                        <button class="admin-only" style="width:auto; padding:8px 22px; border-radius:20px; border:none; cursor:pointer; font-weight:800; font-size:0.85rem; background:${c.obPont !== false ? 'var(--success)' : 'var(--card-3)'}; color:${c.obPont !== false ? 'black' : '#ddd'};" onclick="toggleObPont('${c.bib}')">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
+                        <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#1c1c1e; color:#fff; border: 1px solid #333; font-weight:bold; font-size: 1.1rem; cursor:pointer; margin-top:0;" onclick="closeAdatlap()">Bezárás</button>
+                    </div>
+                </div>`;
+            document.getElementById('adatlapModal').style.display = 'flex';
+            return;
+        }
+
         let baseDist = c.dist ? c.dist.replace('j', '') : '20';
         let distName = catNames[c.dist] || (c.dist + " km");
         let cfg = ctx.config[baseDist] || { h: '00', m: '00', s: '00', laps: [] };
@@ -3896,6 +4144,13 @@
     // ez adja a pontsáv alapját is, és ez alapján összegződik a ló-ranglista is (176. §).
     function getCompletedKm(comp, cfg) {
         const baseDist = comp.dist ? comp.dist.replace('j', '') : null;
+
+        // IDEIGLENES: "Gyors eredmény" (kör-adatok nélküli, kézzel rögzített helyezés) esetén nincs
+        // kör-bontás, amiből összegezni lehetne - ha nem esett ki, a kategória névleges távját vesszük.
+        if (comp.manualEntry) {
+            return comp.isEliminated || !baseDist ? 0 : parseInt(baseDist, 10);
+        }
+
         const distCfg = baseDist && cfg ? cfg[baseDist] : null;
         if (!distCfg || !distCfg.laps) return 0;
         let km = 0;
@@ -3928,6 +4183,7 @@
                     startNum: c.startNum || '', horseName: c.internal || '',
                     dist: c.dist, km: parseInt(baseDist, 10),
                     completedKm: getCompletedKm(c, cfg), place: place, isEliminated: !!c.isEliminated,
+                    status: c.status || (c.isEliminated ? 'FTQ-ME' : 'Active'), extraCodes: c.extraCodes || [],
                     obPont: c.obPont !== false
                 });
             });
@@ -3935,12 +4191,119 @@
         return rows;
     }
 
+    // --- TÖRZSADATOK: lovas/ló profil (összes eddigi versenyeredmény - nem csak OB-forduló, ez egy
+    // személyes előzmény-nézet, nem bajnoki számítás) ---
+    function getRiderHistory(license) {
+        return getAllPastRaceRows().filter(r => r.license === license).sort((a, b) => (b.raceDate || '').localeCompare(a.raceDate || ''));
+    }
+
+    function getHorseHistory(startNum) {
+        return getAllPastRaceRows().filter(r => r.startNum === startNum).sort((a, b) => (b.raceDate || '').localeCompare(a.raceDate || ''));
+    }
+
+    function renderProfileHistoryTable(history, mode) {
+        if (!history.length) return `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs rögzített versenyeredmény.</p>`;
+        let html = `<div class="table-responsive"><table class="ttrack-table"><tr>
+            <th class="col-header" style="text-align:left;">Dátum</th>
+            <th class="col-header" style="text-align:left;">Verseny</th>
+            <th class="col-header">Táv</th>
+            <th class="col-header" style="text-align:left;">${mode === 'rider' ? 'Ló' : 'Lovas'}</th>
+            <th class="col-header">Eredmény</th>
+        </tr>`;
+        history.forEach(r => {
+            const finished = !r.isEliminated && r.place != null;
+            const resultStr = finished ? `${r.place}. hely` : getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes });
+            const other = mode === 'rider' ? (r.horseName || '-') : r.name;
+            html += `<tr>
+                <td style="text-align:left; white-space:nowrap;">${r.raceDate || '-'}</td>
+                <td style="text-align:left; font-weight:700;">${r.raceName || '-'}</td>
+                <td>${catNames[r.dist] || r.dist}</td>
+                <td style="text-align:left;">${other}</td>
+                <td><b style="color:${finished ? 'var(--primary)' : 'var(--danger)'};">${resultStr}</b></td>
+            </tr>`;
+        });
+        html += `</table></div>`;
+        return html;
+    }
+
+    // Az adatlapModal generikus üres tartalmát (#modalBody) használja - ugyanaz a modal, mint az
+    // openAdatlap()-nál, csak más tartalommal, hogy ne kelljen új modal-markupot felvenni.
+    function openRiderProfile(license) {
+        const rider = ridersCache[sanitizeKey(license)] || {};
+        const history = getRiderHistory(license);
+        document.getElementById('modalBody').innerHTML = `
+            <div style="text-align:center; margin-bottom:15px;">
+                <h3 style="color:var(--primary); margin:0;">${rider.name || license}</h3>
+                <p style="color:var(--text-dim); margin-top:4px;">${rider.club ? rider.club + ' · ' : ''}Ig. szám: ${license}</p>
+            </div>
+            ${renderProfileHistoryTable(history, 'rider')}
+        `;
+        document.getElementById('adatlapModal').style.display = 'flex';
+    }
+
+    function openHorseProfile(startNum) {
+        const horse = horsesCache[sanitizeKey(startNum)] || {};
+        const history = getHorseHistory(startNum);
+        document.getElementById('modalBody').innerHTML = `
+            <div style="text-align:center; margin-bottom:15px;">
+                <h3 style="color:var(--primary); margin:0;">${horse.name || startNum}</h3>
+                <p style="color:var(--text-dim); margin-top:4px;">Start szám: ${startNum}</p>
+            </div>
+            ${renderProfileHistoryTable(history, 'horse')}
+        `;
+        document.getElementById('adatlapModal').style.display = 'flex';
+    }
+
+    function renderTorzsLovasokList() {
+        const cont = document.getElementById('torzs-lovasok-list');
+        if (!cont) return;
+        const q = (document.getElementById('torzs-lovasok-search')?.value || '').trim().toLowerCase();
+        const riders = Object.values(ridersCache).filter(r => r && r.name)
+            .filter(r => !q || r.name.toLowerCase().includes(q) || (r.license || '').toLowerCase().includes(q) || (r.club || '').toLowerCase().includes(q))
+            .sort((a, b) => a.name.localeCompare(b.name, 'hu'));
+
+        if (!riders.length) { cont.innerHTML = `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs találat.</p>`; return; }
+
+        cont.innerHTML = riders.map(r => `
+            <div class="competitor-item" style="cursor:pointer;" onclick="openRiderProfile('${r.license}')">
+                <div style="flex:1;"><b>${r.name}</b><br><span style="color:var(--text-dim); font-size:0.85rem;">${r.club || 'Nincs egyesület megadva'} · Ig. szám: ${r.license}</span></div>
+                <div class="adatlap-arrow">❯</div>
+            </div>
+        `).join('');
+    }
+
+    function renderTorzsLovakList() {
+        const cont = document.getElementById('torzs-lovak-list');
+        if (!cont) return;
+        const q = (document.getElementById('torzs-lovak-search')?.value || '').trim().toLowerCase();
+        const horses = Object.values(horsesCache).filter(h => h && h.name)
+            .filter(h => !q || h.name.toLowerCase().includes(q) || (h.startNum || '').toLowerCase().includes(q))
+            .sort((a, b) => a.name.localeCompare(b.name, 'hu'));
+
+        if (!horses.length) { cont.innerHTML = `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs találat.</p>`; return; }
+
+        cont.innerHTML = horses.map(h => `
+            <div class="competitor-item" style="cursor:pointer;" onclick="openHorseProfile('${h.startNum}')">
+                <div style="flex:1;"><b>${h.name}</b><br><span style="color:var(--text-dim); font-size:0.85rem;">Start szám: ${h.startNum}</span></div>
+                <div class="adatlap-arrow">❯</div>
+            </div>
+        `).join('');
+    }
+
+    // A "K" előtaggal kezdődő igazolási szám külföldi versenyzőt jelöl (l. felhasználói megerősítés) -
+    // az egyéni bajnokság kizárólag a magyar versenyzőknek szól, még ha egy külföldi vendég be is
+    // fut egy hazai OB-fordulón.
+    function isForeignLicense(license) {
+        return /^\s*K/i.test(license || '');
+    }
+
     // --- 1. EGYÉNI BAJNOKSÁG (3 osztály, "legkorábban nevezett N ló" szabály + 174.§(3) dedup) ---
+    // Csak magyar versenyzőkre vonatkozik - a külföldiek (K-előtagú igazolási szám) kimaradnak.
     function computeIndividualChampionship(classKey, year) {
         const cls = CHAMPIONSHIP_CLASSES[classKey];
         const win = getChampionshipWindow(year);
         const rows = getAllPastRaceRows().filter(r =>
-            r.isObRound && cls.distKeys.includes(r.dist) && r.obPont && r.place != null && isDateInWindow(r.raceDate, win)
+            r.isObRound && cls.distKeys.includes(r.dist) && r.obPont && r.place != null && isDateInWindow(r.raceDate, win) && !isForeignLicense(r.license)
         );
 
         const byRider = {};
@@ -3984,6 +4347,24 @@
 
         riders.sort((a, b) => b.totalPoints - a.totalPoints);
         return riders;
+    }
+
+    // Összesített nézet: mindhárom bajnoki osztály eredményét egyetlen ranglistába vonja össze
+    // (osztály-szűrés nélkül) - egy lovas, aki több osztályban is szerzett pontot, összesítve
+    // szerepel, a classBreakdown mutatja, honnan jött a pontja.
+    function computeIndividualChampionshipAll(year) {
+        const merged = {};
+        Object.keys(CHAMPIONSHIP_CLASSES).forEach(classKey => {
+            computeIndividualChampionship(classKey, year).forEach(r => {
+                const key = r.license || r.name;
+                if (!merged[key]) merged[key] = { license: r.license, name: r.name, club: r.club, totalPoints: 0, classBreakdown: [] };
+                merged[key].totalPoints += r.totalPoints;
+                if (r.name) merged[key].name = r.name;
+                if (r.club) merged[key].club = r.club;
+                merged[key].classBreakdown.push({ classKey, label: CHAMPIONSHIP_CLASSES[classKey].label, points: r.totalPoints });
+            });
+        });
+        return Object.values(merged).sort((a, b) => b.totalPoints - a.totalPoints);
     }
 
     // --- 2. LÓ-RANGLISTA (a lo-lovas-integracio.md törzsadatára épül - minden kategóriájú verseny számít) ---
@@ -4085,21 +4466,34 @@
         if (yearSel && yearSel.options.length === 0) populateYearSelect('egyeni-year-select', egyeniYear);
         if (yearSel) egyeniYear = parseInt(yearSel.value, 10) || egyeniYear;
 
-        const cls = CHAMPIONSHIP_CLASSES[egyeniClassKey];
-        const riders = computeIndividualChampionship(egyeniClassKey, egyeniYear);
         const cont = document.getElementById('egyeni-bajnoksag-content');
         if (!cont) return;
 
         const clubView = document.getElementById('egyeni-club-toggle')?.checked;
+        const isAll = egyeniClassKey === 'osszesitett';
+        const riders = isAll ? computeIndividualChampionshipAll(egyeniYear) : computeIndividualChampionship(egyeniClassKey, egyeniYear);
 
-        let html = `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">${cls.label}</h4><p class="field-hint" style="margin-bottom:0;">${cls.sub} · legfeljebb ${cls.maxHorses} ló pontjai számítanak lovasonként</p></div>`;
+        let html;
+        if (isAll) {
+            html = `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">Összesített ranglista</h4><p class="field-hint" style="margin-bottom:0;">Mindhárom bajnoki osztály (Távlovas, Rövidtávú, Junior) összpontjai egyben, osztály-szűrés nélkül - mindenki rajta van, akinek van pontja.</p></div>`;
+        } else {
+            const cls = CHAMPIONSHIP_CLASSES[egyeniClassKey];
+            html = `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">${cls.label}</h4><p class="field-hint" style="margin-bottom:0;">${cls.sub} · legfeljebb ${cls.maxHorses} ló pontjai számítanak lovasonként · csak magyar versenyzők (K-jelű igazolási számok kimaradnak)</p></div>`;
+        }
 
         if (riders.length === 0) {
-            html += `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még pontszerző eredmény ebben az osztályban erre az évre.</p>`;
+            html += `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még pontszerző eredmény ${isAll ? 'erre az évre' : 'ebben az osztályban erre az évre'}.</p>`;
         } else if (clubView) {
             const clubs = computeClubBreakdownPoints(riders);
             html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Összpont</th></tr>`;
             clubs.forEach((c, i) => { html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${c.club}</td><td><b>${c.points}</b></td></tr>`; });
+            html += `</table></div>`;
+        } else if (isAll) {
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Összpont</th><th class="col-header">Osztályok</th></tr>`;
+            riders.forEach((r, i) => {
+                const clsStr = r.classBreakdown.map(c => `${c.label.replace('Magyar ', '').replace(' Bajnokság', '')}: ${c.points} p`).join(', ');
+                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${r.name}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${clsStr}</td></tr>`;
+            });
             html += `</table></div>`;
         } else {
             html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Pont</th><th class="col-header">Lovak</th></tr>`;
@@ -4376,8 +4770,9 @@
         if (savedMode === 'terv') savedMode = 'versenyek';
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
 
-        initAutocompleteFields('');   // élő nevezési form
-        initAutocompleteFields('rm'); // múltbéli/jövőbeli verseny szerkesztő modal
+        initAutocompleteFields('');     // élő nevezési form
+        initAutocompleteFields('rm');    // múltbéli/jövőbeli verseny szerkesztő modal
+        // initAutocompleteFields('rm-gy'); // IDEIGLENES "Gyors eredmény" fül - kikapcsolva
 
         // Bajnoki pontszámítás: csapattag / külföldi eredmény javaslatlisták
         attachAutocomplete('team-member-search', searchRiders, (item) => {
