@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v102</title>
+    <title>Verseny Kalkulátor v103</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,6 +72,12 @@
     
     <div class="menu-title">Verseny</div>
     <button id="btn-menu-versenyek" class="sidebar-btn" onclick="switchSidebarMode('versenyek', this)">🏁 Versenyek</button>
+
+    <div class="menu-title">Bajnokság</div>
+    <button id="btn-menu-bajnoksag-egyeni" class="sidebar-btn" onclick="switchSidebarMode('bajnoksag-egyeni', this)">🏆 Egyéni bajnokság</button>
+    <button id="btn-menu-bajnoksag-lo" class="sidebar-btn" onclick="switchSidebarMode('bajnoksag-lo', this)">🐴 Ló-ranglista</button>
+    <button id="btn-menu-bajnoksag-csapat" class="sidebar-btn" onclick="switchSidebarMode('bajnoksag-csapat', this)">🤝 Csapatbajnokság</button>
+    <button id="btn-menu-bajnoksag-teny" class="sidebar-btn" onclick="switchSidebarMode('bajnoksag-teny', this)">🐎 Év Tenyésztője</button>
 
     <div class="menu-title">Eszközök</div>
     <button id="btn-menu-reszido" class="sidebar-btn" onclick="switchSidebarMode('reszido', this)">⏳ Részidő</button>
@@ -262,6 +268,114 @@
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
                 <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+            </div>
+        </div>
+
+        <div id="bajnoksag-egyeni" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">🏆 Egyéni bajnokság</h3>
+            <div class="tabs" id="egyeni-class-tabs">
+                <button class="tab-btn active" onclick="setEgyeniClass('tavlovas', this)">Távlovas</button>
+                <button class="tab-btn" onclick="setEgyeniClass('rovid', this)">Rövidtávú</button>
+                <button class="tab-btn" onclick="setEgyeniClass('junior', this)">Junior</button>
+            </div>
+            <div class="kiiras-card" style="border-left-color: var(--teal); display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Bajnoki év:</label>
+                    <select id="egyeni-year-select" onchange="renderEgyeniBajnoksag()"></select>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; margin-top:20px; text-transform:none; cursor:pointer; font-size:0.9rem; color:var(--text);">
+                    <input type="checkbox" id="egyeni-club-toggle" style="width:auto; margin:0;" onchange="renderEgyeniBajnoksag()"> 🏛️ Egyesületi bontás
+                </label>
+            </div>
+            <div id="egyeni-bajnoksag-content"></div>
+        </div>
+
+        <div id="bajnoksag-lo" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">🐴 Ló-ranglista</h3>
+            <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">A legmegbízhatóbb lovak - bármilyen kategóriájú versenyen teljesített összes kilométer, nem csak az OB-fordulók.</p>
+            <div class="kiiras-card" style="border-left-color: var(--teal); display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Bajnoki év:</label>
+                    <select id="lo-year-select" onchange="renderLoRanglista()"></select>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; margin-top:20px; text-transform:none; cursor:pointer; font-size:0.9rem; color:var(--text);">
+                    <input type="checkbox" id="lo-club-toggle" style="width:auto; margin:0;" onchange="renderLoRanglista()"> 🏛️ Egyesületi bontás
+                </label>
+            </div>
+            <div id="lo-ranglista-content"></div>
+        </div>
+
+        <div id="bajnoksag-csapat" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 15px;">🤝 Csapatbajnokság</h3>
+            <div class="tabs">
+                <button id="btn-csapat-rang" class="tab-btn active" onclick="switchCsapatTab('csapat-rang', this)">Ranglista</button>
+                <button id="btn-csapat-kezel" class="tab-btn admin-only" onclick="switchCsapatTab('csapat-kezel', this)">Csapatok kezelése</button>
+                <button id="btn-csapat-kulf" class="tab-btn admin-only" onclick="switchCsapatTab('csapat-kulf', this)">Külföldi eredmények</button>
+                <button id="btn-csapat-datum" class="tab-btn admin-only" onclick="switchCsapatTab('csapat-datum', this)">Bajnokavatás dátuma</button>
+            </div>
+
+            <div id="csapat-rang" class="sub-mode-content" style="display:block;">
+                <div class="kiiras-card" style="border-left-color: var(--teal);">
+                    <label style="margin-top:0;">Bajnoki év:</label>
+                    <select id="csapat-year-select" onchange="renderCsapatRanglista()"></select>
+                </div>
+                <div id="csapat-ranglista-content"></div>
+            </div>
+
+            <div id="csapat-kezel" class="sub-mode-content" style="display:none;">
+                <h4 style="margin-bottom: 15px; color: var(--text);">Új csapat létrehozása</h4>
+                <label>Csapat neve:</label> <input type="text" id="team-name" placeholder="pl. Alföldi Lovasok SE">
+                <label>Kapcsolattartó:</label> <input type="text" id="team-contact" placeholder="pl. telefonszám vagy email" autocomplete="off">
+                <label>Tagok (2-5 fő):</label>
+                <input type="text" id="team-member-search" placeholder="Lovas keresése név vagy igazolási szám alapján..." autocomplete="off">
+                <div id="team-member-list" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+
+                <button id="btn-team-mentes" class="calc-btn add-btn admin-only" onclick="saveTeam()">Csapat mentése</button>
+                <button id="team-cancel-btn" class="cancel-btn" onclick="cancelTeamEdit()">Mégse</button>
+
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált csapatok:</h4>
+                <div id="team-list-container"></div>
+            </div>
+
+            <div id="csapat-kulf" class="sub-mode-content" style="display:none;">
+                <h4 style="margin-bottom: 15px; color: var(--text);">Külföldi (CEI/CEIO) eredmény felvitele</h4>
+                <p class="field-hint">Ez nem az élő verseny-lebonyolítási rendszer része, csak egy egyszerű kézi nyilvántartás a csapatbajnoksághoz és a ló-ranglistához.</p>
+                <label>Lovas:</label>
+                <input type="text" id="ext-rider-search" placeholder="Név vagy igazolási szám..." autocomplete="off">
+                <input type="hidden" id="ext-license">
+                <label>Ló (opcionális - ha ismert, a km a ló-ranglistába is beszámít):</label>
+                <input type="text" id="ext-horse-search" placeholder="Ló neve vagy start száma..." autocomplete="off">
+                <input type="hidden" id="ext-horseStartNum">
+                <label>Verseny neve:</label> <input type="text" id="ext-raceName" placeholder="pl. CEI2* Compiègne">
+                <label>Ország:</label> <input type="text" id="ext-country" placeholder="pl. Franciaország">
+                <label>Időpont:</label> <input type="date" id="ext-date">
+                <label>Táv (km):</label> <input type="number" id="ext-distanceKm" placeholder="pl. 120">
+                <label>Helyezés (opcionális):</label> <input type="number" id="ext-place" placeholder="pl. 5">
+                <button id="btn-ext-mentes" class="calc-btn add-btn admin-only" onclick="saveExternalResult()">Eredmény mentése</button>
+                <button id="ext-cancel-btn" class="cancel-btn" onclick="cancelExternalEdit()">Mégse</button>
+
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Rögzített külföldi eredmények:</h4>
+                <div id="ext-list-container"></div>
+            </div>
+
+            <div id="csapat-datum" class="sub-mode-content" style="display:none;">
+                <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:0;">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">📅 Bajnokavatás dátuma évenként</h4>
+                    <p class="field-hint" style="margin-bottom:0;">
+                        A csapatbajnokság pontszerző időszaka mindig az előző évi bajnokavatás dátuma + 1 nap és az adott évi
+                        bajnokavatás dátuma közé esik. Amíg nem ismert a tényleges dátum, a rendszer alapból {év}-12-31-gyel
+                        számol - ez nem blokkol semmit, mindig van valamilyen ésszerű ablak.
+                    </p>
+                    <div id="bajnokavatas-datum-container" style="margin-top:15px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="bajnoksag-teny" class="mode-content">
+            <div class="placeholder-page">
+                <div class="placeholder-icon">🐎</div>
+                <h2>Év Tenyésztője</h2>
+                <p>Ez a rész még nyergelés alatt áll - hamarosan galoppban érkezik!</p>
             </div>
         </div>
 
@@ -475,6 +589,14 @@
             <input type="date" id="rm-date" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: var(--card-3); color: var(--text); width: 100%; box-sizing: border-box; margin-top: 5px;">
             <label>Leírás:</label>
             <textarea id="rm-desc" rows="3" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: var(--card-3); color: var(--text); width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
+
+            <div class="kiiras-card" style="border-left-color: var(--primary); margin-top:20px; margin-bottom:0;">
+                <label class="ob-round-check" style="margin-top:0; display:flex; align-items:center; gap:10px; cursor:pointer; text-transform:none;">
+                    <input type="checkbox" id="rm-isObRound" style="width:auto; margin:0;">
+                    <span style="color:var(--text); font-size:0.95rem; font-weight:700;">🏆 Ez a verseny hivatalos OB-forduló</span>
+                </label>
+                <p class="field-hint" style="margin-bottom:0;">Ha bejelölöd, ennek a versenynek az eredményei beleszámítanak az egyéni bajnokságba, az egyesületi bontásba és a csapatbajnokság jogosultsági feltételébe.</p>
+            </div>
 
             <button class="calc-btn admin-only" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
         </div>

@@ -25,18 +25,31 @@
     let speedThresholds = {};
     let ridersCache = {}; // riders/{license} - lo-lovas-integracio.md
     let horsesCache = {}; // horses/{startNum}
-    let uiTheme = 'default'; // 'default' / 'alt' / 'forest' / 'violet' - admin választja, mindenkinek szinkronban
+    let uiTheme = 'default'; // admin választja (settings/uiTheme), mindenkinek szinkronban - l. THEME_LIST
+    // colors: [primary (dot), bg, card] - a swatch előnézet ebből épül fel (renderThemeSwatches)
     const THEME_LIST = [
-        { key: 'default', label: 'Alap (kék)', colors: ['#0A84FF', '#000000'] },
-        { key: 'alt', label: 'Meleg', colors: ['#E8A33D', '#0f0b08'] },
-        { key: 'forest', label: 'Erdő', colors: ['#34C77B', '#070f0c'] },
-        { key: 'violet', label: 'Ibolya', colors: ['#9B7FD4', '#0e0b16'] },
-        { key: 'graphite', label: 'Grafit', colors: ['#6C99C4', '#0a0b0d'] },
-        { key: 'wine', label: 'Bordó', colors: ['#C1626E', '#120a0c'] },
+        { key: 'default',  label: '☀️ Alap',      colors: ['#0A84FF', '#000000', '#1c1c1e'] },
+        { key: 'alt',      label: '🌅 Alkony',     colors: ['#FF7A45', '#150a08', '#241209'] },
+        { key: 'forest',   label: '🌲 Fenyves',    colors: ['#28C97A', '#060f0a', '#0f2318'] },
+        { key: 'violet',   label: '💜 Ametiszt',   colors: ['#A66EF0', '#0f0a1a', '#1f1530'] },
+        { key: 'graphite', label: '⚙️ Acél',       colors: ['#5CA9E8', '#0a0d10', '#161b21'] },
+        { key: 'wine',     label: '🍷 Rubin',      colors: ['#E0475C', '#130709', '#26121A'] },
+        { key: 'ocean',    label: '🌊 Óceán',      colors: ['#22C9D6', '#04121a', '#0c2430'] },
+        { key: 'gold',     label: '✨ Éjarany',    colors: ['#E8B33D', '#0a0906', '#1c170e'] },
+        { key: 'daylight', label: '🌤️ Verőfény',  colors: ['#0A6FE8', '#eef4fb', '#ffffff'] },
+        { key: 'wheat',    label: '🌾 Búzamező',   colors: ['#A8631A', '#faf3e6', '#fffdfa'] },
+        { key: 'mint',     label: '🌿 Menta',      colors: ['#159873', '#eef7f3', '#ffffff'] },
     ];
+
+    function applyThemeColorMeta(key) {
+        const t = THEME_LIST.find(x => x.key === key) || THEME_LIST[0];
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', t.colors[1]);
+    }
 
     // Villanás-mentes indulás: amíg a Firebase beállítás betöltődik, a legutóbb ismert témát használjuk
     document.documentElement.setAttribute('data-theme', localStorage.getItem('uiTheme') || 'default');
+    applyThemeColorMeta(localStorage.getItem('uiTheme') || 'default');
     
     let viewingPastRaceData = null; 
     let pastAdatlapFilter = null; 
@@ -269,6 +282,7 @@
                     let oldId = curLiveMeta.id || Date.now().toString();
                     updates['races/mult/' + oldId] = {
                         id: oldId, name: curLiveMeta.name, loc: curLiveMeta.loc, date: curLiveMeta.date, desc: curLiveMeta.desc || "",
+                        isObRound: curLiveMeta.isObRound || false,
                         raceConfig: curRaceConfig || getEmptyRaceConfig(),
                         competitors: curCompetitors || null
                     };
@@ -276,7 +290,7 @@
 
                 let sourceRace = sourceSnap.val();
                 if (sourceRace) {
-                    updates['liveRaceMeta'] = { id: sourceRace.id, name: sourceRace.name, loc: sourceRace.loc, date: sourceRace.date, desc: sourceRace.desc || "" };
+                    updates['liveRaceMeta'] = { id: sourceRace.id, name: sourceRace.name, loc: sourceRace.loc, date: sourceRace.date, desc: sourceRace.desc || "", isObRound: sourceRace.isObRound || false };
                     updates['raceConfig'] = sourceRace.raceConfig || getEmptyRaceConfig();
                     updates['competitors'] = sourceRace.competitors || null;
                     updates['races/' + sourceType + '/' + id] = null;
@@ -306,6 +320,7 @@
 
                 updates['races/mult/' + oldId] = {
                     id: oldId, name: curLiveMeta.name, loc: curLiveMeta.loc, date: curLiveMeta.date, desc: curLiveMeta.desc || "",
+                    isObRound: curLiveMeta.isObRound || false,
                     raceConfig: raceConfigSnap.val() || getEmptyRaceConfig(),
                     competitors: competitorsSnap.val() || null
                 };
@@ -346,6 +361,7 @@
                 let id = meta.id || Date.now().toString();
                 updates['races/mult/' + id] = {
                     id: id, name: meta.name, loc: meta.loc, date: meta.date, desc: meta.desc || "",
+                    isObRound: meta.isObRound || false,
                     raceConfig: curRaceConfig || getEmptyRaceConfig(),
                     competitors: curCompetitors || {}
                 };
@@ -360,7 +376,7 @@
                 let toMoveId = Object.keys(jovo).find(key => jovo[key].date === today);
                 if (toMoveId) {
                     let r = jovo[toMoveId];
-                    updates['liveRaceMeta'] = { id: r.id, name: r.name, loc: r.loc, date: r.date, desc: r.desc || "" };
+                    updates['liveRaceMeta'] = { id: r.id, name: r.name, loc: r.loc, date: r.date, desc: r.desc || "", isObRound: r.isObRound || false };
                     updates['raceConfig'] = r.raceConfig || getEmptyRaceConfig();
                     updates['competitors'] = r.competitors || {};
                     updates['races/jovo/' + toMoveId] = null;
@@ -404,6 +420,8 @@
                 const updatedRace = localRaces.mult.find(x => x.id === viewingPastRaceData.id);
                 if(updatedRace) { viewingPastRaceData = updatedRace; renderPastAdatlapList(); }
             }
+
+            refreshOpenBajnoksagViews();
         });
 
         db.ref('raceConfig').on('value', (snapshot) => {
@@ -468,9 +486,26 @@
             uiTheme = snap.val() || 'default';
             localStorage.setItem('uiTheme', uiTheme);
             document.documentElement.setAttribute('data-theme', uiTheme);
+            applyThemeColorMeta(uiTheme);
             renderThemeSwatches();
         });
 
+        // Bajnoki pontszámítás törzsadatai (bajnoki-pontszamitas.md)
+        db.ref('teams').on('value', snap => { teamsCache = snap.val() || {}; refreshOpenBajnoksagViews(); });
+        db.ref('externalResults').on('value', snap => { externalResultsCache = snap.val() || {}; refreshOpenBajnoksagViews(); });
+        db.ref('settings/bajnokavatasDatum').on('value', snap => { bajnokavatasDatumCache = snap.val() || {}; refreshOpenBajnoksagViews(); });
+    }
+
+    // Csak azt a bajnoksági nézetet frissíti, ami épp aktív - a többi majd megnyitáskor újraszámol.
+    function refreshOpenBajnoksagViews() {
+        if (document.getElementById('bajnoksag-egyeni')?.classList.contains('active')) renderEgyeniBajnoksag();
+        if (document.getElementById('bajnoksag-lo')?.classList.contains('active')) renderLoRanglista();
+        if (document.getElementById('bajnoksag-csapat')?.classList.contains('active')) {
+            if (document.getElementById('csapat-rang')?.style.display !== 'none') renderCsapatRanglista();
+            if (document.getElementById('csapat-kezel')?.style.display === 'block') renderTeamList();
+            if (document.getElementById('csapat-kulf')?.style.display === 'block') renderExternalResultsList();
+            if (document.getElementById('csapat-datum')?.style.display === 'block') renderBajnokavatasDatumSettings();
+        }
     }
 
     startDatabaseListeners();
@@ -592,6 +627,9 @@
         
         if (targetId === 'adatlapok') renderAdatlapList();
         if (targetId === 'export-mod') renderExportList();
+        if (targetId === 'bajnoksag-egyeni') renderEgyeniBajnoksag();
+        if (targetId === 'bajnoksag-lo') renderLoRanglista();
+        if (targetId === 'bajnoksag-csapat') switchCsapatTab('csapat-rang', document.querySelector('#bajnoksag-csapat .tabs .tab-btn'));
     }
 
     function switchMainTab(targetId, btn) { switchSidebarMode(targetId, btn || document.getElementById('btn-menu-fomod')); }
@@ -826,6 +864,10 @@
     }
 
     // --- LISTÁK (Múlt / Jövő / Jelenlegi) ---
+    function obBadge(r) {
+        return r && r.isObRound ? `<span style="background:var(--primary-dim); color:var(--primary); font-size:0.7rem; font-weight:800; padding:3px 9px; border-radius:20px; margin-left:8px; vertical-align:middle;">🏆 OB-FORDULÓ</span>` : '';
+    }
+
     function renderLocalRaces() {
         const multCont = document.getElementById('v-mult-list');
         const jovoCont = document.getElementById('v-jovo-list');
@@ -838,7 +880,7 @@
         if(liveRaceMeta) {
             jelenCont.innerHTML = `
             <div class="race-card" style="border-left-color: var(--success); background:#202820;">
-                <div class="race-card-title">${liveRaceMeta.name} <span style="color:var(--success); font-size:0.8rem;">(ÉLŐ FUTAM)</span></div>
+                <div class="race-card-title">${liveRaceMeta.name} <span style="color:var(--success); font-size:0.8rem;">(ÉLŐ FUTAM)</span>${obBadge(liveRaceMeta)}</div>
                 <div class="race-card-date">${liveRaceMeta.date} | Helyszín: ${liveRaceMeta.loc}</div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
                     <button class="calc-btn admin-only" style="padding:10px; margin-top:0; font-size:0.9rem;" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>
@@ -852,7 +894,7 @@
         localRaces.mult.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(r => {
             multCont.innerHTML += `
             <div class="race-card" style="border-left-color: #666;">
-                <div class="race-card-title">${r.name}</div>
+                <div class="race-card-title">${r.name}${obBadge(r)}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
                 <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openPublicPastRace('${r.id}')">📊 Eredmények megtekintése</button>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
@@ -867,7 +909,7 @@
         localRaces.jovo.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
             jovoCont.innerHTML += `
             <div class="race-card" style="border-left-color: var(--warning);">
-                <div class="race-card-title">${r.name}</div>
+                <div class="race-card-title">${r.name}${obBadge(r)}</div>
                 <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
                 <button class="calc-btn" style="padding:10px; margin-top:10px; background: var(--teal); color: white;" onclick="showFutureInfo('${r.id}')">ℹ️ Részletek megtekintése</button>
                 <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
@@ -1015,12 +1057,14 @@
                 document.getElementById('rm-loc').value = race.loc;
                 document.getElementById('rm-date').value = race.date;
                 document.getElementById('rm-desc').value = race.desc || '';
+                document.getElementById('rm-isObRound').checked = !!race.isObRound;
             }
         } else {
             document.getElementById('rm-name').value = '';
             document.getElementById('rm-loc').value = '';
             document.getElementById('rm-date').value = '';
             document.getElementById('rm-desc').value = '';
+            document.getElementById('rm-isObRound').checked = false;
         }
 
         document.getElementById('raceModal').style.display = 'flex';
@@ -1043,7 +1087,8 @@
         if (!id) { id = generateSlug(name, document.getElementById('rm-date').value); }
 
         const raceData = {
-            id: id, name: name, loc: document.getElementById('rm-loc').value, date: document.getElementById('rm-date').value, desc: document.getElementById('rm-desc').value
+            id: id, name: name, loc: document.getElementById('rm-loc').value, date: document.getElementById('rm-date').value, desc: document.getElementById('rm-desc').value,
+            isObRound: document.getElementById('rm-isObRound').checked
         };
         
         db.ref('races/' + type + '/' + id).update(raceData).then(() => {
@@ -2324,7 +2369,7 @@
         if (!cont) return;
         cont.innerHTML = THEME_LIST.map(t => `
             <div class="theme-swatch ${uiTheme === t.key ? 'active' : ''}" onclick="setUiTheme('${t.key}')">
-                <div class="theme-swatch-preview" style="background:${t.colors[1]};"><div class="dot" style="background:${t.colors[0]};"></div></div>
+                <div class="theme-swatch-preview" style="background:linear-gradient(135deg, ${t.colors[1]} 0%, ${t.colors[2]} 100%);"><div class="dot" style="background:${t.colors[0]}; color:${t.colors[0]};"></div></div>
                 <div class="theme-swatch-label">${t.label}</div>
                 <div class="theme-swatch-check">✓ Aktív</div>
             </div>
@@ -3446,8 +3491,9 @@
         html += `
                     </table>
                 </div>
-                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #111;">
-                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#1c1c1e; color:#fff; border: 1px solid #333; font-weight:bold; font-size: 1.1rem; cursor:pointer;" onclick="closeAdatlap()">Bezárás</button>
+                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #111; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                    <button class="admin-only" style="width:auto; padding:8px 22px; border-radius:20px; border:none; cursor:pointer; font-weight:800; font-size:0.85rem; background:${c.obPont !== false ? 'var(--success)' : 'var(--card-3)'}; color:${c.obPont !== false ? 'black' : '#ddd'};" onclick="toggleObPont('${c.bib}')" title="Bajnoki (OB) pontszerzésre jogosult-e ez a versenyző - ha lemond, ennek a versenynek az eredménye nem számít bele az egyéni bajnokságba">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
+                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#1c1c1e; color:#fff; border: 1px solid #333; font-weight:bold; font-size: 1.1rem; cursor:pointer; margin-top:0;" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>`;
         
@@ -3754,6 +3800,577 @@
         return base;
     }
     
+    // ============================================================================
+    // BAJNOKI PONTSZÁMÍTÁS (bajnoki-pontszamitas.md) - egyéni/ló/csapat/klub bontás
+    // ============================================================================
+
+    function toggleObPont(bib) {
+        const ctx = getAdatlapContext();
+        const comp = ctx.comps.find(c => c.bib == bib);
+        if (!comp) return;
+        const newVal = !(comp.obPont !== false);
+        const path = viewingPastRaceData
+            ? 'races/mult/' + viewingPastRaceData.id + '/competitors/' + bib + '/obPont'
+            : 'competitors/' + bib + '/obPont';
+        db.ref(path).set(newVal).then(() => {
+            showToast(newVal ? '🏆 Jogosult az OB-pontra' : '🚫 Lemondva az OB-pontról');
+        }).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    // --- A magyar bajnokság pontrendszere (III. sz. melléklet). Index 0 = 1. hely, index 23 = 24. hely. ---
+    const CHAMPIONSHIP_POINTS = {
+        band140_160: [125,115,107,101,97,94,91,88,85,82,80,78,77,76,75,75,75,75,75,75,75,75,75,75],
+        band120_139: [100,91,84,79,76,73,70,67,64,61,58,56,54,52,50,49,48,47,46,45,45,45,45,45],
+        band100_119: [85,77,72,69,66,63,60,57,54,51,48,46,44,42,40,39,38,37,36,35,35,35,35,35],
+        band80_99:   [75,68,63,60,57,54,51,48,46,44,42,40,38,36,34,32,30,28,27,26,25,25,25,25],
+        band50_79:   [60,54,51,48,45,43,41,39,37,35,33,31,29,27,26,25,24,23,22,21,20,20,20,20],
+        band40_49:   [45,42,39,36,34,32,30,28,26,24,22,20,19,18,17,16,15,14,13,12,11,10,10,10]
+    };
+
+    function getPoints(band, place) {
+        if (!band || !place || place < 1) return 0;
+        const arr = CHAMPIONSHIP_POINTS[band];
+        if (!arr) return 0;
+        return arr[Math.min(place, 24) - 1] || 0;
+    }
+
+    // A sáv a ténylegesen megtett km alapján dől el, nem a nevezési kategória szerint.
+    function getPointBand(totalKm) {
+        if (totalKm >= 140) return 'band140_160';
+        if (totalKm >= 120) return 'band120_139';
+        if (totalKm >= 100) return 'band100_119';
+        if (totalKm >= 80) return 'band80_99';
+        if (totalKm >= 50) return 'band50_79';
+        if (totalKm >= 40) return 'band40_49';
+        return null;
+    }
+
+    // Nincs Magyar Távhajtó Bajnokság - nem lesznek távhajtó versenyzők.
+    const CHAMPIONSHIP_CLASSES = {
+        tavlovas: { label: 'Magyar Távlovas Bajnokság', sub: '80–160 km, felnőtt', distKeys: ['80', '100'], maxHorses: 2 },
+        rovid:    { label: 'Magyar Rövidtávú Távlovas Bajnokság', sub: '40–60 km, bármilyen korú', distKeys: ['40', '60'], maxHorses: 2 },
+        junior:   { label: 'Magyar Junior Bajnokság', sub: '80–120 km, junior', distKeys: ['80j', '100j'], maxHorses: 2 },
+    };
+
+    // --- Csapatbajnokság törzsadatai (Firebase) ---
+    let teamsCache = {};
+    let externalResultsCache = {};
+    let bajnokavatasDatumCache = {};
+
+    function getBajnokavatasDatum(year) {
+        return (bajnokavatasDatumCache && bajnokavatasDatumCache[year]) || (year + '-12-31');
+    }
+
+    // window(year) = [ bajnokavatasDatum[year-1] + 1 nap, bajnokavatasDatum[year] ] - l. terv 3.2.
+    // Minden bajnoki ranglista (egyéni, ló, klub, csapat) ugyanezt az ablakot használja az évhez,
+    // hogy egységes legyen a "bajnoki év" fogalma - alapból ez gyakorlatilag a naptári évet adja ki.
+    function getChampionshipWindow(year) {
+        const prevDate = getBajnokavatasDatum(year - 1);
+        const d = new Date(prevDate + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        const startDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return { start: startDate, end: getBajnokavatasDatum(year) };
+    }
+
+    function isDateInWindow(dateStr, win) {
+        return !!dateStr && dateStr >= win.start && dateStr <= win.end;
+    }
+
+    function getAvailableChampionshipYears() {
+        const years = new Set([new Date().getFullYear()]);
+        localRaces.mult.forEach(r => { if (r.date) years.add(parseInt(r.date.slice(0, 4), 10)); });
+        Object.values(externalResultsCache).forEach(e => { if (e.date) years.add(parseInt(e.date.slice(0, 4), 10)); });
+        return Array.from(years).filter(y => !isNaN(y)).sort((a, b) => b - a);
+    }
+
+    function populateYearSelect(selectId, currentYear) {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        const years = getAvailableChampionshipYears();
+        if (!years.includes(currentYear)) years.unshift(currentYear);
+        years.sort((a, b) => b - a);
+        sel.innerHTML = years.map(y => `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}. bajnoki év</option>`).join('');
+    }
+
+    // Egy versenyző adott versenyen, adott kategóriában teljesített (befejezett köreinek) km-összege -
+    // ez adja a pontsáv alapját is, és ez alapján összegződik a ló-ranglista is (176. §).
+    function getCompletedKm(comp, cfg) {
+        const baseDist = comp.dist ? comp.dist.replace('j', '') : null;
+        const distCfg = baseDist && cfg ? cfg[baseDist] : null;
+        if (!distCfg || !distCfg.laps) return 0;
+        let km = 0;
+        (comp.laps || []).forEach((l, i) => {
+            if (l && l.isComplete) {
+                const d = parseFloat(distCfg.laps[i]);
+                if (!isNaN(d)) km += d;
+            }
+        });
+        return Math.round(km * 100) / 100;
+    }
+
+    // Az összes múltbéli verseny összes eredményét egy lapos listává alakítja - ez a közös alap
+    // minden bajnoki számításhoz (egyéni, ló-ranglista, klub bontás, csapat jogosultság).
+    function getAllPastRaceRows() {
+        let rows = [];
+        localRaces.mult.forEach(race => {
+            const comps = parseCompetitors(race.competitors);
+            if (!comps.length) return;
+            const cfg = mergeRaceConfig(race.raceConfig);
+            const ranks = calculateCurrentRanks(comps, cfg);
+            comps.forEach(c => {
+                const baseDist = c.dist ? c.dist.replace('j', '') : null;
+                if (!baseDist) return;
+                const rInfo = ranks[c.bib];
+                const place = (!c.isEliminated && rInfo && typeof rInfo.rank === 'number') ? rInfo.rank : null;
+                rows.push({
+                    raceId: race.id, raceDate: race.date || '', raceName: race.name, isObRound: !!race.isObRound,
+                    bib: c.bib, name: c.name, license: c.license || '', club: c.club || '',
+                    startNum: c.startNum || '', horseName: c.internal || '',
+                    dist: c.dist, km: parseInt(baseDist, 10),
+                    completedKm: getCompletedKm(c, cfg), place: place, isEliminated: !!c.isEliminated,
+                    obPont: c.obPont !== false
+                });
+            });
+        });
+        return rows;
+    }
+
+    // --- 1. EGYÉNI BAJNOKSÁG (3 osztály, "legkorábban nevezett N ló" szabály + 174.§(3) dedup) ---
+    function computeIndividualChampionship(classKey, year) {
+        const cls = CHAMPIONSHIP_CLASSES[classKey];
+        const win = getChampionshipWindow(year);
+        const rows = getAllPastRaceRows().filter(r =>
+            r.isObRound && cls.distKeys.includes(r.dist) && r.obPont && r.place != null && isDateInWindow(r.raceDate, win)
+        );
+
+        const byRider = {};
+        rows.forEach(r => {
+            const key = r.license || ('bib:' + r.bib + ':' + r.name);
+            if (!byRider[key]) byRider[key] = { license: r.license, name: r.name, club: r.club, results: [] };
+            byRider[key].results.push(r);
+            if (r.name) byRider[key].name = r.name;
+            if (r.club) byRider[key].club = r.club;
+        });
+
+        const riders = Object.values(byRider).map(rider => {
+            const byHorse = {};
+            rider.results.forEach(r => {
+                const hKey = r.startNum || ('horse:' + r.horseName);
+                if (!byHorse[hKey]) byHorse[hKey] = { startNum: r.startNum, horseName: r.horseName, results: [], firstDate: r.raceDate };
+                byHorse[hKey].results.push(r);
+                if (r.raceDate && r.raceDate < byHorse[hKey].firstDate) byHorse[hKey].firstDate = r.raceDate;
+            });
+            const horsesSorted = Object.values(byHorse).sort((a, b) => (a.firstDate || '').localeCompare(b.firstDate || ''));
+            const usedHorses = horsesSorted.slice(0, cls.maxHorses);
+            const excludedHorseCount = horsesSorted.length - usedHorses.length;
+
+            let totalPoints = 0;
+            const horseBreakdown = usedHorses.map(h => {
+                // 174. § (3): azonos verseny, azonos táv-kategória két futamánál csak a jobbik pont számít
+                const byRaceCat = {};
+                h.results.forEach(r => {
+                    const rcKey = r.raceId + '|' + r.dist;
+                    const pts = getPoints(getPointBand(r.completedKm), r.place);
+                    if (!byRaceCat[rcKey] || pts > byRaceCat[rcKey].points) byRaceCat[rcKey] = Object.assign({ points: pts }, r);
+                });
+                const dedupedResults = Object.values(byRaceCat).sort((a, b) => (a.raceDate || '').localeCompare(b.raceDate || ''));
+                const horsePoints = dedupedResults.reduce((s, r) => s + r.points, 0);
+                totalPoints += horsePoints;
+                return { startNum: h.startNum, horseName: h.horseName, points: horsePoints, results: dedupedResults };
+            });
+
+            return { license: rider.license, name: rider.name, club: rider.club, totalPoints, horses: horseBreakdown, excludedHorseCount };
+        });
+
+        riders.sort((a, b) => b.totalPoints - a.totalPoints);
+        return riders;
+    }
+
+    // --- 2. LÓ-RANGLISTA (a lo-lovas-integracio.md törzsadatára épül - minden kategóriájú verseny számít) ---
+    function computeHorseRanking(year) {
+        const win = getChampionshipWindow(year);
+        const byHorse = {};
+
+        getAllPastRaceRows().filter(r => isDateInWindow(r.raceDate, win) && r.completedKm > 0 && r.startNum).forEach(r => {
+            if (!byHorse[r.startNum]) byHorse[r.startNum] = { startNum: r.startNum, horseName: r.horseName, totalKm: 0, raceCount: 0, clubs: {}, lastRider: '', lastDate: '' };
+            const e = byHorse[r.startNum];
+            e.totalKm += r.completedKm;
+            e.raceCount += 1;
+            if (r.horseName) e.horseName = r.horseName;
+            if (r.club) e.clubs[r.club] = (e.clubs[r.club] || 0) + r.completedKm;
+            if (r.raceDate >= e.lastDate) { e.lastDate = r.raceDate; e.lastRider = r.name; }
+        });
+
+        // Külföldi (externalResults) eredmények is beszámítanak, ha ismert a ló azonosítója (l. terv 3.4).
+        Object.values(externalResultsCache).filter(ex => ex.horseStartNum && isDateInWindow(ex.date, win)).forEach(ex => {
+            const km = parseFloat(ex.distanceKm) || 0;
+            if (km <= 0) return;
+            if (!byHorse[ex.horseStartNum]) {
+                const h = horsesCache[sanitizeKey(ex.horseStartNum)] || {};
+                byHorse[ex.horseStartNum] = { startNum: ex.horseStartNum, horseName: h.name || ex.horseStartNum, totalKm: 0, raceCount: 0, clubs: {}, lastRider: '', lastDate: '' };
+            }
+            const e = byHorse[ex.horseStartNum];
+            e.totalKm += km;
+            e.raceCount += 1;
+            const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
+            if (riderInfo.club) e.clubs[riderInfo.club] = (e.clubs[riderInfo.club] || 0) + km;
+            if (ex.date >= e.lastDate) { e.lastDate = ex.date; e.lastRider = riderInfo.name || ex.license; }
+        });
+
+        return Object.values(byHorse).map(e => ({ ...e, totalKm: Math.round(e.totalKm * 100) / 100 })).sort((a, b) => b.totalKm - a.totalKm);
+    }
+
+    // --- 4. EGYESÜLETI BONTÁS (nem hivatalos - a fenti ranglisták klubonkénti összesítése) ---
+    function computeClubBreakdownPoints(riders) {
+        const byClub = {};
+        riders.forEach(r => {
+            const club = r.club || 'Ismeretlen egyesület';
+            byClub[club] = (byClub[club] || 0) + r.totalPoints;
+        });
+        return Object.entries(byClub).map(([club, points]) => ({ club, points })).sort((a, b) => b.points - a.points);
+    }
+
+    function computeClubBreakdownKm(horseRows) {
+        const byClub = {};
+        horseRows.forEach(h => {
+            Object.entries(h.clubs).forEach(([club, km]) => { byClub[club] = (byClub[club] || 0) + km; });
+        });
+        return Object.entries(byClub).map(([club, km]) => ({ club, km: Math.round(km * 100) / 100 })).sort((a, b) => b.km - a.km);
+    }
+
+    // --- 3. CSAPATBAJNOKSÁG ---
+    function computeTeamChampionship(year) {
+        const win = getChampionshipWindow(year);
+        const rows = getAllPastRaceRows();
+
+        // Ki "OB-jogosult" ebben az időszakban: legalább egyszer elindult hazai ob-fordulón, >= 40 km-en
+        // (visszamenőleg is teljesülhet - l. terv 3.3, ezért a teljes időszakot előre összegyűjtjük).
+        const obParticipants = new Set();
+        rows.filter(r => isDateInWindow(r.raceDate, win) && r.isObRound && r.km >= 40 && r.license).forEach(r => obParticipants.add(r.license));
+
+        const homeQualified = rows.filter(r => isDateInWindow(r.raceDate, win) && r.km >= 40 && r.place != null && r.license && obParticipants.has(r.license));
+        const externalQualified = Object.values(externalResultsCache).filter(e => isDateInWindow(e.date, win) && e.license && obParticipants.has(e.license));
+
+        const teams = Object.entries(teamsCache).map(([teamId, t]) => {
+            const members = t.memberLicenses || [];
+            let totalKm = 0;
+            const memberBreakdown = members.map(lic => {
+                const homeKm = homeQualified.filter(r => r.license === lic).reduce((s, r) => s + r.completedKm, 0);
+                const extKm = externalQualified.filter(e => e.license === lic).reduce((s, e) => s + (parseFloat(e.distanceKm) || 0), 0);
+                const km = Math.round((homeKm + extKm) * 100) / 100;
+                totalKm += km;
+                const riderInfo = ridersCache[sanitizeKey(lic)] || {};
+                return { license: lic, name: riderInfo.name || lic, km, isObQualified: obParticipants.has(lic) };
+            });
+            return { teamId, name: t.name, contact: t.contact || '', totalKm: Math.round(totalKm * 100) / 100, members: memberBreakdown };
+        });
+
+        teams.sort((a, b) => b.totalKm - a.totalKm);
+        return teams;
+    }
+
+    // --- RENDER: Egyéni bajnokság ---
+    let egyeniClassKey = 'tavlovas';
+    let egyeniYear = new Date().getFullYear();
+
+    function setEgyeniClass(key, btn) {
+        egyeniClassKey = key;
+        document.querySelectorAll('#egyeni-class-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderEgyeniBajnoksag();
+    }
+
+    function renderEgyeniBajnoksag() {
+        const yearSel = document.getElementById('egyeni-year-select');
+        if (yearSel && yearSel.options.length === 0) populateYearSelect('egyeni-year-select', egyeniYear);
+        if (yearSel) egyeniYear = parseInt(yearSel.value, 10) || egyeniYear;
+
+        const cls = CHAMPIONSHIP_CLASSES[egyeniClassKey];
+        const riders = computeIndividualChampionship(egyeniClassKey, egyeniYear);
+        const cont = document.getElementById('egyeni-bajnoksag-content');
+        if (!cont) return;
+
+        const clubView = document.getElementById('egyeni-club-toggle')?.checked;
+
+        let html = `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">${cls.label}</h4><p class="field-hint" style="margin-bottom:0;">${cls.sub} · legfeljebb ${cls.maxHorses} ló pontjai számítanak lovasonként</p></div>`;
+
+        if (riders.length === 0) {
+            html += `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még pontszerző eredmény ebben az osztályban erre az évre.</p>`;
+        } else if (clubView) {
+            const clubs = computeClubBreakdownPoints(riders);
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Összpont</th></tr>`;
+            clubs.forEach((c, i) => { html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${c.club}</td><td><b>${c.points}</b></td></tr>`; });
+            html += `</table></div>`;
+        } else {
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Pont</th><th class="col-header">Lovak</th></tr>`;
+            riders.forEach((r, i) => {
+                const horseStr = r.horses.map(h => `${h.horseName || '?'} (${h.points} p)`).join(', ');
+                const excl = r.excludedHorseCount > 0 ? ` <span style="color:var(--text-dim-2); font-size:0.78rem;">(+${r.excludedHorseCount} ló nem számít)</span>` : '';
+                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${r.name}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${horseStr}${excl}</td></tr>`;
+            });
+            html += `</table></div>`;
+        }
+        cont.innerHTML = html;
+    }
+
+    // --- RENDER: Ló-ranglista ---
+    let loYear = new Date().getFullYear();
+
+    function renderLoRanglista() {
+        const yearSel = document.getElementById('lo-year-select');
+        if (yearSel && yearSel.options.length === 0) populateYearSelect('lo-year-select', loYear);
+        if (yearSel) loYear = parseInt(yearSel.value, 10) || loYear;
+
+        const horses = computeHorseRanking(loYear);
+        const cont = document.getElementById('lo-ranglista-content');
+        if (!cont) return;
+        const clubView = document.getElementById('lo-club-toggle')?.checked;
+
+        let html = '';
+        if (horses.length === 0) {
+            html = `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még rögzített teljesítés erre az évre.</p>`;
+        } else if (clubView) {
+            const clubs = computeClubBreakdownKm(horses);
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Össz. km</th></tr>`;
+            clubs.forEach((c, i) => { html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${c.club}</td><td><b>${c.km}</b></td></tr>`; });
+            html += `</table></div>`;
+        } else {
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Ló</th><th class="col-header">Össz. km</th><th class="col-header">Rajtok</th><th class="col-header" style="text-align:left;">Utoljára</th></tr>`;
+            horses.forEach((h, i) => {
+                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${h.horseName || '?'} <span style="color:var(--text-dim-2); font-size:0.78rem;">#${h.startNum}</span></td><td><b style="color:var(--primary);">${h.totalKm}</b></td><td>${h.raceCount}</td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${h.lastRider || '-'}</td></tr>`;
+            });
+            html += `</table></div>`;
+        }
+        cont.innerHTML = html;
+    }
+
+    // --- CSAPATBAJNOKSÁG: fül-váltás ---
+    function switchCsapatTab(tabId, btn) {
+        document.querySelectorAll('#bajnoksag-csapat .sub-mode-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('#bajnoksag-csapat .tabs .tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        if (btn) btn.classList.add('active');
+        if (tabId === 'csapat-rang') renderCsapatRanglista();
+        if (tabId === 'csapat-kezel') renderTeamList();
+        if (tabId === 'csapat-kulf') renderExternalResultsList();
+        if (tabId === 'csapat-datum') renderBajnokavatasDatumSettings();
+    }
+
+    // --- CSAPATBAJNOKSÁG: ranglista ---
+    let csapatYear = new Date().getFullYear();
+
+    function renderCsapatRanglista() {
+        const yearSel = document.getElementById('csapat-year-select');
+        if (yearSel && yearSel.options.length === 0) populateYearSelect('csapat-year-select', csapatYear);
+        if (yearSel) csapatYear = parseInt(yearSel.value, 10) || csapatYear;
+
+        const teams = computeTeamChampionship(csapatYear);
+        const cont = document.getElementById('csapat-ranglista-content');
+        if (!cont) return;
+
+        if (Object.keys(teamsCache).length === 0) {
+            cont.innerHTML = `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Még nincs felvitt csapat. Admin a "Csapatok kezelése" fülön hozhat létre.</p>`;
+            return;
+        }
+
+        let html = `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Csapat</th><th class="col-header">Össz. km</th><th class="col-header" style="text-align:left;">Tagok</th></tr>`;
+        teams.forEach((t, i) => {
+            const memberStr = t.members.map(m => `${m.name} (${m.km} km)${m.isObQualified ? '' : ' ⚠️'}`).join(', ');
+            html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${t.name}</td><td><b style="color:var(--primary);">${t.totalKm}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${memberStr}</td></tr>`;
+        });
+        html += `</table></div><p class="field-hint">⚠️ = a tag ebben az időszakban még nem indult hazai OB-fordulón legalább 40 km-en, ezért egyelőre nem jogosult a csapatpontra (visszamenőleg pótolható).</p>`;
+        cont.innerHTML = html;
+    }
+
+    // --- CSAPATBAJNOKSÁG: csapatok kezelése (admin CRUD) ---
+    let teamMemberDraft = [];
+    let editingTeamId = null;
+
+    function addTeamMember(item) {
+        if (teamMemberDraft.length >= 5) { showToast('Egy csapatnak legfeljebb 5 tagja lehet!', true); return; }
+        if (teamMemberDraft.some(m => m.license === item.license)) return;
+        teamMemberDraft.push({ license: item.license, name: item.name });
+        renderTeamMemberDraft();
+    }
+
+    function removeTeamMember(license) {
+        teamMemberDraft = teamMemberDraft.filter(m => m.license !== license);
+        renderTeamMemberDraft();
+    }
+
+    function renderTeamMemberDraft() {
+        const cont = document.getElementById('team-member-list');
+        if (!cont) return;
+        cont.innerHTML = teamMemberDraft.map(m => `
+            <span class="extra-code-chip checked" style="cursor:default;">${m.name} <span style="cursor:pointer; margin-left:4px; font-weight:900;" onclick="removeTeamMember('${m.license}')">✕</span></span>
+        `).join('') || `<span style="color:var(--text-dim-2); font-size:0.85rem;">Még nincs tag hozzáadva.</span>`;
+    }
+
+    function saveTeam() {
+        const name = document.getElementById('team-name').value.trim();
+        const contact = document.getElementById('team-contact').value.trim();
+        if (!name) { showToast('A csapat nevének megadása kötelező!', true); return; }
+        if (teamMemberDraft.length < 2 || teamMemberDraft.length > 5) { showToast('Egy csapatnak 2-5 tagja lehet!', true); return; }
+
+        const conflict = Object.entries(teamsCache).find(([tid, t]) =>
+            tid !== editingTeamId && (t.memberLicenses || []).some(lic => teamMemberDraft.some(m => m.license === lic))
+        );
+        if (conflict) { showToast(`Egy vagy több lovas már tagja a(z) "${conflict[1].name}" csapatnak!`, true); return; }
+
+        const id = editingTeamId || generateSlug(name, Date.now().toString());
+        const teamData = { name, contact, memberLicenses: teamMemberDraft.map(m => m.license) };
+        db.ref('teams/' + id).set(teamData).then(() => {
+            showToast('Csapat sikeresen mentve!');
+            cancelTeamEdit();
+        }).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function editTeam(teamId) {
+        const t = teamsCache[teamId];
+        if (!t) return;
+        editingTeamId = teamId;
+        document.getElementById('team-name').value = t.name || '';
+        document.getElementById('team-contact').value = t.contact || '';
+        teamMemberDraft = (t.memberLicenses || []).map(lic => ({ license: lic, name: (ridersCache[sanitizeKey(lic)] && ridersCache[sanitizeKey(lic)].name) || lic }));
+        renderTeamMemberDraft();
+        document.getElementById('team-cancel-btn').style.display = 'block';
+        window.scrollTo(0, 0);
+    }
+
+    function cancelTeamEdit() {
+        editingTeamId = null;
+        teamMemberDraft = [];
+        document.getElementById('team-name').value = '';
+        document.getElementById('team-contact').value = '';
+        document.getElementById('team-cancel-btn').style.display = 'none';
+        renderTeamMemberDraft();
+    }
+
+    function deleteTeam(teamId) {
+        showConfirm('Csapat törlése', 'Biztosan törlöd ezt a csapatot?', () => {
+            db.ref('teams/' + teamId).remove().then(() => showToast('Csapat törölve.'));
+        });
+    }
+
+    function renderTeamList() {
+        const cont = document.getElementById('team-list-container');
+        if (!cont) return;
+        const entries = Object.entries(teamsCache);
+        if (entries.length === 0) { cont.innerHTML = `<p style="color:var(--text-dim); text-align:center;">Nincs még felvitt csapat.</p>`; return; }
+        cont.innerHTML = entries.map(([id, t]) => {
+            const memberNames = (t.memberLicenses || []).map(lic => (ridersCache[sanitizeKey(lic)] && ridersCache[sanitizeKey(lic)].name) || lic).join(', ');
+            return `<div class="competitor-item">
+                <div style="flex:1;"><b>${t.name}</b><br><span style="color:var(--text-dim); font-size:0.85rem;">${memberNames}</span></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="edit-btn admin-only" onclick="editTeam('${id}')">Módosítás</button>
+                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteTeam('${id}')">Törlés</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // --- CSAPATBAJNOKSÁG: külföldi eredmények (admin CRUD, l. terv 3.4) ---
+    let editingExternalId = null;
+
+    function saveExternalResult() {
+        const license = document.getElementById('ext-license').value.trim();
+        const horseStartNum = document.getElementById('ext-horseStartNum').value.trim();
+        const raceName = document.getElementById('ext-raceName').value.trim();
+        const country = document.getElementById('ext-country').value.trim();
+        const date = document.getElementById('ext-date').value;
+        const distanceKm = parseFloat(document.getElementById('ext-distanceKm').value);
+        const place = parseInt(document.getElementById('ext-place').value, 10);
+
+        if (!license) { showToast('Válassz lovast a listából!', true); return; }
+        if (!raceName || !date || !distanceKm) { showToast('Verseny neve, dátum és táv megadása kötelező!', true); return; }
+
+        const data = {
+            license, horseStartNum: horseStartNum || null, raceName, country, date,
+            distanceKm, place: isNaN(place) ? null : place,
+            enteredBy: (auth.currentUser && auth.currentUser.uid) || 'ismeretlen', enteredAt: Date.now()
+        };
+
+        const id = editingExternalId || (Date.now().toString() + Math.floor(Math.random() * 1000));
+        db.ref('externalResults/' + id).set(data).then(() => {
+            showToast('Külföldi eredmény mentve!');
+            cancelExternalEdit();
+        }).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function editExternalResult(id) {
+        const ex = externalResultsCache[id];
+        if (!ex) return;
+        editingExternalId = id;
+        const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
+        document.getElementById('ext-rider-search').value = riderInfo.name ? `${riderInfo.name} — ${ex.license}` : ex.license;
+        document.getElementById('ext-license').value = ex.license;
+        if (ex.horseStartNum) {
+            const h = horsesCache[sanitizeKey(ex.horseStartNum)] || {};
+            document.getElementById('ext-horse-search').value = h.name ? `${h.name} — ${ex.horseStartNum}` : ex.horseStartNum;
+            document.getElementById('ext-horseStartNum').value = ex.horseStartNum;
+        }
+        document.getElementById('ext-raceName').value = ex.raceName || '';
+        document.getElementById('ext-country').value = ex.country || '';
+        document.getElementById('ext-date').value = ex.date || '';
+        document.getElementById('ext-distanceKm').value = ex.distanceKm || '';
+        document.getElementById('ext-place').value = ex.place || '';
+        document.getElementById('ext-cancel-btn').style.display = 'block';
+        window.scrollTo(0, 0);
+    }
+
+    function cancelExternalEdit() {
+        editingExternalId = null;
+        ['ext-rider-search', 'ext-license', 'ext-horse-search', 'ext-horseStartNum', 'ext-raceName', 'ext-country', 'ext-date', 'ext-distanceKm', 'ext-place'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = '';
+        });
+        document.getElementById('ext-cancel-btn').style.display = 'none';
+    }
+
+    function deleteExternalResult(id) {
+        showConfirm('Eredmény törlése', 'Biztosan törlöd ezt a külföldi eredményt?', () => {
+            db.ref('externalResults/' + id).remove().then(() => showToast('Törölve.'));
+        });
+    }
+
+    function renderExternalResultsList() {
+        const cont = document.getElementById('ext-list-container');
+        if (!cont) return;
+        const entries = Object.entries(externalResultsCache).sort((a, b) => (b[1].date || '').localeCompare(a[1].date || ''));
+        if (entries.length === 0) { cont.innerHTML = `<p style="color:var(--text-dim); text-align:center;">Nincs még rögzített külföldi eredmény.</p>`; return; }
+        cont.innerHTML = entries.map(([id, ex]) => {
+            const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
+            return `<div class="competitor-item">
+                <div style="flex:1;"><b>${riderInfo.name || ex.license}</b> — ${ex.raceName} <span style="color:var(--text-dim);">(${ex.country || '?'}, ${ex.date})</span><br>
+                <span style="color:var(--text-dim); font-size:0.85rem;">${ex.distanceKm} km${ex.place ? ', ' + ex.place + '. hely' : ''}</span></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="edit-btn admin-only" onclick="editExternalResult('${id}')">Módosítás</button>
+                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteExternalResult('${id}')">Törlés</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // --- CSAPATBAJNOKSÁG: bajnokavatás dátuma (admin, l. terv 3.2) ---
+    function saveBajnokavatasDatum(year, val) {
+        db.ref('settings/bajnokavatasDatum/' + year).set(val || null).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function renderBajnokavatasDatumSettings() {
+        const cont = document.getElementById('bajnokavatas-datum-container');
+        if (!cont) return;
+        const thisYear = new Date().getFullYear();
+        const years = Array.from(new Set([...getAvailableChampionshipYears(), thisYear, thisYear + 1])).sort((a, b) => b - a);
+        cont.innerHTML = years.map(y => `
+            <div style="display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft);">
+                <span style="font-weight:700; color:var(--text); min-width:90px;">${y}. év:</span>
+                <input type="date" value="${bajnokavatasDatumCache[y] || ''}" placeholder="${y}-12-31" style="margin-top:0; flex:1;" onchange="saveBajnokavatasDatum(${y}, this.value)">
+            </div>
+        `).join('');
+    }
+
+    // --- ÉV TENYÉSZTŐJE - placeholder (l. terv 5.) ---
+    // (a tenyésztő adata még nincs eltárolva a ló-törzsben, ez egy későbbi kiegészítés lesz)
+
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
         if (savedMode === 'terv') savedMode = 'versenyek';
@@ -3761,4 +4378,18 @@
 
         initAutocompleteFields('');   // élő nevezési form
         initAutocompleteFields('rm'); // múltbéli/jövőbeli verseny szerkesztő modal
+
+        // Bajnoki pontszámítás: csapattag / külföldi eredmény javaslatlisták
+        attachAutocomplete('team-member-search', searchRiders, (item) => {
+            addTeamMember(item);
+            document.getElementById('team-member-search').value = '';
+        });
+        attachAutocomplete('ext-rider-search', searchRiders, (item) => {
+            document.getElementById('ext-rider-search').value = `${item.name} — ${item.license}`;
+            document.getElementById('ext-license').value = item.license;
+        });
+        attachAutocomplete('ext-horse-search', searchHorses, (item) => {
+            document.getElementById('ext-horse-search').value = `${item.name} — ${item.startNum}`;
+            document.getElementById('ext-horseStartNum').value = item.startNum;
+        });
     };
