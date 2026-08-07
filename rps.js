@@ -533,6 +533,7 @@
         db.ref('riders').on('value', snap => {
             ridersCache = snap.val() || {};
             if (document.getElementById('torzs-lovasok')?.classList.contains('active')) renderTorzsLovasokList();
+            if (document.getElementById('beallitasok-pontkereso')?.style.display === 'block') renderAdminPontkereso();
         });
         db.ref('horses').on('value', snap => {
             horsesCache = snap.val() || {};
@@ -992,11 +993,13 @@
     }
     
     // --- VENDÉG NÉZET MÚLTBÉLI VERSENYEKHEZ ---
-    function openPublicPastRace(id) {
+    // dist: ha meg van adva (pl. egy lovas/ló profiljából érkezünk), egyből azt a kategóriát
+    // nyitja meg a szelektor helyett - l. goToRaceResults().
+    function openPublicPastRace(id, dist = null) {
         const r = localRaces.mult.find(x => x.id === id);
         if(!r) return;
         viewingPastRaceData = r;
-        pastAdatlapFilter = null;
+        pastAdatlapFilter = dist;
         document.getElementById('pastRaceModalTitle').innerText = r.name + " - Eredmények";
         switchSidebarMode('past-race-view', null);
         renderPastAdatlapList();
@@ -4201,6 +4204,13 @@
         return getAllPastRaceRows().filter(r => r.startNum === startNum).sort((a, b) => (b.raceDate || '').localeCompare(a.raceDate || ''));
     }
 
+    // Bezárja az épp nyitott profil/pontkereső popupot, és a versenynek pont az eredmény-nézetére
+    // ugrik (ugyanaz, mint a Versenyek listánál a "📊 Eredmények megtekintése" gomb).
+    function goToRaceResults(raceId, dist) {
+        closeAdatlap();
+        openPublicPastRace(raceId, dist);
+    }
+
     function renderProfileHistoryTable(history, mode) {
         if (!history.length) return `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs rögzített versenyeredmény.</p>`;
         let html = `<div class="table-responsive"><table class="ttrack-table"><tr>
@@ -4216,7 +4226,7 @@
             const other = mode === 'rider' ? (r.horseName || '-') : r.name;
             html += `<tr>
                 <td style="text-align:left; white-space:nowrap;">${r.raceDate || '-'}</td>
-                <td style="text-align:left; font-weight:700;">${r.raceName || '-'}</td>
+                <td style="text-align:left; font-weight:700; color:var(--primary); cursor:pointer; text-decoration:underline;" onclick="goToRaceResults('${r.raceId}', '${r.dist}')">${r.raceName || '-'}</td>
                 <td>${catNames[r.dist] || r.dist}</td>
                 <td style="text-align:left;">${other}</td>
                 <td><b style="color:${finished ? 'var(--primary)' : 'var(--danger)'};">${resultStr}</b></td>
@@ -4548,6 +4558,91 @@
         if (tabId === 'csapat-kezel') renderTeamList();
         if (tabId === 'csapat-kulf') renderExternalResultsList();
         if (tabId === 'csapat-datum') renderBajnokavatasDatumSettings();
+    }
+
+    // --- BEÁLLÍTÁSOK FÜL: versenyző pontkereső (admin) ---
+    function switchBeallitasokTab(tabId, btn) {
+        document.querySelectorAll('#beallitasok-mod .sub-mode-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('#beallitasok-mod .tabs .tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        if (btn) btn.classList.add('active');
+        if (tabId === 'beallitasok-pontkereso') renderAdminPontkereso();
+    }
+
+    // Versenyenkénti bontás egy adott lovasra: táv, helyezés és az adott eredményre eső nyers
+    // bajnoki pont (a getPoints/getPointBand ugyanazon számítása, mint az egyéni bajnokságnál) -
+    // ha egy sor 0 pontot ad, a note megmondja miért (nem OB-forduló, lemondott, stb.).
+    function getRiderPointsBreakdown(license) {
+        return getRiderHistory(license).map(r => {
+            let points = 0, note = '';
+            if (!r.isObRound) note = 'nem OB-forduló';
+            else if (isForeignLicense(license)) note = 'külföldi versenyző';
+            else if (!r.obPont) note = 'lemondott az OB-pontról';
+            else if (r.isEliminated || r.place == null) note = 'nincs helyezés';
+            else {
+                const band = getPointBand(r.completedKm);
+                if (!band) note = 'túl rövid táv a ponttáblázathoz';
+                else points = getPoints(band, r.place);
+            }
+            return Object.assign({ points, note }, r);
+        });
+    }
+
+    function renderAdminPontkereso() {
+        const cont = document.getElementById('admin-pontkereso-list');
+        if (!cont) return;
+        const q = (document.getElementById('admin-pontkereso-search')?.value || '').trim().toLowerCase();
+        const riders = Object.values(ridersCache).filter(r => r && r.name)
+            .filter(r => !q || r.name.toLowerCase().includes(q) || (r.license || '').toLowerCase().includes(q) || (r.club || '').toLowerCase().includes(q))
+            .sort((a, b) => a.name.localeCompare(b.name, 'hu'));
+
+        if (!riders.length) { cont.innerHTML = `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs találat.</p>`; return; }
+
+        cont.innerHTML = riders.map(r => `
+            <div class="competitor-item" style="cursor:pointer;" onclick="openRiderPointsBreakdown('${r.license}')">
+                <div style="flex:1;"><b>${r.name}</b><br><span style="color:var(--text-dim); font-size:0.85rem;">${r.club || 'Nincs egyesület megadva'} · Ig. szám: ${r.license}</span></div>
+                <div class="adatlap-arrow">❯</div>
+            </div>
+        `).join('');
+    }
+
+    function openRiderPointsBreakdown(license) {
+        const rider = ridersCache[sanitizeKey(license)] || {};
+        const breakdown = getRiderPointsBreakdown(license);
+        const totalPoints = breakdown.reduce((s, r) => s + r.points, 0);
+
+        let html = `
+            <div style="text-align:center; margin-bottom:15px;">
+                <h3 style="color:var(--primary); margin:0;">${rider.name || license}</h3>
+                <p style="color:var(--text-dim); margin-top:4px;">${rider.club ? rider.club + ' · ' : ''}Ig. szám: ${license}</p>
+            </div>
+        `;
+
+        if (!breakdown.length) {
+            html += `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs rögzített versenyeredmény.</p>`;
+        } else {
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr>
+                <th class="col-header" style="text-align:left;">Verseny</th>
+                <th class="col-header">Táv</th>
+                <th class="col-header">Helyezés</th>
+                <th class="col-header">Pont</th>
+            </tr>`;
+            breakdown.forEach(r => {
+                const placeStr = (!r.isEliminated && r.place != null) ? `${r.place}. hely` : getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes });
+                const pointsStr = r.points > 0 ? `<b style="color:var(--primary);">${r.points}</b>` : `<span style="color:var(--text-dim-2); font-size:0.78rem;">0${r.note ? ' · ' + r.note : ''}</span>`;
+                html += `<tr>
+                    <td style="text-align:left;"><b style="color:var(--primary); cursor:pointer; text-decoration:underline;" onclick="goToRaceResults('${r.raceId}', '${r.dist}')">${r.raceName || '-'}</b><br><span style="color:var(--text-dim); font-size:0.78rem;">${r.raceDate || '-'}</span></td>
+                    <td>${catNames[r.dist] || r.dist}</td>
+                    <td>${placeStr}</td>
+                    <td>${pointsStr}</td>
+                </tr>`;
+            });
+            html += `</table></div>
+            <div class="summary-total" style="text-align:center;">Nyers pontösszeg (a fenti sorok összege - nem a hivatalos, lovankénti korlátozással számolt végeredmény): <b style="color:var(--primary); font-size:1.2rem;">${totalPoints}</b></div>`;
+        }
+
+        document.getElementById('modalBody').innerHTML = html;
+        document.getElementById('adatlapModal').style.display = 'flex';
     }
 
     // --- CSAPATBAJNOKSÁG: ranglista ---

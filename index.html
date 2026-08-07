@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v104</title>
+    <title>Verseny Kalkulátor v105</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -414,12 +414,24 @@
 
         <div id="beallitasok-mod" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 15px;">⚙️ Beállítások</h3>
-            <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Ez a beállítás mindenkinek, minden eszközön (beérkeztető, orvos, admin tabletek) egyszerre érvényes - nem személyes preferencia.</p>
+            <div class="tabs">
+                <button id="btn-beallitasok-tema" class="tab-btn active" onclick="switchBeallitasokTab('beallitasok-tema', this)">Design téma</button>
+                <button id="btn-beallitasok-pontkereso" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-pontkereso', this)">Versenyző pontkereső</button>
+            </div>
 
-            <div class="kiiras-card" style="border-left-color: var(--teal);">
-                <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🎨 Design téma</h4>
-                <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - azonnal mindenkinél átvált.</p>
-                <div class="theme-swatch-row" id="themeSwatchRow"></div>
+            <div id="beallitasok-tema" class="sub-mode-content" style="display:block;">
+                <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Ez a beállítás mindenkinek, minden eszközön (beérkeztető, orvos, admin tabletek) egyszerre érvényes - nem személyes preferencia.</p>
+                <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🎨 Design téma</h4>
+                    <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - azonnal mindenkinél átvált.</p>
+                    <div class="theme-swatch-row" id="themeSwatchRow"></div>
+                </div>
+            </div>
+
+            <div id="beallitasok-pontkereso" class="sub-mode-content" style="display:none;">
+                <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Keress rá egy versenyzőre, és nézd meg versenyenkénti bontásban, hányadik helyen végzett, milyen távon, és mennyi bajnoki pontot ért ez.</p>
+                <input type="text" id="admin-pontkereso-search" placeholder="Keresés név, igazolási szám vagy egyesület alapján..." autocomplete="off" oninput="renderAdminPontkereso()">
+                <div id="admin-pontkereso-list" style="margin-top:15px;"></div>
             </div>
         </div>
 
