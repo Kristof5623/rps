@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v105</title>
+    <title>Verseny Kalkulátor v106</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,6 +56,8 @@
         <button class="sidebar-btn admin-only" onclick="printVersenyLista('nevezes')">🖨️ Nevezési Lista (A4)</button>
         <button class="sidebar-btn admin-only" onclick="printVersenyLista('rajt')">🖨️ Rajtlista (A4)</button>
         <button class="sidebar-btn admin-only" onclick="printQRCodeFlyer()">📲 QR Plakát (A4)</button>
+        <!-- IDEIGLENES, egyszeri adatjavítás (JAVITAS_bajnoki_pontszamitas.md, 1. pont) - ha lefutott és leellenőrizve lett, TÖRÖLD ezt a gombot és a runBajnoksagJavitasok() függvényt (rps.js). -->
+        <button class="sidebar-btn admin-only" onclick="runBajnoksagJavitasok()">🩹 Bajnoksági adatjavítás (egyszer!)</button>
     </div>
 
     <div id="szerepkor-menu" style="display: none; flex-direction: column;">
@@ -334,9 +336,14 @@
             </div>
 
             <div id="csapat-rang" class="sub-mode-content" style="display:block;">
-                <div class="kiiras-card" style="border-left-color: var(--teal);">
-                    <label style="margin-top:0;">Bajnoki év:</label>
-                    <select id="csapat-year-select" onchange="renderCsapatRanglista()"></select>
+                <div class="kiiras-card" style="border-left-color: var(--teal); display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:140px;">
+                        <label style="margin-top:0;">Bajnoki év:</label>
+                        <select id="csapat-year-select" onchange="renderCsapatRanglista()"></select>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:20px; text-transform:none; cursor:pointer; font-size:0.9rem; color:var(--text);">
+                        <input type="checkbox" id="csapat-km-toggle" style="width:auto; margin:0;" onchange="renderCsapatRanglista()"> 📏 Km-ben mutasd
+                    </label>
                 </div>
                 <div id="csapat-ranglista-content"></div>
             </div>
@@ -606,9 +613,7 @@
             <button class="tab-btn" id="rm-tab-btn-orvosok" onclick="switchRmTab('rm-orvosok', this)">Állatorvosok</button>
             <button class="tab-btn" id="rm-tab-btn-versenyzok" onclick="switchRmTab('rm-versenyzok', this)">Versenyzők</button>
             <button class="tab-btn" id="rm-tab-btn-verseny" onclick="switchRmTab('rm-verseny', this)">Eredmények</button>
-            <!-- IDEIGLENES "Gyors eredmény" fül kikapcsolva (felhasználói kérés) - l. rps.js ugyanezzel a megjegyzéssel
             <button class="tab-btn" id="rm-tab-btn-gyors" onclick="switchRmTab('rm-gyors', this)">Gyors eredmény</button>
-            -->
         </div>
 
         <div id="rm-alap" class="rm-tab-content" style="display:block;">
@@ -629,7 +634,7 @@
                     <input type="checkbox" id="rm-isObRound" style="width:auto; margin:0;">
                     <span style="color:var(--text); font-size:0.95rem; font-weight:700;">🏆 Ez a verseny hivatalos OB-forduló</span>
                 </label>
-                <p class="field-hint" style="margin-bottom:0;">Ha bejelölöd, ennek a versenynek az eredményei beleszámítanak az egyéni bajnokságba, az egyesületi bontásba és a csapatbajnokság jogosultsági feltételébe.</p>
+                <p class="field-hint" style="margin-bottom:0;">Alapból minden verseny OB-fordulónak számít - ha ez a verseny mégsem az, itt veheted ki a pipát. Az OB-forduló eredményei számítanak bele az egyéni bajnokságba, az egyesületi bontásba és a csapatbajnokság jogosultsági feltételébe.</p>
             </div>
 
             <button class="calc-btn admin-only" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
@@ -735,8 +740,7 @@
 
         <!-- IDEIGLENES: gyors eredmény-rögzítés helyezés alapján, kör-/időadatok nélkül -
              akkor kell, ha a rendszer nem volt kint a helyszínen és utólag csak a helyezéseket
-             kapjuk meg. Kikapcsolva (felhasználói kérés) - ha kell megint, csak vedd ki a
-             komment-jelölést, ne írd újra.
+             kapjuk meg. -->
         <div id="rm-gyors" class="rm-tab-content" style="display:none;">
             <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:0;">
                 <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">⚡ Gyors eredmény rögzítése</h4>
@@ -794,7 +798,6 @@
             <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Gyorsan rögzített eredmények:</h4>
             <div id="rm-gyors-list"></div>
         </div>
-        -->
 
 
     </div>
