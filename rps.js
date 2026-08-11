@@ -4319,6 +4319,19 @@
         document.getElementById('adatlapModal').style.display = 'flex';
     }
 
+    // Ranglistákon (egyéni, ló, csapat) mindenhol ugyanígy jelenik meg egy lovas/ló neve - kattintható
+    // link, ami az adott profil (openRiderProfile/openHorseProfile) versenytörténet-táblázatát nyitja meg.
+    // Ha nincs azonosító (pl. igazolási szám nélküli, kézzel felvitt versenyző), sima szöveg marad.
+    function riderLink(name, license) {
+        const label = name || license || '-';
+        return license ? `<span class="name-link" onclick="openRiderProfile('${license}')">${label}</span>` : label;
+    }
+
+    function horseLink(name, startNum) {
+        const label = name || startNum || '?';
+        return startNum ? `<span class="name-link" onclick="openHorseProfile('${startNum}')">${label}</span>` : label;
+    }
+
     function renderTorzsLovasokList() {
         const cont = document.getElementById('torzs-lovasok-list');
         if (!cont) return;
@@ -4472,13 +4485,13 @@
         const byHorse = {};
 
         getAllPastRaceRows().filter(r => isDateInWindow(r.raceDate, win) && r.completedKm > 0 && r.startNum).forEach(r => {
-            if (!byHorse[r.startNum]) byHorse[r.startNum] = { startNum: r.startNum, horseName: r.horseName, totalKm: 0, raceCount: 0, clubs: {}, lastRider: '', lastDate: '' };
+            if (!byHorse[r.startNum]) byHorse[r.startNum] = { startNum: r.startNum, horseName: r.horseName, totalKm: 0, raceCount: 0, clubs: {}, lastRider: '', lastRiderLicense: '', lastDate: '' };
             const e = byHorse[r.startNum];
             e.totalKm += r.completedKm;
             e.raceCount += 1;
             if (r.horseName) e.horseName = r.horseName;
             if (r.club) e.clubs[r.club] = (e.clubs[r.club] || 0) + r.completedKm;
-            if (r.raceDate >= e.lastDate) { e.lastDate = r.raceDate; e.lastRider = r.name; }
+            if (r.raceDate >= e.lastDate) { e.lastDate = r.raceDate; e.lastRider = r.name; e.lastRiderLicense = r.license || ''; }
         });
 
         // Külföldi (externalResults) eredmények is beszámítanak, ha ismert a ló azonosítója (l. terv 3.4).
@@ -4487,14 +4500,14 @@
             if (km <= 0) return;
             if (!byHorse[ex.horseStartNum]) {
                 const h = horsesCache[sanitizeKey(ex.horseStartNum)] || {};
-                byHorse[ex.horseStartNum] = { startNum: ex.horseStartNum, horseName: h.name || ex.horseStartNum, totalKm: 0, raceCount: 0, clubs: {}, lastRider: '', lastDate: '' };
+                byHorse[ex.horseStartNum] = { startNum: ex.horseStartNum, horseName: h.name || ex.horseStartNum, totalKm: 0, raceCount: 0, clubs: {}, lastRider: '', lastRiderLicense: '', lastDate: '' };
             }
             const e = byHorse[ex.horseStartNum];
             e.totalKm += km;
             e.raceCount += 1;
             const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
             if (riderInfo.club) e.clubs[riderInfo.club] = (e.clubs[riderInfo.club] || 0) + km;
-            if (ex.date >= e.lastDate) { e.lastDate = ex.date; e.lastRider = riderInfo.name || ex.license; }
+            if (ex.date >= e.lastDate) { e.lastDate = ex.date; e.lastRider = riderInfo.name || ex.license; e.lastRiderLicense = ex.license || ''; }
         });
 
         return Object.values(byHorse).map(e => ({ ...e, totalKm: Math.round(e.totalKm * 100) / 100 })).sort((a, b) => b.totalKm - a.totalKm);
@@ -4598,18 +4611,18 @@
             clubs.forEach((c, i) => { html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${c.club}</td><td><b>${c.points}</b></td></tr>`; });
             html += `</table></div>`;
         } else if (isAll) {
-            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Összpont</th><th class="col-header">Osztályok</th></tr>`;
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header">Összpont</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Osztályok</th></tr>`;
             riders.forEach((r, i) => {
                 const clsStr = r.classBreakdown.map(c => `${c.label.replace('Magyar ', '').replace(' Bajnokság', '')}: ${c.points} p`).join(', ');
-                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${r.name}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${clsStr}</td></tr>`;
+                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${clsStr}</td></tr>`;
             });
             html += `</table></div>`;
         } else {
-            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Pont</th><th class="col-header">Lovak</th></tr>`;
+            html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header">Pont</th><th class="col-header">Lovak</th><th class="col-header" style="text-align:left;">Egyesület</th></tr>`;
             riders.forEach((r, i) => {
-                const horseStr = r.horses.map(h => `${h.horseName || '?'} (${h.points} p)`).join(', ');
+                const horseStr = r.horses.map(h => `${horseLink(h.horseName, h.startNum)} (${h.points} p)`).join(', ');
                 const excl = r.excludedHorseCount > 0 ? ` <span style="color:var(--text-dim-2); font-size:0.78rem;">(+${r.excludedHorseCount} ló nem számít)</span>` : '';
-                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${r.name}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${horseStr}${excl}</td></tr>`;
+                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${horseStr}${excl}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td></tr>`;
             });
             html += `</table></div>`;
         }
@@ -4640,7 +4653,7 @@
         } else {
             html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Ló</th><th class="col-header">Össz. km</th><th class="col-header">Rajtok</th><th class="col-header" style="text-align:left;">Utoljára</th></tr>`;
             horses.forEach((h, i) => {
-                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${h.horseName || '?'} <span style="color:var(--text-dim-2); font-size:0.78rem;">#${h.startNum}</span></td><td><b style="color:var(--primary);">${h.totalKm}</b></td><td>${h.raceCount}</td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${h.lastRider || '-'}</td></tr>`;
+                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${horseLink(h.horseName, h.startNum)} <span style="color:var(--text-dim-2); font-size:0.78rem;">#${h.startNum}</span></td><td><b style="color:var(--primary);">${h.totalKm}</b></td><td>${h.raceCount}</td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${riderLink(h.lastRider, h.lastRiderLicense)}</td></tr>`;
             });
             html += `</table></div>`;
         }
@@ -4773,7 +4786,7 @@
 
         let html = `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Csapat</th><th class="col-header">Össz. ${kmView ? 'km' : 'pont'}</th><th class="col-header" style="text-align:left;">Tagok</th></tr>`;
         teams.forEach((t, i) => {
-            const memberStr = t.members.map(m => `${m.name} (${kmView ? m.km : m.points} ${unit})${m.isObQualified ? '' : ' ⚠️'}`).join(', ');
+            const memberStr = t.members.map(m => `${riderLink(m.name, m.license)} (${kmView ? m.km : m.points} ${unit})${m.isObQualified ? '' : ' ⚠️'}`).join(', ');
             html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${t.name}</td><td><b style="color:var(--primary);">${kmView ? t.totalKm : t.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${memberStr}</td></tr>`;
         });
         html += `</table></div><p class="field-hint">A sorrend mindig a bajnoki pont alapján dől el, a km-nézet csak a megjelenített számot cseréli. ⚠️ = a tag ebben az időszakban még nem indult hazai OB-fordulón legalább 40 km-en, ezért egyelőre nem jogosult a csapatpontra (visszamenőleg pótolható).</p>`;
@@ -4967,7 +4980,7 @@
     }
 
     // --- ÉV TENYÉSZTŐJE - placeholder (l. terv 5.) ---
-    // (a tenyésztő adata még nincs eltárolva a ló-törzsben, ez egy későbbi kiegészítés lesz)
+    // (a tenyésztő a ló-törzsbe a tavlovasok_import_v4.json-ból kerül be - horses/{startNum}.breeder)
 
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';

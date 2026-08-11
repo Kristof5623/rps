@@ -796,6 +796,9 @@ button.add-btn { background: var(--primary); color: white; }
 .ttrack-table th.col-header { background: var(--card-3); color: var(--primary); font-weight: 800; }
 .ttrack-table tr:nth-child(even) td:not(.row-header) { background: rgba(255,255,255,.02); }
 
+.name-link { color: var(--primary); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.name-link:hover { color: var(--text); }
+
 .competitor-item {
     background: var(--card-2); padding: 13px 14px; border-radius: var(--radius-sm); margin-top: 10px; display: flex;
     justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); transition: background .18s var(--ease);
