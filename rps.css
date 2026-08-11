@@ -33,6 +33,12 @@ html, body { width: 100%; height: 100%; overflow: hidden; margin: 0; padding: 0;
     --warning-dim: rgba(255, 159, 10, .14);
     --danger-dim: rgba(255, 69, 58, .16);
 
+    /* Dobogós színek a profil eredménylistájához. Szándékosan minden témában azonosak
+       (az érem az érem), és sötét/világos háttéren is olvasható árnyalatok. */
+    --arany: #d9a520;
+    --ezust: #9ba1a8;
+    --bronz: #c07a45;
+
     --radius-sm: 8px;
     --radius: 14px;
     --radius-lg: 22px;
@@ -755,6 +761,26 @@ button.add-btn { background: var(--primary); color: white; }
 
 .kiiras-card { background: var(--card-2); padding: 16px; border-radius: var(--radius); margin-bottom: 15px; border-left: 4px solid var(--warning); box-shadow: var(--shadow-sm); }
 
+/* Versenykiírás: lenyitható táv-blokkok. Natív <details>/<summary> - nulla JS, a nyíl és a
+   billentyűzet-kezelés a böngészőtől jön. 8 távval már nem fér el minden nyitva. */
+details.kiiras-card { padding: 0; overflow: hidden; }
+details.kiiras-card > summary {
+    display: flex; align-items: center; gap: 10px; min-height: 44px; box-sizing: border-box;
+    padding: 12px 16px; cursor: pointer; font-weight: 800; color: var(--text);
+    list-style: none; user-select: none;
+}
+details.kiiras-card > summary::-webkit-details-marker { display: none; }
+details.kiiras-card > summary::before {
+    content: '▸'; color: var(--primary); font-size: 1rem; flex-shrink: 0;
+    transition: transform .18s var(--ease);
+}
+details.kiiras-card[open] > summary::before { transform: rotate(90deg); }
+details.kiiras-card > summary:hover { background: var(--card-3); }
+/* Csukott állapotban is látszania kell, ha hiányzik adat - ez okozta a néma 0 pontot. */
+.kiiras-hiany { margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--warning); text-align: right; }
+.kiiras-tartalom { padding: 12px 16px 16px 16px; border-top: 1px solid var(--border-soft); }
+.kiiras-korszam { width: auto; padding: 6px 10px; margin: 0; background: var(--card-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); }
+
 /* --- PLACEHOLDER OLDAL (pl. "Év Tenyésztője") --- */
 .placeholder-page { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 70px 20px; gap: 10px; }
 .placeholder-icon { font-size: 3.4rem; margin-bottom: 6px; filter: drop-shadow(0 6px 14px rgba(0,0,0,.3)); animation: placeholderFloat 3.2s ease-in-out infinite; }
@@ -798,6 +824,84 @@ button.add-btn { background: var(--primary); color: white; }
 
 .name-link { color: var(--primary); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
 .name-link:hover { color: var(--text); }
+
+/* ============================================================================
+   LOVAS / LÓ PROFIL ABLAK
+   A fejléc és a törzsadat fix, csak az eredménylista görget - ezért a gyökér egy
+   flex oszlop, és az eredményblokk kapja a flex:1 + overflow-y:auto párost.
+   ============================================================================ */
+.profil { display: flex; flex-direction: column; max-height: calc(90vh - 50px); }
+
+.profil-fejlec { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+/* Az eredeti oldalon itt lófej-rajz áll; nekünk nincs képünk, ezért nagy halvány monogram. */
+.profil-monogram {
+    width: 62px; height: 62px; flex-shrink: 0; border-radius: var(--radius);
+    background: var(--card-3); color: var(--text-dim-2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem; font-weight: 800; letter-spacing: .5px; text-align: center; line-height: 1.1;
+}
+.profil-nev { font-size: 1.3rem; font-weight: 800; color: var(--text); margin: 0; word-break: break-word; }
+.profil-alcim { font-size: 0.85rem; color: var(--text-dim); margin-top: 3px; }
+.profil-vissza {
+    flex-shrink: 0; align-self: flex-start; background: var(--card-3); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 8px 12px; min-height: 44px; cursor: pointer; font-weight: 700; font-size: 0.85rem;
+}
+.profil-vissza:hover { background: var(--card-2); }
+
+/* Törzsadat: mezőnév balra félkövéren, érték jobbra, soronként halvány vonal - nem doboz-rács. */
+.profil-adatok { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); column-gap: 26px; margin-top: 12px; }
+.profil-sor { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.9rem; }
+.profil-cimke { color: var(--text-dim); font-weight: 700; flex-shrink: 0; }
+.profil-ertek { color: var(--text); text-align: right; word-break: break-word; }
+
+.profil-csaladfa { margin-top: 12px; padding-left: 14px; border-left: 2px solid var(--border); }
+.profil-csaladfa-cim { font-size: 0.78rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 2px; }
+
+/* Lejárt licenc pirosan - terepen azonnal látszik, kinek nincs érvényes licence. */
+.profil-licenc { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-weight: 800; font-size: 0.8rem; }
+.profil-licenc.ervenyes { background: var(--success-dim); color: var(--success); }
+.profil-licenc.lejart { background: var(--danger-dim); color: var(--danger); }
+.profil-megjegyzes { font-size: 0.78rem; color: var(--text-dim-2); margin-top: 8px; line-height: 1.5; }
+
+/* Eredmény-sáv: forrásváltó + évszűrő */
+.profil-sav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+.profil-sav-cim { font-weight: 800; color: var(--text); margin-right: auto; }
+.profil-forras {
+    background: var(--card-3); color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px; min-height: 44px; cursor: pointer; font-size: 0.82rem; font-weight: 700;
+}
+.profil-forras.aktiv { background: var(--primary); border-color: var(--primary); color: #fff; }
+.profil-forras:disabled { opacity: .45; cursor: default; }
+.profil-ev { width: auto; margin: 0; padding: 8px 12px; min-height: 44px; background: var(--card-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); }
+
+.profil-eredmenyek { flex: 1 1 auto; overflow-y: auto; min-height: 130px; padding-right: 4px; }
+.profil-ures { text-align: center; color: var(--text-dim); padding: 26px 10px; }
+
+/* Versenyenkénti kártya: a fejléc a verseny, a törzs a saját eredmény. */
+.eredmeny-kartya { background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.eredmeny-fej { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 14px; background: var(--card-3); }
+.eredmeny-verseny { font-weight: 800; color: var(--text); }
+.eredmeny-alcim { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
+.eredmeny-jobb { text-align: right; flex-shrink: 0; font-size: 0.78rem; color: var(--text-dim); }
+.eredmeny-torzs { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; flex-wrap: wrap; }
+/* A helyezés a sor legnagyobb eleme - azt keresi a szem először. */
+.eredmeny-hely { font-size: 1.45rem; font-weight: 800; line-height: 1.1; }
+.eredmeny-indulok { font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
+.eredmeny-jobb-oszlop { text-align: right; font-size: 0.82rem; color: var(--text-dim); }
+.eredmeny-partner { color: var(--text); font-weight: 700; }
+
+.hely-1 { color: var(--arany); }
+.hely-2 { color: var(--ezust); }
+.hely-3 { color: var(--bronz); }
+.hely-tobbi { color: var(--primary); }
+.hely-kiesett { color: var(--danger); font-size: 1rem; }
+
+@media (max-width: 560px) {
+    .profil-adatok { grid-template-columns: 1fr; }
+    .profil-monogram { width: 52px; height: 52px; font-size: 1.1rem; }
+    .profil-nev { font-size: 1.12rem; }
+}
 
 .competitor-item {
     background: var(--card-2); padding: 13px 14px; border-radius: var(--radius-sm); margin-top: 10px; display: flex;

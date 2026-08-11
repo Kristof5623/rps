@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v107</title>
+    <title>Verseny Kalkulátor v108</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -362,7 +362,22 @@
             </div>
 
             <div id="csapat-kulf" class="sub-mode-content" style="display:none;">
-                <h4 style="margin-bottom: 15px; color: var(--text);">Külföldi (CEI/CEIO) eredmény felvitele</h4>
+                <!-- EGYSZER-HASZNÁLATOS: a 2026-os FEI eredmények feltöltése (FELADAT_v6, A. rész).
+                     A sikeres futás és az ellenőrzés után ez a blokk és a runFeiImport() törlendő. -->
+                <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🌍 FEI eredmények importálása (2026)</h4>
+                    <p class="field-hint" style="margin-bottom:0;">
+                        13 nemzetközi eredmény a data.fei.org-ról, 7 versenyzőnél. Az <code>externalResults</code>
+                        node-ba kerül, ahonnan a <b>csapatbajnokság</b> és a <b>ló-ranglista</b> már olvassa.
+                        A <code>races/mult</code> alá <b>nem</b> megy, így az egyéni bajnokság állása nem változik.
+                        <br><b>Ezt elég egyszer lefuttatni.</b>
+                    </p>
+                </div>
+                <button id="btn-fei-import" class="calc-btn admin-only" style="background:var(--teal); color:black;" onclick="runFeiImport()">🌍 FEI eredmények importálása (egyszer!)</button>
+                <input type="file" id="fei-fajl" accept=".json,application/json" style="display:none;">
+                <div id="fei-import-report" style="margin-top:20px;"></div>
+
+                <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--text);">Külföldi (CEI/CEIO) eredmény felvitele</h4>
                 <p class="field-hint">Ez nem az élő verseny-lebonyolítási rendszer része, csak egy egyszerű kézi nyilvántartás a csapatbajnoksághoz és a ló-ranglistához.</p>
                 <label>Lovas:</label>
                 <input type="text" id="ext-rider-search" placeholder="Név vagy igazolási szám..." autocomplete="off">
@@ -486,6 +501,10 @@
                     <option value="80j">80 km Junior</option>
                     <option value="100">100 km</option>
                     <option value="100j">100 km Junior</option>
+                    <option value="120">120 km</option>
+                    <option value="120j">120 km Junior</option>
+                    <option value="140">140 km</option>
+                    <option value="160">160 km</option>
                 </select>
                 
                 <button id="addCompBtn" class="calc-btn add-btn admin-only" onclick="saveCompetitor()">Hozzáadás</button>
@@ -551,6 +570,10 @@
                         <option value="80j">80 km Junior</option>
                         <option value="100">100 km</option>
                         <option value="100j">100 km Junior</option>
+                        <option value="120">120 km</option>
+                        <option value="120j">120 km Junior</option>
+                        <option value="140">140 km</option>
+                        <option value="160">160 km</option>
                     </select>
                     <select id="lapCount" onchange="genLaps('lapCount', 'lapInputsContainer', 'v')" style="margin-top:10px;"></select>
                     <label>Rajt ideje:</label>
@@ -670,6 +693,10 @@
                 <option value="80j">80 km Junior</option>
                 <option value="100">100 km</option>
                 <option value="100j">100 km Junior</option>
+                <option value="120">120 km</option>
+                <option value="120j">120 km Junior</option>
+                <option value="140">140 km</option>
+                <option value="160">160 km</option>
             </select>
             <button id="rm-addCompBtn" class="calc-btn add-btn admin-only" onclick="saveRmCompetitor()">Hozzáadás</button>
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
@@ -722,6 +749,10 @@
                     <option value="80j">80 km Junior</option>
                     <option value="100">100 km</option>
                     <option value="100j">100 km Junior</option>
+                    <option value="120">120 km</option>
+                    <option value="120j">120 km Junior</option>
+                    <option value="140">140 km</option>
+                    <option value="160">160 km</option>
                 </select>
                 <select id="rm-lapCount" onchange="genLaps('rm-lapCount', 'rm-lapInputsContainer', 'rm-v')" style="margin-top:10px;"></select>
                 <label>Rajt ideje:</label>
@@ -759,6 +790,10 @@
                 <option value="80j">80 km Junior</option>
                 <option value="100">100 km</option>
                 <option value="100j">100 km Junior</option>
+                <option value="120">120 km</option>
+                <option value="120j">120 km Junior</option>
+                <option value="140">140 km</option>
+                <option value="160">160 km</option>
             </select>
 
             <label>Helyezés:</label>
