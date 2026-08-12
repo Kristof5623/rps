@@ -28,26 +28,36 @@
     let clubsCache = {}; // clubs/{clubKey} - önálló egyesület-törzs
     let uiTheme = 'default'; // admin választja (settings/uiTheme), mindenkinek szinkronban - l. THEME_LIST
     // colors: [primary (dot), bg, card] - a swatch előnézet ebből épül fel (renderThemeSwatches)
+    // Sorrend: sötét témák, majd világosak. A key-ek szándékosan változatlanok, hogy a
+    // settings/uiTheme-ben tárolt régi érték ne törjön el - két téma jelentése viszont
+    // megváltozott: 'terminal' már Éjkék (Tokyo Night), 'wheat' már Pergamen (meleg papír).
     const THEME_LIST = [
         { key: 'default',  label: '☀️ Alap',          colors: ['#0A84FF', '#000000', '#1c1c1e'] },
-        { key: 'alt',      label: '🌅 Alkony',         colors: ['#FF6B35', '#170a06', '#271208'] },
-        { key: 'forest',   label: '🌲 Fenyves',        colors: ['#3FCB80', '#050e08', '#0e2015'] },
-        { key: 'violet',   label: '💜 Ametiszt',       colors: ['#9B7EF0', '#0c0a14', '#171325'] },
-        { key: 'graphite', label: '⚙️ Acél',           colors: ['#6FB1F0', '#0a0b0d', '#131519'] },
-        { key: 'wine',     label: '🍷 Rubin',          colors: ['#E84C68', '#0f0608', '#201015'] },
-        { key: 'ocean',    label: '🌊 Óceán (üveg)',   colors: ['#3FD0E0', '#03121c', '#12384a'] },
-        { key: 'gold',     label: '✨ Éjarany',        colors: ['#F0B93D', '#0a0805', '#1a150c'] },
-        { key: 'neon',     label: '🌆 Neon Város',     colors: ['#FF2E9F', '#050208', '#0f0818'] },
-        { key: 'player',   label: '🎧 Player',         colors: ['#22DD66', '#000000', '#121212'] },
-        { key: 'terminal', label: '🖥️ Terminál',       colors: ['#33FF66', '#000000', '#050805'] },
-        { key: 'mono',     label: '⬛ Minimál Fekete', colors: ['#4F8AF5', '#000000', '#0a0a0a'] },
-        { key: 'daylight', label: '🌤️ Verőfény',      colors: ['#0A6FE8', '#eef4fb', '#ffffff'] },
-        { key: 'wheat',    label: '🌾 Búzamező',       colors: ['#A8631A', '#faf3e6', '#fffdfa'] },
-        { key: 'mint',     label: '🌿 Menta',          colors: ['#159873', '#eef7f3', '#ffffff'] },
-        { key: 'nordic',   label: '🧊 Északi Fény',    colors: ['#3A6EA5', '#eef1f4', '#ffffff'] },
-        { key: 'coral',    label: '🌺 Korall',         colors: ['#FF5C6C', '#fff2f0', '#ffffff'] },
-        { key: 'pearl',    label: '🫧 Gyöngyház (üveg)', colors: ['#8E6FD1', '#f3eef7', '#e7dcf2'] },
+        { key: 'graphite', label: '⚙️ Acél',          colors: ['#2F81F7', '#0D1117', '#161B22'] },
+        { key: 'violet',   label: '🔮 Ametiszt',      colors: ['#7C7FF5', '#0B0C11', '#14161C'] },
+        { key: 'terminal', label: '🌃 Éjkék',         colors: ['#7AA2F7', '#1A1B26', '#24283B'] },
+        { key: 'mono',     label: '⬛ Minimál',       colors: ['#3E8BFF', '#000000', '#0A0A0A'] },
+        { key: 'forest',   label: '🌲 Fenyves',       colors: ['#35C47D', '#0B120E', '#141C17'] },
+        { key: 'ocean',    label: '🌊 Óceán',         colors: ['#3EB8E5', '#08131C', '#0F1F2B'] },
+        { key: 'wine',     label: '🍷 Rubin',         colors: ['#E5484D', '#120E10', '#1C171A'] },
+        { key: 'alt',      label: '🌅 Borostyán',     colors: ['#F5A524', '#14110D', '#1E1A15'] },
+        { key: 'player',   label: '🎧 Player',        colors: ['#1DB954', '#0B0B0B', '#181818'] },
+        { key: 'gold',     label: '✨ Éjarany',       colors: ['#D9A93C', '#0C0A07', '#17140E'] },
+        { key: 'neon',     label: '🌆 Neon',          colors: ['#F04FB0', '#07060E', '#110E1E'] },
+        { key: 'daylight', label: '🌤️ Verőfény',     colors: ['#0570DE', '#F6F9FC', '#FFFFFF'] },
+        { key: 'nordic',   label: '🧊 Északi Fény',   colors: ['#5E81AC', '#ECEFF4', '#FFFFFF'] },
+        { key: 'mint',     label: '🌿 Menta',         colors: ['#0E9F6E', '#F2F8F5', '#FFFFFF'] },
+        { key: 'wheat',    label: '📜 Pergamen',      colors: ['#9F5B21', '#FAF8F4', '#FFFFFF'] },
+        { key: 'coral',    label: '🌺 Korall',        colors: ['#D9544A', '#FCF6F4', '#FFFFFF'] },
+        { key: 'pearl',    label: '🫧 Gyöngyház',     colors: ['#6B5AD6', '#F1EEF8', '#FFFFFF'] },
     ];
+
+    // Ismeretlen kulcs (pl. egy régen törölt téma neve a localStorage-ban) esetén az Alapra esünk
+    // vissza - anélkül a data-theme egy nem létező témára mutatna, és a :root maradna érvényben,
+    // de a swatch-listán semmi sem lenne kijelölve.
+    function ervenyesTemaKulcs(key) {
+        return THEME_LIST.some(t => t.key === key) ? key : 'default';
+    }
 
     function applyThemeColorMeta(key) {
         const t = THEME_LIST.find(x => x.key === key) || THEME_LIST[0];
@@ -55,9 +65,15 @@
         if (meta) meta.setAttribute('content', t.colors[1]);
     }
 
+    function applyTheme(key) {
+        const kulcs = ervenyesTemaKulcs(key);
+        document.documentElement.setAttribute('data-theme', kulcs);
+        applyThemeColorMeta(kulcs);
+        return kulcs;
+    }
+
     // Villanás-mentes indulás: amíg a Firebase beállítás betöltődik, a legutóbb ismert témát használjuk
-    document.documentElement.setAttribute('data-theme', localStorage.getItem('uiTheme') || 'default');
-    applyThemeColorMeta(localStorage.getItem('uiTheme') || 'default');
+    applyTheme(localStorage.getItem('uiTheme') || 'default');
     
     let viewingPastRaceData = null; 
     let pastAdatlapFilter = null; 
@@ -70,6 +86,9 @@
 
     // LOKÁLIS VERSENYLISTÁK A FIREBASE-BŐL
     let localRaces = { mult: [], jovo: [] };
+    // Megjött-e már az első Firebase pillanatkép? Amíg nem, töltés-csontvázat mutatunk a
+    // "nincs verseny rögzítve" felirat helyett (l. renderLocalRaces).
+    const betoltesAllapot = { races: false, live: false };
 
     // MODAL VERSENY ADATOK
     let modalRaceId = null;
@@ -478,6 +497,7 @@
 
         db.ref('liveRaceMeta').on('value', snap => {
             liveRaceMeta = snap.val();
+            betoltesAllapot.live = true;
             renderLocalRaces();
         });
 
@@ -491,6 +511,7 @@
             } else {
                 localRaces = { mult: [], jovo: [] };
             }
+            betoltesAllapot.races = true;
             renderLocalRaces();
             
             if (document.getElementById('export-mod').classList.contains('active')) {
@@ -572,10 +593,8 @@
 
         // Design téma - alapból "default", minden eszközön szinkronban
         db.ref('settings/uiTheme').on('value', snap => {
-            uiTheme = snap.val() || 'default';
+            uiTheme = applyTheme(snap.val() || 'default');
             localStorage.setItem('uiTheme', uiTheme);
-            document.documentElement.setAttribute('data-theme', uiTheme);
-            applyThemeColorMeta(uiTheme);
             renderThemeSwatches();
         });
 
@@ -706,11 +725,17 @@
         document.querySelector('.overlay').classList.toggle('open');
     }
 
+    // Ezekben a nézetekben széles, nem törhető ranglista-tábla van (.ttrack-table), ezért nagy
+    // kijelzőn kitágul alattuk a hasáb. Mindenhol máshol az űrlapokhoz szabott keskeny hasáb
+    // marad - egy input nem lesz szebb attól, ha 1300px széles (l. .szeles-nezet a CSS-ben).
+    const SZELES_NEZETEK = ['bajnoksag-egyeni', 'bajnoksag-lo', 'bajnoksag-csapat'];
+
     function switchSidebarMode(targetId, btn) {
         if(btn && btn.id === 'btn-menu-adatlapok') { viewingPastRaceData = null; }
         document.querySelectorAll('.mode-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
+        document.body.classList.toggle('szeles-nezet', SZELES_NEZETEK.includes(targetId));
         if(btn) btn.classList.add('active');
         localStorage.setItem('currentMode', targetId); 
         if(window.innerWidth <= 800) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
@@ -771,7 +796,7 @@
         if(!catConf) return;
         
         document.getElementById('infoModalTitle').innerText = catNames[dist] + " Információk";
-        let html = `<strong>Kategória rajtja:</strong><br><span style="font-size:1.5rem; color:white; font-family:monospace;">${toTimeStr(toSec(catConf.h, catConf.m, catConf.s))}</span><br><br><strong>Körök távolságai:</strong><br><div style="display:inline-block; text-align:left; margin-top:5px;">`;
+        let html = `<strong>Kategória rajtja:</strong><br><span style="font-size:1.5rem; color:var(--text); font-family:monospace;">${toTimeStr(toSec(catConf.h, catConf.m, catConf.s))}</span><br><br><strong>Körök távolságai:</strong><br><div style="display:inline-block; text-align:left; margin-top:5px;">`;
         if(catConf.laps && catConf.laps.length > 0) {
             catConf.laps.forEach((l, i) => { html += `<b>${i+1}. kör:</b> &nbsp;&nbsp;${l || '0'} km<br>`; });
         } else {
@@ -786,13 +811,13 @@
         const r = localRaces.jovo.find(x => x.id === id);
         if(!r) return;
         document.getElementById('infoModalTitle').innerText = r.name;
-        let html = `<strong>Dátum:</strong> <span style="color:white;">${r.date}</span><br><strong>Helyszín:</strong> <span style="color:white;">${r.loc}</span><br><br><strong>Leírás:</strong><br><span style="color:white;">${r.desc || 'Nincs leírás megadva.'}</span><br><br><strong>Kategóriák és Rajtidők:</strong><br><div style="text-align:left; display:inline-block; margin-top:5px;">`;
+        let html = `<strong>Dátum:</strong> <span style="color:var(--text);">${r.date}</span><br><strong>Helyszín:</strong> <span style="color:var(--text);">${r.loc}</span><br><br><strong>Leírás:</strong><br><span style="color:var(--text);">${r.desc || 'Nincs leírás megadva.'}</span><br><br><strong>Kategóriák és Rajtidők:</strong><br><div style="text-align:left; display:inline-block; margin-top:5px;">`;
         
         const cfg = mergeRaceConfig(r.raceConfig);
         let hasCats = false;
         DIST_ORDER.forEach(d => {
             if(cfg[d] && cfg[d].h !== "") {
-                html += `• ${catNames[d]}: <b style="color:white;">${toTimeStr(toSec(cfg[d].h, cfg[d].m, cfg[d].s))}</b> <small>(${(cfg[d].laps||[]).length} kör)</small><br>`;
+                html += `• ${catNames[d]}: <b style="color:var(--text);">${toTimeStr(toSec(cfg[d].h, cfg[d].m, cfg[d].s))}</b> <small>(${(cfg[d].laps||[]).length} kör)</small><br>`;
                 hasCats = true;
             }
         });
@@ -815,12 +840,19 @@
 
         localRaces.mult.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(r => {
             cont.innerHTML += `
-            <div class="race-card" style="border-left-color: #217346; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <div class="race-card-title">${r.name}</div>
-                    <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
+            <!-- A #217346 az Excel márkaszíne, szándékosan fix - itt a kártya felső csíkja lesz. -->
+            <div class="race-card" style="--status-color:#217346;">
+                <div class="race-card-head">
+                    <div class="race-card-title">${escapeHtml(r.name || 'Névtelen verseny')}</div>
                 </div>
-                <button class="calc-btn" style="background:#217346; color:white; width:auto; padding:10px 15px; font-size:0.9rem; margin-top:0;" onclick="exportSpecificRaceToCSV('${r.id}')">📥 Letöltés Excelbe</button>
+                <div class="race-card-meta">
+                    ${r.date ? `<span>📅 <b>${escapeHtml(r.date)}</b></span>` : ''}
+                    ${r.loc ? `<span>📍 <b>${escapeHtml(r.loc)}</b></span>` : ''}
+                </div>
+                <div class="race-card-foot">
+                    <span class="race-entries"><b>${parseCompetitors(r.competitors).length}</b> nevezés</span>
+                    <button class="calc-btn" style="background:#217346; color:#fff; border-color:#217346;" onclick="exportSpecificRaceToCSV('${r.id}')">📥 Letöltés Excelbe</button>
+                </div>
             </div>`;
         });
     }
@@ -960,56 +992,126 @@
         return r && r.isObRound !== false ? `<span style="background:var(--primary-dim); color:var(--primary); font-size:0.7rem; font-weight:800; padding:3px 9px; border-radius:20px; margin-left:8px; vertical-align:middle;">🏆 OB-FORDULÓ</span>` : '';
     }
 
+    // --- TÖLTÉS-JELZÉS ----------------------------------------------------------
+    // A Firebase-figyelők első pillanatában még minden lista üres. Enélkül a felület azt
+    // állítaná, hogy "nincs verseny rögzítve", holott csak még nem érkezett meg az adat -
+    // ezért addig a végleges elrendezés csontvázát mutatjuk. (Az állapotjelző a globálisok
+    // között van deklarálva, mert a figyelők előbb futnak, mint ez a szakasz.)
+    function betoltoSor(szoveg) {
+        return `<div class="betolto-sor"><span class="spinner"></span>${escapeHtml(szoveg || 'Betöltés…')}</div>`;
+    }
+
+    function skeletonVersenyKartyak(db) {
+        return Array.from({ length: db }, () => `<div class="skeleton" aria-hidden="true">
+            <div class="skeleton-sor cim"></div>
+            <div class="skeleton-sor meta"></div>
+            <div class="skeleton-sor chip"></div>
+        </div>`).join('');
+    }
+
+    function skeletonEredmenyKartyak(db) {
+        return Array.from({ length: db }, () => `<div class="skeleton" aria-hidden="true">
+            <div class="skeleton-sor cim"></div>
+            <div class="skeleton-sor meta"></div>
+        </div>`).join('');
+    }
+
+    // --- VERSENY-KÁRTYA: egy közös renderelő a három állapotra ------------------
+    // A státusz (élő / következő / lezárult) adja a felső csík színét és a pill szövegét,
+    // a gombokat pedig az opts-ban kapja - így a kártya szerkezete egy helyen van.
+    const RACE_STATUS = {
+        live: { osztaly: 'is-live',   cimke: 'ÉLŐ' },
+        jovo: { osztaly: 'is-future', cimke: 'KÖVETKEZŐ' },
+        mult: { osztaly: 'is-past',   cimke: 'LEZÁRULT' }
+    };
+
+    // A kiírt kategóriák nevezésszámmal. Ha a raceConfig-ban nincs kiírt táv (hiányos adat),
+    // a ténylegesen nevezett távokra esünk vissza; ha úgy sincs egy sem, a sor kimarad.
+    // A junior a felnőtt párja alá számít ("80j" -> "80"), mert a raceConfig is csak alaptávra
+    // van kulcsolva - így a chipek összege kiadja a lábléc nevezésszámát.
+    function raceCardTavChips(cfg, comps) {
+        const alapTav = c => String(c.dist || '').replace('j', '');
+        const kiirt = DIST_ORDER.filter(d => cfg[d] && cfg[d].h !== '');
+        const tavok = kiirt.length ? kiirt : DIST_ORDER.filter(d => comps.some(c => alapTav(c) === d));
+        if (!tavok.length) return '';
+        const chipek = tavok.map(d => {
+            const db = comps.filter(c => alapTav(c) === d).length;
+            return `<span class="race-chip${db ? '' : ' is-empty'}">${escapeHtml(catNames[d] || d)} <b>${db}</b></span>`;
+        }).join('');
+        return `<div class="race-chips">${chipek}</div>`;
+    }
+
+    function raceCardHTML(r, kind, opts = {}) {
+        const st = RACE_STATUS[kind] || RACE_STATUS.mult;
+        // Az élő futamnál a nevezők és a kiírás nem a verseny-objektumban vannak, hanem a
+        // globális állapotban - ezért lehet felülírni az opts-ból.
+        const comps = opts.comps || parseCompetitors(r.competitors);
+        const cfg = mergeRaceConfig(opts.raceConfig || r.raceConfig);
+
+        const meta = [
+            r.date ? `<span>📅 <b>${escapeHtml(r.date)}</b></span>` : '',
+            r.loc ? `<span>📍 <b>${escapeHtml(r.loc)}</b></span>` : ''
+        ].join('');
+
+        return `<div class="race-card ${st.osztaly}">
+            <div class="race-card-head">
+                <div class="race-card-title">${escapeHtml(r.name || 'Névtelen verseny')}${obBadge(r)}</div>
+                <span class="race-status">${st.cimke}</span>
+            </div>
+            ${meta ? `<div class="race-card-meta">${meta}</div>` : ''}
+            ${raceCardTavChips(cfg, comps)}
+            <div class="race-card-foot">
+                <span class="race-entries">${comps.length ? `<b>${comps.length}</b> nevezés` : 'Nincs még nevezés'}</span>
+                ${opts.fooGomb || ''}
+            </div>
+            ${opts.adminGombok ? `<div class="race-admin-controls admin-only">${opts.adminGombok}</div>` : ''}
+        </div>`;
+    }
+
     function renderLocalRaces() {
         const multCont = document.getElementById('v-mult-list');
         const jovoCont = document.getElementById('v-jovo-list');
         const jelenCont = document.getElementById('v-jelen-list');
         if(!multCont || !jovoCont || !jelenCont) return;
 
-        multCont.innerHTML = localRaces.mult.length > 0 ? '' : '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs múltbéli verseny rögzítve.</div>';
-        jovoCont.innerHTML = localRaces.jovo.length > 0 ? '' : '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs jövőbeli verseny rögzítve.</div>';
+        const uresVagySkeleton = (van, szoveg, dbSkeleton) => van ? ''
+            : (betoltesAllapot.races ? `<div style="text-align:center; padding: 20px; color: var(--text-dim);">${szoveg}</div>`
+                                     : skeletonVersenyKartyak(dbSkeleton));
+
+        multCont.innerHTML = uresVagySkeleton(localRaces.mult.length > 0, 'Nincs múltbéli verseny rögzítve.', 3);
+        jovoCont.innerHTML = uresVagySkeleton(localRaces.jovo.length > 0, 'Nincs jövőbeli verseny rögzítve.', 2);
 
         if(liveRaceMeta) {
-            jelenCont.innerHTML = `
-            <div class="race-card" style="border-left-color: var(--success); background:#202820;">
-                <div class="race-card-title">${liveRaceMeta.name} <span style="color:var(--success); font-size:0.8rem;">(ÉLŐ FUTAM)</span>${obBadge(liveRaceMeta)}</div>
-                <div class="race-card-date">${liveRaceMeta.date} | Helyszín: ${liveRaceMeta.loc}</div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-                    <button class="calc-btn admin-only" style="padding:10px; margin-top:0; font-size:0.9rem;" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>
-                    <button class="calc-btn admin-only" style="padding:10px; margin-top:0; font-size:0.9rem; background:var(--danger); color:white;" onclick="forceMoveToPastFromLive()">🛑 Lezárás (Múltbélivé tétel)</button>
-                </div>
-            </div>`;
+            jelenCont.innerHTML = raceCardHTML(liveRaceMeta, 'live', {
+                comps: competitors, raceConfig: raceConfig,
+                fooGomb: `<button class="calc-btn add-btn admin-only" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>`,
+                adminGombok: `<button class="edit-btn is-danger" onclick="forceMoveToPastFromLive()">🛑 Lezárás (Múltbélivé tétel)</button>`
+            });
         } else {
-            jelenCont.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>';
+            jelenCont.innerHTML = betoltesAllapot.live
+                ? '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>'
+                : skeletonVersenyKartyak(1);
         }
 
         localRaces.mult.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(r => {
-            multCont.innerHTML += `
-            <div class="race-card" style="border-left-color: #666;">
-                <div class="race-card-title">${r.name}${obBadge(r)}</div>
-                <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <button class="calc-btn" style="padding:10px; margin-top:10px; background: #444; color: white;" onclick="openPublicPastRace('${r.id}')">📊 Eredmények megtekintése</button>
-                <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+            multCont.innerHTML += raceCardHTML(r, 'mult', {
+                fooGomb: `<button class="calc-btn" onclick="openPublicPastRace('${r.id}')">📊 Eredmények megtekintése</button>`,
+                adminGombok: `
                     <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Szerkesztés</button>
-                    <button class="edit-btn" style="background:var(--teal); color:white;" onclick="forceMoveRace('mult', 'jovo', '${r.id}')">⏪ Vissza Jövőbelibe</button>
-                    <button class="edit-btn" style="background:var(--success); color:black;" onclick="forceMoveToLive('mult', '${r.id}')">▶️ Újra ÉLŐ-be</button>
-                    <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('mult', '${r.id}')">Törlés</button>
-                </div>
-            </div>`;
+                    <button class="edit-btn is-info" onclick="forceMoveRace('mult', 'jovo', '${r.id}')">⏪ Vissza Jövőbelibe</button>
+                    <button class="edit-btn is-success" onclick="forceMoveToLive('mult', '${r.id}')">▶️ Újra ÉLŐ-be</button>
+                    <button class="edit-btn is-danger" onclick="deleteRace('mult', '${r.id}')">Törlés</button>`
+            });
         });
 
         localRaces.jovo.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
-            jovoCont.innerHTML += `
-            <div class="race-card" style="border-left-color: var(--warning);">
-                <div class="race-card-title">${r.name}${obBadge(r)}</div>
-                <div class="race-card-date">${r.date} | Helyszín: ${r.loc}</div>
-                <button class="calc-btn" style="padding:10px; margin-top:10px; background: var(--teal); color: white;" onclick="showFutureInfo('${r.id}')">ℹ️ Részletek megtekintése</button>
-                <div class="race-admin-controls admin-only" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+            jovoCont.innerHTML += raceCardHTML(r, 'jovo', {
+                fooGomb: `<button class="calc-btn" onclick="showFutureInfo('${r.id}')">ℹ️ Részletek megtekintése</button>`,
+                adminGombok: `
                     <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Szerkesztés</button>
-                    <button class="edit-btn" style="background:var(--success); color:black;" onclick="forceMoveToLive('jovo', '${r.id}')">▶️ Élesítés (ÉLŐ)</button>
-                    <button class="edit-btn" style="background:var(--danger);" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>
-                </div>
-            </div>`;
+                    <button class="edit-btn is-success" onclick="forceMoveToLive('jovo', '${r.id}')">▶️ Élesítés (ÉLŐ)</button>
+                    <button class="edit-btn is-danger" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>`
+            });
         });
     }
     
@@ -1043,8 +1145,8 @@
         if (!pastAdatlapFilter || pastAdatlapFilter === 'all') {
             let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
             if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Nincsenek adatok ebben a versenyben.</p>`; } 
-            else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setPastAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
-            cont.innerHTML = html + `<button class="calc-btn" style="background:#444; color:white; margin-top:20px; font-size:0.9rem; padding:10px;" onclick="closePastRaceModal()">🔙 Vissza a versenyekhez</button></div>`;
+            else { activeCats.forEach(cat => { html += `<button class="calc-btn cat-select-btn" onclick="setPastAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
+            cont.innerHTML = html + `<button class="calc-btn" style="background:var(--card-3); color:var(--text); border:1px solid var(--border); margin-top:20px; font-size:0.9rem; padding:10px;" onclick="closePastRaceModal()">🔙 Vissza a versenyekhez</button></div>`;
         } else {
             let catComps = comps.filter(c => c.dist === pastAdatlapFilter);
             let total = catComps.length;
@@ -1219,7 +1321,7 @@
             const origText = btn.innerText;
             const origBg = btn.style.background;
             btn.innerText = 'Sikeresen mentve! ✅';
-            btn.style.background = '#28a745';
+            btn.style.background = 'var(--success)';
             setTimeout(() => { 
                 btn.innerText = origText; 
                 btn.style.background = origBg; 
@@ -1762,12 +1864,12 @@
             let isFinalLap = (i === countLaps - 1);
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
-                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:var(--text);">${toTimeStr(l.loopSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:var(--text);">${toTimeStr(l.arrSec)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
-                <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
-                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${toTimeStr(isFinalLap ? (l.loopSec + l.pulzusSec) : l.phaseSec)}</b></div>
+                <div style="margin-top:6px; border-top:1px dashed var(--border); padding-top:6px;"></div>
+                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:var(--text);">${toTimeStr(isFinalLap ? (l.loopSec + l.pulzusSec) : l.phaseSec)}</b></div>
                 ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${l.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
                 <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(l.pulzusSec)}</b></div>
                 ` : ""}
@@ -1782,7 +1884,7 @@
                 let totalTime = ((comp.dist === "20" || comp.dist === "20j") && lastComplete.vetSec > 0) ? (lastComplete.loopSec + lastComplete.pulzusSec) : lastComplete.rideTime;
                 html += `<div class="summary-total">
                     <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalTime)}</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:var(--text);">${toTimeStr(totalTime)}</b></div>
                     <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${lastComplete.rideSpd.toFixed(2)} km/h</b></div>
                 </div>`;
             }
@@ -2226,7 +2328,7 @@
         let phases = (comp.laps || []).filter(l => l.arrSec > 0 || l.vetSec > 0);
         
         if (phases.length === 0) {
-            document.getElementById('print-sticker').innerHTML = `<p style="color:white; text-align:center;">Nincs rögzített adat.</p>`;
+            document.getElementById('print-sticker').innerHTML = `<p style="color:var(--text); text-align:center;">Nincs rögzített adat.</p>`;
             form.style.display = 'block';
             return;
         }
@@ -3018,12 +3120,12 @@
 
             html += `<div class="plan-box" style="border-left-color:${loopColor}">
                 <span class="plan-header" style="color:${loopColor}">${i+1}. KÖR</span>
-                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:white;">${toTimeStr(l.loopSec)}</b></div>
-                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:white;">${toTimeStr(l.arrSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Kör idő:</span> <b style="color:var(--text);">${toTimeStr(l.loopSec)}</b></div>
+                <div class="plan-data-row"><span class="plan-data-label">Beérkezés:</span> <b style="color:var(--text);">${toTimeStr(l.arrSec)}</b></div>
                 <div class="plan-data-row"><span class="plan-data-label">Átlag:</span> <b style="color:${loopColor}">${l.loopSpd.toFixed(2)} km/h</b></div>
                 ${l.vetSec > 0 ? `
-                <div style="margin-top:6px; border-top:1px dashed #444; padding-top:6px;"></div>
-                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:white;">${toTimeStr(isFinalLap ? (l.loopSec + l.pulzusSec) : l.phaseSec)}</b></div>
+                <div style="margin-top:6px; border-top:1px dashed var(--border); padding-top:6px;"></div>
+                <div class="plan-data-row"><span class="plan-data-label">Orvosi idő:</span> <b style="color:var(--text);">${toTimeStr(isFinalLap ? (l.loopSec + l.pulzusSec) : l.phaseSec)}</b></div>
                 ${!isFinalLap ? `<div class="plan-data-row"><span class="plan-data-label">Orvosi átlag:</span> <b style="color:${phaseColor}">${l.phaseSpd.toFixed(2)} km/h</b></div>` : ''}
                 <div class="plan-data-row"><span class="plan-data-label">Pulzus idő:</span> <b style="color:var(--primary);">${toTimeStr(l.pulzusSec)}</b></div>
                 ` : ""}
@@ -3038,7 +3140,7 @@
                 let totalTime = ((comp.dist === "20" || comp.dist === "20j") && lastComplete.vetSec > 0) ? (lastComplete.loopSec + lastComplete.pulzusSec) : lastComplete.rideTime;
                 html += `<div class="summary-total">
                     <strong style="color:var(--primary); font-size:1.1rem; display:block; margin-bottom:8px;">Összesített statisztika</strong>
-                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:white;">${toTimeStr(totalTime)}</b></div>
+                    <div class="plan-data-row"><span class="plan-data-label">Össz. menetidő:</span> <b style="font-size:1.3rem; color:var(--text);">${toTimeStr(totalTime)}</b></div>
                     <div class="plan-data-row"><span class="plan-data-label">Össz. átlagsebesség:</span> <b style="font-size:1.3rem; color:${avgColor}">${lastComplete.rideSpd.toFixed(2)} km/h</b></div>
                 </div>`;
             }
@@ -3410,7 +3512,7 @@
             if (startSec > 0 && diff > -60) {
                 return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
             }
-            return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
+            return { text: "Körön van", color: "var(--primary)", textCol: "var(--on-primary, #fff)" };
         }
 
         let last = validLaps[completed - 1];
@@ -3433,7 +3535,7 @@
             if (diff > 0) return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
         }
 
-        return { text: "Körön van", color: "var(--primary)", textCol: "#fff" };
+        return { text: "Körön van", color: "var(--primary)", textCol: "var(--on-primary, #fff)" };
     }
 
     // 31. §: ha két, nem kiesett versenyző utolsó teljesített körének menetideje másodpercre
@@ -3551,9 +3653,9 @@
         let activeCats = getActiveCategories(ctx.comps, ctx.config);
         let html = "";
         activeCats.forEach(cat => {
-            html += `<button class="calc-btn" style="background:var(--teal); color:white; padding:12px; margin-top:0;" onclick="closeCatSwapModal(); setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
+            html += `<button class="calc-btn cat-select-btn kicsi" onclick="closeCatSwapModal(); setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
         });
-        html += `<button class="calc-btn" style="background:#e0e0e0; color:#000; margin-top:20px; padding:10px;" onclick="closeCatSwapModal()">Bezárás</button>`;
+        html += `<button class="cancel-btn" style="display:block; margin-top:20px;" onclick="closeCatSwapModal()">Bezárás</button>`;
         document.getElementById('catSwapModalBody').innerHTML = html;
         document.getElementById('catSwapModal').style.display = 'flex';
     }
@@ -3572,7 +3674,7 @@
         if (!currentAdatlapFilter || currentAdatlapFilter === 'all') {
             let html = `<div style="display:flex; flex-direction:column; gap:10px; margin-top:0;">`;
             if (activeCats.length === 0) { html += `<p style="text-align:center; color:var(--text-dim);">Még nincs beállított kategória vagy versenyző.</p>`; } 
-            else { activeCats.forEach(cat => { html += `<button class="calc-btn" style="background:var(--teal); color:white; font-size:1.2rem; padding:20px; margin-top:0;" onclick="setAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
+            else { activeCats.forEach(cat => { html += `<button class="calc-btn cat-select-btn" onclick="setAdatlapFilter('${cat}')">${catNames[cat]}</button>`; }); }
             cont.innerHTML = html + `</div>`;
         } else {
             let catComps = ctx.comps.filter(c => c.dist === currentAdatlapFilter);
@@ -3843,7 +3945,7 @@
             ? `<div class="warning-banner level-warn" style="margin-top:0; margin-bottom:12px;"><span class="wb-icon">⚠️</span><span>Ez az idő szokatlanul távolinak tűnik - ellenőrizd, nem gépeltél-e el egy számjegyet.</span></div>`
             : '';
         document.getElementById('res1').style.display = 'block';
-        document.getElementById('res1').innerHTML = `${warnHtml}Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:white;">${toTimeStr(nextStart)}</b></span>`;
+        document.getElementById('res1').innerHTML = `${warnHtml}Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:var(--text);">${toTimeStr(nextStart)}</b></span>`;
     }
 
     function calcMinosites() {
@@ -4342,22 +4444,34 @@
         return window.matchMedia('(min-width: 701px)').matches;
     }
 
+    // Igaz, amíg a hivatalos eredménylista tölt. Cache-ből nyitott profilnál egy pillanatig sem
+    // igaz, így nem villan fel fölöslegesen a jelzés.
+    let profilTolt = false;
+
+    function profilBetoltesIndit() {
+        const { tipus, id } = profilAllapot;
+        profilTolt = !profilHivatalosCache[tipus + ':' + id];
+        renderProfil();                                    // azonnal, a cache-ből
+        profilHivatalosBetoltes().then(() => {             // majd a hivatalos eredményekkel
+            profilTolt = false;
+            renderProfil();
+        });
+    }
+
     function profilNyitas(tipus, id, veremre) {
         if (veremre && profilAllapot) profilElozmeny.push(profilAllapot);
         else if (!veremre) profilElozmeny = [];
         // ev: null + evAuto: true = "a legutóbbi aktív éve", amíg a felhasználó nem választ mást.
         profilAllapot = { tipus: tipus, id: String(id), ev: null, evAuto: true, forras: 'magyar' };
         document.getElementById('adatlapModal').style.display = 'flex';
-        renderProfil();                                        // azonnal, a cache-ből
-        profilHivatalosBetoltes().then(() => renderProfil());   // majd a hivatalos eredményekkel
+        profilBetoltesIndit();
     }
 
     function profilVissza() {
         const elozo = profilElozmeny.pop();
         if (!elozo) return;
         profilAllapot = elozo;
-        renderProfil();
-        profilHivatalosBetoltes().then(() => renderProfil());
+        profilBetoltesIndit();
     }
 
     function profilForrasValt(forras) { if (profilAllapot) { profilAllapot.forras = forras; renderProfil(); } }
@@ -4592,6 +4706,14 @@
         return escapeHtml(szavak.slice(0, 2).map(sz => sz[0]).join('').toUpperCase()) || escapeHtml(id);
     }
 
+    // Amíg a hivatalos eredmények töltenek: ha még egy kártya sincs, csontvázat mutatunk (nehogy
+    // azt higgye a felhasználó, hogy nincs eredmény), ha már van, csak egy halk "még jön" sort.
+    function betoltesJelzesAProfilban(kartyaDb, ev) {
+        if (profilTolt) return kartyaDb ? betoltoSor('További eredmények betöltése…') : skeletonEredmenyKartyak(3);
+        if (kartyaDb) return '';
+        return `<p class="profil-ures">${ev === 'osszes' ? 'Nincs rögzített eredmény ebben a forrásban.' : 'Ebben az évben nincs rögzített eredmény.'}</p>`;
+    }
+
     function renderProfil() {
         if (!profilAllapot) return;
         const { tipus, id, forras } = profilAllapot;
@@ -4660,9 +4782,8 @@
             </div>
 
             <div class="profil-eredmenyek">
-                ${szurtek.length
-                    ? szurtek.map(r => profilEredmenyKartya(r, tipus)).join('')
-                    : `<p class="profil-ures">${ev === 'osszes' ? 'Nincs rögzített eredmény ebben a forrásban.' : 'Ebben az évben nincs rögzített eredmény.'}</p>`}
+                ${szurtek.length ? szurtek.map(r => profilEredmenyKartya(r, tipus)).join('') : ''}
+                ${betoltesJelzesAProfilban(szurtek.length, ev)}
             </div>
         </div>`;
     }
@@ -5552,6 +5673,10 @@
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
         if (savedMode === 'terv') savedMode = 'versenyek';
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
+
+        // A versenylistákat egyébként csak a Firebase-figyelők rajzolják, azok viszont már
+        // adattal futnak le - enélkül a töltés alatt üres lenne a képernyő a csontváz helyett.
+        renderLocalRaces();
 
         initAutocompleteFields('');      // élő nevezési form
         initAutocompleteFields('rm');    // múltbéli/jövőbeli verseny szerkesztő modal
