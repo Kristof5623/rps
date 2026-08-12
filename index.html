@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v108</title>
+    <title>Verseny Kalkulátor v109</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -312,6 +312,10 @@
         <div id="bajnoksag-lo" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 15px;">🐴 Ló-ranglista</h3>
             <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">A legmegbízhatóbb lovak - bármilyen kategóriájú versenyen teljesített összes kilométer, nem csak az OB-fordulók.</p>
+            <div class="tabs" id="lo-hatokor-tabs">
+                <button id="btn-lo-magyar" class="tab-btn active" onclick="setLoHatokor('magyar', this)">🇭🇺 Magyar versenyek</button>
+                <button id="btn-lo-osszes" class="tab-btn" onclick="setLoHatokor('osszes', this)">🌍 Összes verseny</button>
+            </div>
             <div class="kiiras-card" style="border-left-color: var(--teal); display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
                 <div style="flex:1; min-width:140px;">
                     <label style="margin-top:0;">Bajnoki év:</label>
@@ -362,34 +366,35 @@
             </div>
 
             <div id="csapat-kulf" class="sub-mode-content" style="display:none;">
-                <!-- EGYSZER-HASZNÁLATOS: a 2026-os FEI eredmények feltöltése (FELADAT_v6, A. rész).
-                     A sikeres futás és az ellenőrzés után ez a blokk és a runFeiImport() törlendő. -->
-                <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
-                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🌍 FEI eredmények importálása (2026)</h4>
-                    <p class="field-hint" style="margin-bottom:0;">
-                        13 nemzetközi eredmény a data.fei.org-ról, 7 versenyzőnél. Az <code>externalResults</code>
-                        node-ba kerül, ahonnan a <b>csapatbajnokság</b> és a <b>ló-ranglista</b> már olvassa.
-                        A <code>races/mult</code> alá <b>nem</b> megy, így az egyéni bajnokság állása nem változik.
-                        <br><b>Ezt elég egyszer lefuttatni.</b>
-                    </p>
-                </div>
-                <button id="btn-fei-import" class="calc-btn admin-only" style="background:var(--teal); color:black;" onclick="runFeiImport()">🌍 FEI eredmények importálása (egyszer!)</button>
-                <input type="file" id="fei-fajl" accept=".json,application/json" style="display:none;">
-                <div id="fei-import-report" style="margin-top:20px;"></div>
-
-                <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--text);">Külföldi (CEI/CEIO) eredmény felvitele</h4>
-                <p class="field-hint">Ez nem az élő verseny-lebonyolítási rendszer része, csak egy egyszerű kézi nyilvántartás a csapatbajnoksághoz és a ló-ranglistához.</p>
+                <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--text);">Külföldi (CEI/CEIO) eredmény felvitele</h4>
+                <p class="field-hint">Ugyanazok a mezők, mint amiket a FEI import is tölt - így a kézzel felvitt eredmény pontosan úgy néz ki és úgy is számít, mint egy importált. A csapatbajnokságba a helyezés és a táv alapján számít pontot, a ló-ranglistába pedig a km - de csak akkor, ha nincs kiesési státusz.</p>
                 <label>Lovas:</label>
                 <input type="text" id="ext-rider-search" placeholder="Név vagy igazolási szám..." autocomplete="off">
                 <input type="hidden" id="ext-license">
                 <label>Ló (opcionális - ha ismert, a km a ló-ranglistába is beszámít):</label>
                 <input type="text" id="ext-horse-search" placeholder="Ló neve vagy start száma..." autocomplete="off">
                 <input type="hidden" id="ext-horseStartNum">
-                <label>Verseny neve:</label> <input type="text" id="ext-raceName" placeholder="pl. CEI2* Compiègne">
-                <label>Ország:</label> <input type="text" id="ext-country" placeholder="pl. Franciaország">
+                <label>Ló neve (külföldi ló, ami nincs a törzsadatban):</label>
+                <input type="text" id="ext-horseName" placeholder="pl. TANN SALOU">
+                <label>Ló FEI száma (opcionális):</label>
+                <input type="text" id="ext-horseFeiId" placeholder="pl. 105IP42">
+                <label>Verseny / versenyszám:</label> <input type="text" id="ext-event" placeholder="pl. CEI2* 120 CIM">
+                <label>Helyszín:</label> <input type="text" id="ext-venue" placeholder="pl. Samorin">
+                <label>Ország (3 betűs kód vagy név):</label> <input type="text" id="ext-country" placeholder="pl. SVK">
                 <label>Időpont:</label> <input type="date" id="ext-date">
                 <label>Táv (km):</label> <input type="number" id="ext-distanceKm" placeholder="pl. 120">
-                <label>Helyezés (opcionális):</label> <input type="number" id="ext-place" placeholder="pl. 5">
+                <label>Helyezés (kiesés esetén hagyd üresen):</label> <input type="number" id="ext-place" placeholder="pl. 5">
+                <label>Kiesési státusz:</label>
+                <select id="ext-status">
+                    <option value="">– befejezte –</option>
+                    <option value="FTQ">FTQ – nem felelt meg a vizsgán</option>
+                    <option value="RET">RET – feladta</option>
+                    <option value="DSQ">DSQ – kizárva</option>
+                    <option value="DNS">DNS – nem indult</option>
+                    <option value="WD">WD – visszalépett</option>
+                </select>
+                <label>Eredmény (menetidő vagy átlagsebesség):</label>
+                <input type="text" id="ext-score" placeholder="pl. 11:21:42 vagy 16.83">
                 <button id="btn-ext-mentes" class="calc-btn add-btn admin-only" onclick="saveExternalResult()">Eredmény mentése</button>
                 <button id="ext-cancel-btn" class="cancel-btn" onclick="cancelExternalEdit()">Mégse</button>
 
@@ -437,6 +442,7 @@
             <div class="tabs">
                 <button id="btn-beallitasok-tema" class="tab-btn active" onclick="switchBeallitasokTab('beallitasok-tema', this)">Design téma</button>
                 <button id="btn-beallitasok-pontkereso" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-pontkereso', this)">Versenyző pontkereső</button>
+                <button id="btn-beallitasok-kulfoldi" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-kulfoldi', this)">Nemzetközi versenyek</button>
             </div>
 
             <div id="beallitasok-tema" class="sub-mode-content" style="display:block;">
@@ -452,6 +458,20 @@
                 <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Keress rá egy versenyzőre, és nézd meg versenyenkénti bontásban, hányadik helyen végzett, milyen távon, és mennyi bajnoki pontot ért ez.</p>
                 <input type="text" id="admin-pontkereso-search" placeholder="Keresés név, igazolási szám vagy egyesület alapján..." autocomplete="off" oninput="renderAdminPontkereso()">
                 <div id="admin-pontkereso-list" style="margin-top:15px;"></div>
+            </div>
+
+            <div id="beallitasok-kulfoldi" class="sub-mode-content" style="display:none;">
+                <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🌍 Nemzetközi (FEI) eredmények</h4>
+                    <p class="field-hint" style="margin-bottom:0;">
+                        Versenyenként csoportosítva - egy blokk egy nemzetközi verseny, alatta az ott indult magyar
+                        lovasok. Nyisd le a versenyt, és a <b>Módosítás</b> gombbal minden mező szerkeszthető, ami a
+                        rekordban van. Ez a lista adja a <b>csapatbajnoksági</b> pontokat és a <b>ló-ranglista</b>
+                        nemzetközi kilométereit, ezért a helyezés és a kiesési státusz itt számít a legtöbbet.
+                    </p>
+                </div>
+                <input type="text" id="kulfoldi-kereso" placeholder="Szűrés versenyre, helyszínre, lovasra, lóra vagy évre..." autocomplete="off" oninput="renderKulfoldiKezelo()">
+                <div id="kulfoldi-kezelo-lista" style="margin-top:15px;"></div>
             </div>
         </div>
 

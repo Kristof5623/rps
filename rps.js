@@ -595,6 +595,7 @@
             if (document.getElementById('csapat-kulf')?.style.display === 'block') renderExternalResultsList();
             if (document.getElementById('csapat-datum')?.style.display === 'block') renderBajnokavatasDatumSettings();
         }
+        if (document.getElementById('beallitasok-kulfoldi')?.style.display === 'block') renderKulfoldiKezelo();
     }
 
     startDatabaseListeners();
@@ -4335,10 +4336,17 @@
     // Kereszthivatkozás a profilon belül: az előzőt a verembe tesszük, hogy legyen hova visszalépni.
     function profilUgras(tipus, id) { profilNyitas(tipus, id, true); }
 
+    // Kis képernyőn a törzsadat alapból össze van csukva (l. .profil-torzs a CSS-ben) - különben
+    // az adatlap elviszi az egész képernyőt, és a versenyekre 1-2 kártyányi hely marad.
+    function szelesKepernyo() {
+        return window.matchMedia('(min-width: 701px)').matches;
+    }
+
     function profilNyitas(tipus, id, veremre) {
         if (veremre && profilAllapot) profilElozmeny.push(profilAllapot);
         else if (!veremre) profilElozmeny = [];
-        profilAllapot = { tipus: tipus, id: String(id), ev: 'osszes', forras: 'sajat' };
+        // ev: null + evAuto: true = "a legutóbbi aktív éve", amíg a felhasználó nem választ mást.
+        profilAllapot = { tipus: tipus, id: String(id), ev: null, evAuto: true, forras: 'magyar' };
         document.getElementById('adatlapModal').style.display = 'flex';
         renderProfil();                                        // azonnal, a cache-ből
         profilHivatalosBetoltes().then(() => renderProfil());   // majd a hivatalos eredményekkel
@@ -4353,7 +4361,8 @@
     }
 
     function profilForrasValt(forras) { if (profilAllapot) { profilAllapot.forras = forras; renderProfil(); } }
-    function profilEvValt(ev) { if (profilAllapot) { profilAllapot.ev = ev; renderProfil(); } }
+    // Ha a felhasználó maga választ évet, onnantól nem írjuk felül az automatikával.
+    function profilEvValt(ev) { if (profilAllapot) { profilAllapot.ev = ev; profilAllapot.evAuto = false; renderProfil(); } }
 
     function profilHivatalosBetoltes() {
         if (!profilAllapot) return Promise.resolve([]);
@@ -4368,45 +4377,54 @@
         }).catch(() => { profilHivatalosCache[kulcs] = []; return []; });
     }
 
-    // --- A három forrás közös kártya-alakra hozva ---------------------------------
-    function profilEredmenyek(forras) {
+    // --- A nyers források közös kártya-alakra hozva -------------------------------
+    // Kifelé két forrás látszik: "Magyar" (a saját lebonyolítás + a szövetség hivatalos listája
+    // összefésülve, l. profilMagyarEredmenyek) és "Nemzetközi" (FEI). A felhasználónak nem kell
+    // tudnia, melyik eredmény melyik adatbázisból jött - egy verseny egy kártya.
+    function profilSajatEredmenyek() {
         const { tipus, id } = profilAllapot;
+        const sorok = tipus === 'lovas' ? getRiderHistory(id) : getHorseHistory(id);
+        return sorok.map(r => ({
+            ev: (r.raceDate || '').slice(0, 4),
+            datum: r.raceDate, verseny: r.raceName, alcim: catNames[r.dist] || r.dist, szint: '',
+            hely: r.place, indulok: null, kiesett: r.isEliminated,
+            statuszSzoveg: getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes }),
+            partnerNev: tipus === 'lovas' ? r.horseName : r.name,
+            partnerId: tipus === 'lovas' ? r.startNum : r.license,
+            ido: '', sebesseg: null, minPont: null, buntetes: null,
+            raceId: r.raceId, dist: r.dist, kmKulcs: r.km
+        }));
+    }
 
-        if (forras === 'sajat') {
-            const sorok = tipus === 'lovas' ? getRiderHistory(id) : getHorseHistory(id);
-            return sorok.map(r => ({
-                ev: (r.raceDate || '').slice(0, 4),
-                datum: r.raceDate, verseny: r.raceName, alcim: catNames[r.dist] || r.dist, szint: '',
-                hely: r.place, indulok: null, kiesett: r.isEliminated,
-                statuszSzoveg: getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes }),
-                partnerNev: tipus === 'lovas' ? r.horseName : r.name,
-                partnerId: tipus === 'lovas' ? r.startNum : r.license,
-                ido: '', sebesseg: null, minPont: null, buntetes: null,
-                raceId: r.raceId, dist: r.dist
-            }));
-        }
+    function profilHivatalosEredmenyek() {
+        const { tipus, id } = profilAllapot;
+        const sorok = profilHivatalosCache[tipus + ':' + id] || [];
+        return sorok.map(e => {
+            // A competition a verseny nevével kezdődik ("VII. Husztót Kupa 2.vrsz.-60 km..."),
+            // a kártyafejlécben viszont csak a versenyszám kell alcímnek.
+            const teljes = e.competition || '';
+            const alcim = (e.event && teljes.startsWith(e.event)) ? teljes.slice(e.event.length).trim() : teljes;
+            const helySzam = /^\d+$/.test(String(e.place || '').trim()) ? parseInt(e.place, 10) : null;
+            // A partner mezőnevei importonként eltérnek: a régi (v4) sorokban partnerName/partnerId,
+            // a 2023-2026-os importban lovasnál horseName/horseId, lónál riderName/license.
+            const partnerNev = e.partnerName || (tipus === 'lovas' ? e.horseName : e.riderName) || '';
+            const partnerAzon = e.partnerId || (tipus === 'lovas' ? e.horseId : e.license) || '';
+            return {
+                ev: e.year || (e.date || '').slice(0, 4),
+                datum: (e.date || '').replace(/\//g, '-'), verseny: e.event, alcim: alcim, szint: e.level || '',
+                hely: helySzam, indulok: e.starters, kiesett: !!e.status,
+                statuszSzoveg: [e.status, e.note && e.note !== '0' ? e.note : ''].filter(Boolean).join(' · '),
+                partnerNev: profilPartnerNev(partnerNev), partnerId: partnerAzon,
+                ido: e.time && /^\d/.test(e.time) ? e.time : '', sebesseg: null,
+                minPont: e.minPoints, buntetes: e.penalty, raceId: null, dist: null,
+                kmKulcs: parseFloat(e.distanceKm) || null
+            };
+        });
+    }
 
-        if (forras === 'hivatalos') {
-            const sorok = profilHivatalosCache[tipus + ':' + id] || [];
-            return sorok.map(e => {
-                // A competition a verseny nevével kezdődik ("VII. Husztót Kupa 2.vrsz.-60 km..."),
-                // a kártyafejlécben viszont csak a versenyszám kell alcímnek.
-                const teljes = e.competition || '';
-                const alcim = (e.event && teljes.startsWith(e.event)) ? teljes.slice(e.event.length).trim() : teljes;
-                const helySzam = /^\d+$/.test(String(e.place || '').trim()) ? parseInt(e.place, 10) : null;
-                return {
-                    ev: e.year || (e.date || '').slice(0, 4),
-                    datum: (e.date || '').replace(/\//g, '-'), verseny: e.event, alcim: alcim, szint: e.level || '',
-                    hely: helySzam, indulok: e.starters, kiesett: !!e.status,
-                    statuszSzoveg: [e.status, e.note && e.note !== '0' ? e.note : ''].filter(Boolean).join(' · '),
-                    partnerNev: profilPartnerNev(e.partnerName), partnerId: e.partnerId,
-                    ido: e.time && /^\d/.test(e.time) ? e.time : '', sebesseg: null,
-                    minPont: e.minPoints, buntetes: e.penalty, raceId: null, dist: null
-                };
-            });
-        }
-
-        // FEI: lovasnál license, lónál horseStartNum szerint
+    // FEI: lovasnál license, lónál horseStartNum szerint
+    function profilFeiEredmenyek() {
+        const { tipus, id } = profilAllapot;
         return Object.values(externalResultsCache)
             .filter(e => tipus === 'lovas' ? e.license === id : e.horseStartNum === id)
             .map(e => ({
@@ -4414,13 +4432,49 @@
                 datum: e.date, verseny: e.event || e.raceName || 'Nemzetközi verseny',
                 alcim: [e.venue, e.country].filter(Boolean).join(', '),
                 szint: e.source === 'FEI' ? 'FEI' : 'nemzetközi',
-                hely: (e.place === null || e.place === undefined) ? null : parseInt(e.place, 10),
+                hely: (e.place === null || e.place === undefined || e.place === '') ? null : parseInt(e.place, 10),
                 indulok: null, kiesett: !!e.status, statuszSzoveg: e.status || '',
                 partnerNev: e.horseName, partnerId: e.horseStartNum,
-                ido: e.rideTime || '', sebesseg: e.avgSpeed,
+                ido: e.score && /^\d+:\d/.test(e.score) ? e.score : (e.rideTime || ''),
+                sebesseg: e.avgSpeed || (e.score && /^\d+[.,]\d+$/.test(String(e.score)) ? e.score : null),
                 minPont: null, buntetes: null, raceId: null, dist: null,
                 km: e.distanceKm
             }));
+    }
+
+    // A magyar eredmények két adatbázisból jönnek: a saját lebonyolításunkból (races/mult - ez az
+    // igazság forrása, innen át lehet ugrani a verseny eredménylistájára) és a szövetség hivatalos
+    // listájából (riderResults/horseResults - 2023-tól, indulószám / minősítő pont / idő). Ugyanaz a
+    // rajt mindkettőben szerepelhet, ezért dátum + táv (és ha van, a partner azonosítója) alapján
+    // összefésüljük: a saját sor marad, a hivatalosból csak azt vesszük át, amit az tud pluszban.
+    function profilMagyarEredmenyek() {
+        const eredmeny = profilSajatEredmenyek();
+        const kulcs = r => (r.datum || '') + '|' + (r.kmKulcs || '');
+
+        const csoport = new Map();
+        eredmeny.forEach(r => {
+            const k = kulcs(r);
+            if (!csoport.has(k)) csoport.set(k, []);
+            csoport.get(k).push(r);
+        });
+
+        profilHivatalosEredmenyek().forEach(h => {
+            const lista = csoport.get(kulcs(h)) || [];
+            const par = lista.find(r => !r.hivatalosIs && r.partnerId && h.partnerId && String(r.partnerId) === String(h.partnerId))
+                || lista.find(r => !r.hivatalosIs);
+            if (!par) { eredmeny.push(h); return; }
+
+            // Kiegészítés, nem felülírás: ami a saját adatban megvan, az marad.
+            if (par.indulok == null) par.indulok = h.indulok;
+            if (!par.ido) par.ido = h.ido;
+            if (par.minPont == null || par.minPont === '') par.minPont = h.minPont;
+            if (!par.buntetes || par.buntetes === '0') par.buntetes = h.buntetes;
+            if (!par.szint) par.szint = h.szint;
+            if (!par.partnerNev) { par.partnerNev = h.partnerNev; par.partnerId = h.partnerId; }
+            par.hivatalosIs = true;
+        });
+
+        return eredmeny;
     }
 
     function profilEredmenyKartya(r, tipus) {
@@ -4540,7 +4594,7 @@
 
     function renderProfil() {
         if (!profilAllapot) return;
-        const { tipus, id, forras, ev } = profilAllapot;
+        const { tipus, id, forras } = profilAllapot;
         const torzs = tipus === 'lovas' ? (ridersCache[sanitizeKey(id)] || {}) : (horsesCache[sanitizeKey(id)] || {});
         const ismert = !!torzs.name;
 
@@ -4550,15 +4604,26 @@
         const alcim = alcimReszek.filter(Boolean).map(x => escapeHtml(String(x))).join(' · ');
 
         // Forrásonkénti darabszám: a kapcsolón látszik, hol van egyáltalán adat.
-        const darab = { sajat: profilEredmenyek('sajat').length, hivatalos: profilEredmenyek('hivatalos').length, fei: profilEredmenyek('fei').length };
-        const aktivSorok = profilEredmenyek(forras);
+        const magyarSorok = profilMagyarEredmenyek();
+        const feiSorok = profilFeiEredmenyek();
+        const darab = { magyar: magyarSorok.length, nemzetkozi: feiSorok.length };
+        const aktivSorok = forras === 'nemzetkozi' ? feiSorok : magyarSorok;
 
         // Évszűrő: a törzsadat resultYears-e ÉS a ténylegesen meglévő évek uniója, hogy
         // egyetlen eredmény se váljon láthatatlanná.
         const evek = Array.from(new Set([
             ...(torzs.resultYears || []),
-            ...[].concat(profilEredmenyek('sajat'), profilEredmenyek('hivatalos'), profilEredmenyek('fei')).map(r => r.ev)
+            ...[].concat(magyarSorok, feiSorok).map(r => r.ev)
         ].filter(Boolean).map(String))).sort((a, b) => b.localeCompare(a));
+
+        // Alapértelmezett év: az aktív forrás legutóbbi éve, amelyben tényleg van eredmény - aki
+        // idén versenyzett, annál 2026, aki nem, annál az utolsó aktív éve. Az "Összes év" csak
+        // akkor marad, ha egyetlen eredmény sincs, vagy ha a felhasználó maga választja.
+        if (profilAllapot.evAuto) {
+            const forrasEvek = aktivSorok.map(r => String(r.ev)).filter(Boolean).sort();
+            profilAllapot.ev = forrasEvek.length ? forrasEvek[forrasEvek.length - 1] : 'osszes';
+        }
+        const ev = profilAllapot.ev || 'osszes';
 
         const szurtek = (ev === 'osszes' ? aktivSorok : aktivSorok.filter(r => String(r.ev) === String(ev)))
             .sort((a, b) => String(b.datum || '').localeCompare(String(a.datum || '')));
@@ -4577,15 +4642,17 @@
             </div>
 
             ${ismert
-                ? (tipus === 'lovas' ? profilLovasTorzsadat(torzs, id) : profilLoTorzsadat(torzs, id))
+                ? `<details class="profil-torzs" ${szelesKepernyo() ? 'open' : ''}>
+                       <summary>Adatlap</summary>
+                       ${tipus === 'lovas' ? profilLovasTorzsadat(torzs, id) : profilLoTorzsadat(torzs, id)}
+                       ${!torzs.siteSyncedAt ? `<p class="profil-megjegyzes">Nincs hivatalos szövetségi adat ehhez a ${tipus === 'lovas' ? 'versenyzőhöz' : 'lóhoz'}.</p>` : ''}
+                   </details>`
                 : `<p class="profil-megjegyzes">Ez a ${tipus === 'lovas' ? 'versenyző' : 'ló'} nincs a törzsadatban – csak a saját versenyeink eredményei érhetők el.</p>`}
-            ${ismert && !torzs.siteSyncedAt ? `<p class="profil-megjegyzes">Nincs hivatalos szövetségi adat ehhez a ${tipus === 'lovas' ? 'versenyzőhöz' : 'lóhoz'}.</p>` : ''}
 
             <div class="profil-sav">
                 <span class="profil-sav-cim">Eredmények</span>
-                ${forrasGomb('sajat', 'Saját verseny')}
-                ${forrasGomb('hivatalos', 'Hivatalos')}
-                ${forrasGomb('fei', 'Nemzetközi')}
+                ${forrasGomb('magyar', '🇭🇺 Magyar')}
+                ${forrasGomb('nemzetkozi', '🌍 Nemzetközi')}
                 <select class="profil-ev" onchange="profilEvValt(this.value)">
                     <option value="osszes" ${ev === 'osszes' ? 'selected' : ''}>Összes év</option>
                     ${evek.map(y => `<option value="${escapeHtml(y)}" ${String(ev) === y ? 'selected' : ''}>${escapeHtml(y)}</option>`).join('')}
@@ -4761,7 +4828,8 @@
     }
 
     // --- 2. LÓ-RANGLISTA (a lo-lovas-integracio.md törzsadatára épül - minden kategóriájú verseny számít) ---
-    function computeHorseRanking(year) {
+    // nemzetkoziIs = false: csak a hazai versenyek (ez az alapértelmezett nézet).
+    function computeHorseRanking(year, nemzetkoziIs) {
         const win = getChampionshipWindow(year);
         const byHorse = {};
 
@@ -4776,7 +4844,10 @@
         });
 
         // Külföldi (externalResults) eredmények is beszámítanak, ha ismert a ló azonosítója (l. terv 3.4).
-        Object.values(externalResultsCache).filter(ex => ex.horseStartNum && isDateInWindow(ex.date, win)).forEach(ex => {
+        // FONTOS: a kiesett (FTQ/RET/DSQ) nemzetközi rajt km-je NEM számít - a ló nem teljesítette a
+        // távot. A hazai soroknál ezt a completedKm intézi (ott tudjuk, hány kört ment), a FEI
+        // rekordban viszont csak a kiírt táv van, ezért a státuszos rekordot egészben kihagyjuk.
+        (nemzetkoziIs ? Object.values(externalResultsCache) : []).filter(ex => ex.horseStartNum && !ex.status && isDateInWindow(ex.date, win)).forEach(ex => {
             const km = parseFloat(ex.distanceKm) || 0;
             if (km <= 0) return;
             if (!byHorse[ex.horseStartNum]) {
@@ -4818,7 +4889,11 @@
     // a listára, nem egy külön rendezési szempont (l. felhasználói javítás).
     function computeTeamChampionship(year) {
         const win = getChampionshipWindow(year);
-        const rows = getAllPastRaceRows();
+        // Az obPont=false eredmény a csapatbajnokságból is kimarad, ugyanúgy, ahogy az egyéniből
+        // (l. computeIndividualChampionship). A szűrés a rows szintjén van, hogy az obParticipants
+        // ("OB-jogosult") halmazba se számítson bele egy ilyen indulás: akinek az adott évben CSAK
+        // obPont=false hazai indulása van, az nem OB-jogosult, tehát a FEI pontjai sem számítanak.
+        const rows = getAllPastRaceRows().filter(r => r.obPont !== false);
 
         // Ki "OB-jogosult" ebben az időszakban: legalább egyszer elindult hazai ob-fordulón, >= 40 km-en
         // (visszamenőleg is teljesülhet - l. terv 3.3, ezért a teljes időszakot előre összegyűjtjük).
@@ -4912,20 +4987,35 @@
 
     // --- RENDER: Ló-ranglista ---
     let loYear = new Date().getFullYear();
+    let loHatokor = 'magyar';   // 'magyar' = csak hazai versenyek (a fő lista), 'osszes' = a nemzetköziekkel
+
+    function setLoHatokor(kulcs, btn) {
+        loHatokor = kulcs;
+        document.querySelectorAll('#lo-hatokor-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        renderLoRanglista();
+    }
 
     function renderLoRanglista() {
         const yearSel = document.getElementById('lo-year-select');
         if (yearSel && yearSel.options.length === 0) populateYearSelect('lo-year-select', loYear);
         if (yearSel) loYear = parseInt(yearSel.value, 10) || loYear;
 
-        const horses = computeHorseRanking(loYear);
+        const nemzetkoziIs = loHatokor === 'osszes';
+        const horses = computeHorseRanking(loYear, nemzetkoziIs);
         const cont = document.getElementById('lo-ranglista-content');
         if (!cont) return;
         const clubView = document.getElementById('lo-club-toggle')?.checked;
 
-        let html = '';
+        let html = `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;">
+            <h4 style="margin:0; color:var(--text);">${nemzetkoziIs ? 'Összes verseny' : 'Magyar versenyek'}</h4>
+            <p class="field-hint" style="margin-bottom:0;">${nemzetkoziIs
+                ? 'A hazai és a nemzetközi (FEI) teljesítés együtt. A kiesett (FTQ/RET) nemzetközi rajt km-je nem számít bele – azt a ló nem teljesítette.'
+                : 'Csak a hazai versenyeken ténylegesen megtett kilométer. Ez a hivatalos ló-ranglista.'}</p>
+        </div>`;
+
         if (horses.length === 0) {
-            html = `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még rögzített teljesítés erre az évre.</p>`;
+            html += `<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még rögzített teljesítés erre az évre.</p>`;
         } else if (clubView) {
             const clubs = computeClubBreakdownKm(horses);
             html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Össz. km</th></tr>`;
@@ -4960,6 +5050,168 @@
         document.getElementById(tabId).style.display = 'block';
         if (btn) btn.classList.add('active');
         if (tabId === 'beallitasok-pontkereso') renderAdminPontkereso();
+        if (tabId === 'beallitasok-kulfoldi') renderKulfoldiKezelo();
+    }
+
+    // ============================================================================
+    // BEÁLLÍTÁSOK: nemzetközi (FEI) eredmények versenyenként csoportosítva + teljes szerkesztő
+    // Ugyanaz az externalResults node, amit a csapatbajnokság és a ló-ranglista is olvas - itt
+    // viszont nem lovasonként, hanem versenyenként látszik, és minden mező szerkeszthető.
+    // ============================================================================
+    let kulfoldiSzerkesztettId = null;
+
+    // Egy "verseny" = azonos nap + azonos versenyszám + azonos helyszín.
+    function kulfoldiVersenyKulcs(ex) {
+        return [ex.date || '', ex.event || ex.raceName || '', ex.venue || ''].join('|');
+    }
+
+    function kulfoldiSzerkesztes(id) { kulfoldiSzerkesztettId = id; renderKulfoldiKezelo(); }
+    function kulfoldiMegse() { kulfoldiSzerkesztettId = null; renderKulfoldiKezelo(); }
+
+    function kulfoldiMentes(id) {
+        const ertek = mezo => (document.getElementById('kf-' + mezo)?.value || '').trim();
+        const regi = externalResultsCache[id] || {};
+        const km = parseFloat(ertek('distanceKm'));
+        const hely = parseInt(ertek('place'), 10);
+        const statusz = ertek('status');
+
+        if (!ertek('license')) { showToast('Az igazolási szám kötelező.', true); return; }
+        if (!ertek('date') || !ertek('event') || !km) { showToast('A dátum, a versenyszám és a táv kötelező.', true); return; }
+        if (statusz && !isNaN(hely)) { showToast('Kiesési státusz mellett nem lehet helyezés – töröld az egyiket.', true); return; }
+
+        const riderInfo = ridersCache[sanitizeKey(ertek('license'))] || {};
+        const adat = {
+            license: ertek('license'),
+            riderName: riderInfo.name || ertek('riderName') || '',
+            date: ertek('date'),
+            event: ertek('event'),
+            venue: ertek('venue'),
+            country: ertek('country'),
+            distanceKm: km,
+            place: isNaN(hely) ? null : hely,
+            status: statusz,
+            score: ertek('score'),
+            horseStartNum: ertek('horseStartNum'),
+            horseName: ertek('horseName'),
+            horseFeiId: ertek('horseFeiId'),
+            source: regi.source || 'kezi',
+            addedAt: regi.addedAt || Date.now(),
+            enteredBy: (auth.currentUser && auth.currentUser.uid) || 'ismeretlen',
+            enteredAt: Date.now()
+        };
+
+        db.ref('externalResults/' + id).set(adat).then(() => {
+            showToast('Nemzetközi eredmény mentve.');
+            kulfoldiSzerkesztettId = null;
+            renderKulfoldiKezelo();
+        }).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function kulfoldiTorles(id) {
+        const ex = externalResultsCache[id] || {};
+        showConfirm('Eredmény törlése',
+            `Biztosan törlöd? ${ex.riderName || ex.license} – ${ex.event || ''} (${ex.date || ''}). A csapatbajnoki pontja és a ló km-e is eltűnik vele.`,
+            () => db.ref('externalResults/' + id).remove()
+                .then(() => { kulfoldiSzerkesztettId = null; showToast('Törölve.'); })
+                .catch(e => showToast('Hiba: ' + e.message, true)));
+    }
+
+    // Az escapeHtml() üres értékre "-"-t ad vissza (a táblázatokban ez a helyes), egy input
+    // value-jába viszont üres string kell, különben minden üres mezőben egy kötőjel jelenne meg.
+    function kulfoldiErtek(v) {
+        return (v === null || v === undefined || v === '') ? '' : escapeHtml(String(v));
+    }
+
+    function kulfoldiMezo(cimke, mezo, ertek, tipus) {
+        return `<label style="margin-top:10px;">${cimke}</label>
+                <input type="${tipus || 'text'}" id="kf-${mezo}" value="${kulfoldiErtek(ertek)}" autocomplete="off" style="margin-top:4px;">`;
+    }
+
+    function kulfoldiSzerkesztoUrlap(id, ex) {
+        const statuszok = ['', 'FTQ', 'RET', 'DSQ', 'DNS', 'WD'];
+        return `<div style="background:var(--card-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin-top:10px;">
+            <p class="field-hint" style="margin-top:0;">Rekord azonosító: <code>${escapeHtml(id)}</code>${ex.source ? ` · forrás: <b>${escapeHtml(ex.source)}</b>` : ''}</p>
+            ${kulfoldiMezo('Lovas igazolási száma', 'license', ex.license)}
+            ${kulfoldiMezo('Lovas neve (a törzsadatból frissül)', 'riderName', ex.riderName)}
+            ${kulfoldiMezo('Dátum', 'date', ex.date, 'date')}
+            ${kulfoldiMezo('Verseny / versenyszám', 'event', ex.event || ex.raceName)}
+            ${kulfoldiMezo('Helyszín', 'venue', ex.venue)}
+            ${kulfoldiMezo('Ország', 'country', ex.country)}
+            ${kulfoldiMezo('Táv (km)', 'distanceKm', ex.distanceKm, 'number')}
+            ${kulfoldiMezo('Helyezés (kiesésnél üres)', 'place', ex.place, 'number')}
+            <label style="margin-top:10px;">Kiesési státusz</label>
+            <select id="kf-status" style="margin-top:4px;">
+                ${statuszok.map(s => `<option value="${s}" ${(ex.status || '') === s ? 'selected' : ''}>${s || '– befejezte –'}</option>`).join('')}
+            </select>
+            ${kulfoldiMezo('Eredmény (menetidő vagy átlagsebesség)', 'score', ex.score)}
+            ${kulfoldiMezo('Ló start száma (a ló-ranglistához)', 'horseStartNum', ex.horseStartNum)}
+            ${kulfoldiMezo('Ló neve', 'horseName', ex.horseName)}
+            ${kulfoldiMezo('Ló FEI száma', 'horseFeiId', ex.horseFeiId)}
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+                <button class="calc-btn add-btn" style="margin-top:0;" onclick="kulfoldiMentes('${escapeHtml(id)}')">Mentés</button>
+                <button class="cancel-btn" style="display:block; margin-top:0;" onclick="kulfoldiMegse()">Mégse</button>
+                <button class="edit-btn" style="background:var(--danger);" onclick="kulfoldiTorles('${escapeHtml(id)}')">Törlés</button>
+            </div>
+        </div>`;
+    }
+
+    function renderKulfoldiKezelo() {
+        const cont = document.getElementById('kulfoldi-kezelo-lista');
+        if (!cont) return;
+        const kereses = (document.getElementById('kulfoldi-kereso')?.value || '').trim().toLowerCase();
+
+        const talalatok = Object.entries(externalResultsCache).filter(([, ex]) => {
+            if (!kereses) return true;
+            const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
+            return [ex.event, ex.raceName, ex.venue, ex.country, ex.horseName, ex.license, ex.riderName, riderInfo.name, ex.date]
+                .filter(Boolean).join(' ').toLowerCase().includes(kereses);
+        });
+
+        if (!talalatok.length) {
+            cont.innerHTML = `<p style="color:var(--text-dim); text-align:center; padding:20px 0;">${kereses ? 'Nincs találat erre a szűrésre.' : 'Nincs még rögzített nemzetközi eredmény.'}</p>`;
+            return;
+        }
+
+        const versenyek = new Map();
+        talalatok.forEach(([id, ex]) => {
+            const k = kulfoldiVersenyKulcs(ex);
+            if (!versenyek.has(k)) versenyek.set(k, []);
+            versenyek.get(k).push([id, ex]);
+        });
+
+        const rendezett = Array.from(versenyek.values())
+            .sort((a, b) => String(b[0][1].date || '').localeCompare(String(a[0][1].date || '')));
+
+        cont.innerHTML = rendezett.map(csoport => {
+            const elso = csoport[0][1];
+            const fej = [elso.event || elso.raceName || '(névtelen verseny)', elso.venue, elso.country].filter(Boolean).join(' · ');
+            const sorok = csoport.map(([id, ex]) => {
+                const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
+                const nev = riderInfo.name || ex.riderName || ex.license;
+                const eredmeny = ex.status
+                    ? `<span style="color:var(--danger); font-weight:700;">${escapeHtml(ex.status)}</span>`
+                    : (ex.place ? `<b style="color:var(--primary);">${ex.place}. hely</b>` : '<span style="color:var(--text-dim);">nincs helyezés</span>');
+                const lo = ex.horseName ? escapeHtml(ex.horseName) : '–';
+                const loJel = ex.horseStartNum ? ` <span style="color:var(--text-dim-2); font-size:0.75rem;">#${escapeHtml(ex.horseStartNum)}</span>`
+                                               : ` <span style="color:var(--text-dim-2); font-size:0.75rem;" title="Nincs magyar start szám, ezért a ló-ranglistába nem számít">(nincs start szám)</span>`;
+                return `<div style="border-top:1px solid var(--border-soft); padding:10px 0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:160px;">
+                            <b>${escapeHtml(nev)}</b> <span style="color:var(--text-dim-2); font-size:0.78rem;">${kulfoldiErtek(ex.license)}</span><br>
+                            <span style="color:var(--text-dim); font-size:0.85rem;">${lo}${loJel} · ${escapeHtml(String(ex.distanceKm || '?'))} km · ${eredmeny}${ex.score ? ' · ' + escapeHtml(ex.score) : ''}</span>
+                        </div>
+                        <button class="edit-btn admin-only" onclick="kulfoldiSzerkesztes('${escapeHtml(id)}')">Módosítás</button>
+                    </div>
+                    ${kulfoldiSzerkesztettId === id ? kulfoldiSzerkesztoUrlap(id, ex) : ''}
+                </div>`;
+            }).join('');
+
+            const nyitva = csoport.some(([id]) => id === kulfoldiSzerkesztettId);
+            return `<details class="kulfoldi-verseny" ${nyitva ? 'open' : ''}>
+                <summary>${kulfoldiErtek(elso.date)} · ${escapeHtml(fej)} <span style="color:var(--text-dim-2); font-weight:600;">(${csoport.length} induló)</span></summary>
+                ${sorok}
+            </details>`;
+        }).join('');
     }
 
     // Versenyenkénti bontás egy adott lovasra: táv, helyezés és az adott eredményre eső nyers
@@ -5164,22 +5416,46 @@
     // --- CSAPATBAJNOKSÁG: külföldi eredmények (admin CRUD, l. terv 3.4) ---
     let editingExternalId = null;
 
+    // A kézi felvitel ugyanazt a rekord-alakot állítja elő, mint a FEI import (l. externalResults),
+    // hogy a csapatbajnokság, a ló-ranglista és a profil ablak ne tudja megkülönböztetni a kettőt.
+    const EXT_MEZOK = ['ext-rider-search', 'ext-license', 'ext-horse-search', 'ext-horseStartNum', 'ext-horseName',
+        'ext-horseFeiId', 'ext-event', 'ext-venue', 'ext-country', 'ext-date', 'ext-distanceKm', 'ext-place',
+        'ext-status', 'ext-score'];
+
+    function extMezo(id) { return (document.getElementById(id)?.value || '').trim(); }
+
     function saveExternalResult() {
-        const license = document.getElementById('ext-license').value.trim();
-        const horseStartNum = document.getElementById('ext-horseStartNum').value.trim();
-        const raceName = document.getElementById('ext-raceName').value.trim();
-        const country = document.getElementById('ext-country').value.trim();
-        const date = document.getElementById('ext-date').value;
-        const distanceKm = parseFloat(document.getElementById('ext-distanceKm').value);
-        const place = parseInt(document.getElementById('ext-place').value, 10);
+        const license = extMezo('ext-license');
+        const event = extMezo('ext-event');
+        const date = extMezo('ext-date');
+        const distanceKm = parseFloat(extMezo('ext-distanceKm'));
+        const place = parseInt(extMezo('ext-place'), 10);
+        const status = extMezo('ext-status');
 
         if (!license) { showToast('Válassz lovast a listából!', true); return; }
-        if (!raceName || !date || !distanceKm) { showToast('Verseny neve, dátum és táv megadása kötelező!', true); return; }
+        if (!event || !date || !distanceKm) { showToast('Verseny neve, dátum és táv megadása kötelező!', true); return; }
+        if (status && !isNaN(place)) { showToast('Kiesési státusz mellett nem lehet helyezés – töröld az egyiket.', true); return; }
 
+        const regi = (editingExternalId && externalResultsCache[editingExternalId]) || {};
+        const riderInfo = ridersCache[sanitizeKey(license)] || {};
         const data = {
-            license, horseStartNum: horseStartNum || null, raceName, country, date,
-            distanceKm, place: isNaN(place) ? null : place,
-            enteredBy: (auth.currentUser && auth.currentUser.uid) || 'ismeretlen', enteredAt: Date.now()
+            license,
+            riderName: riderInfo.name || regi.riderName || '',
+            date, event,
+            venue: extMezo('ext-venue'),
+            country: extMezo('ext-country'),
+            distanceKm,
+            place: isNaN(place) ? null : place,
+            status,
+            score: extMezo('ext-score'),
+            horseStartNum: extMezo('ext-horseStartNum'),
+            horseName: extMezo('ext-horseName'),
+            horseFeiId: extMezo('ext-horseFeiId'),
+            // Importált rekord szerkesztésekor a forrásjelzés és az eredeti időbélyeg megmarad.
+            source: regi.source || 'kezi',
+            addedAt: regi.addedAt || Date.now(),
+            enteredBy: (auth.currentUser && auth.currentUser.uid) || 'ismeretlen',
+            enteredAt: Date.now()
         };
 
         const id = editingExternalId || (Date.now().toString() + Math.floor(Math.random() * 1000));
@@ -5194,27 +5470,31 @@
         if (!ex) return;
         editingExternalId = id;
         const riderInfo = ridersCache[sanitizeKey(ex.license)] || {};
-        document.getElementById('ext-rider-search').value = riderInfo.name ? `${riderInfo.name} — ${ex.license}` : ex.license;
-        document.getElementById('ext-license').value = ex.license;
+        document.getElementById('ext-rider-search').value = riderInfo.name ? `${riderInfo.name} — ${ex.license}` : (ex.riderName || ex.license);
+        document.getElementById('ext-license').value = ex.license || '';
         if (ex.horseStartNum) {
             const h = horsesCache[sanitizeKey(ex.horseStartNum)] || {};
             document.getElementById('ext-horse-search').value = h.name ? `${h.name} — ${ex.horseStartNum}` : ex.horseStartNum;
             document.getElementById('ext-horseStartNum').value = ex.horseStartNum;
         }
-        document.getElementById('ext-raceName').value = ex.raceName || '';
+        // A régi kézi rekordokban raceName volt a verseny neve, az importban event - mindkettőt kezeljük.
+        document.getElementById('ext-horseName').value = ex.horseName || '';
+        document.getElementById('ext-horseFeiId').value = ex.horseFeiId || '';
+        document.getElementById('ext-event').value = ex.event || ex.raceName || '';
+        document.getElementById('ext-venue').value = ex.venue || '';
         document.getElementById('ext-country').value = ex.country || '';
         document.getElementById('ext-date').value = ex.date || '';
         document.getElementById('ext-distanceKm').value = ex.distanceKm || '';
-        document.getElementById('ext-place').value = ex.place || '';
+        document.getElementById('ext-place').value = (ex.place === null || ex.place === undefined) ? '' : ex.place;
+        document.getElementById('ext-status').value = ex.status || '';
+        document.getElementById('ext-score').value = ex.score || '';
         document.getElementById('ext-cancel-btn').style.display = 'block';
         window.scrollTo(0, 0);
     }
 
     function cancelExternalEdit() {
         editingExternalId = null;
-        ['ext-rider-search', 'ext-license', 'ext-horse-search', 'ext-horseStartNum', 'ext-raceName', 'ext-country', 'ext-date', 'ext-distanceKm', 'ext-place'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.value = '';
-        });
+        EXT_MEZOK.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         document.getElementById('ext-cancel-btn').style.display = 'none';
     }
 
@@ -5268,132 +5548,6 @@
     // --- ÉV TENYÉSZTŐJE - placeholder (l. terv 5.) ---
     // (a tenyésztő a ló-törzsbe a tavlovasok_import_v4.json-ból kerül be - horses/{startNum}.breeder)
 
-    // ============================================================================
-    // EGYSZER-HASZNÁLATOS: FEI eredmények importálása (FELADAT_v6, A. rész)
-    // Forrás: externalresults_fei_2026.json (data.fei.org, 2026).
-    // Kizárólag az externalResults node-ba ír - a races/mult-hoz NEM nyúl, ezért az
-    // egyéni bajnokság állása változatlan marad. A futás és ellenőrzés után törlendő.
-    // ============================================================================
-
-    // Ha az oldal file:// protokollon fut, a fetch mindig elbukik (CORS) - ilyenkor a
-    // felhasználó kiválasztja a fájlt. A FileReader UTF-8-ként olvas, az ékezetek épek maradnak.
-    function fajlValasztasJson(inputId) {
-        return new Promise((resolve, reject) => {
-            const input = document.getElementById(inputId);
-            if (!input) { reject(new Error('hiányzik a fájlválasztó mező')); return; }
-            input.value = '';
-            input.onchange = () => {
-                const fajl = input.files && input.files[0];
-                if (!fajl) { reject(new Error('nem választottál fájlt')); return; }
-                const olvaso = new FileReader();
-                olvaso.onload = () => {
-                    try { resolve(JSON.parse(olvaso.result)); }
-                    catch (e) { reject(new Error('hibás JSON: ' + e.message)); }
-                };
-                olvaso.onerror = () => reject(new Error('a fájl nem olvasható'));
-                olvaso.readAsText(fajl, 'utf-8');
-            };
-            input.click();
-        });
-    }
-
-    function feiPayloadBetoltese() {
-        return fetch('externalresults_fei_2026.json', { cache: 'no-store' })
-            .then(valasz => {
-                if (!valasz.ok) throw new Error('HTTP ' + valasz.status);
-                return valasz.json();
-            })
-            .catch(() => {
-                showToast('A fájl nem érhető el közvetlenül – válaszd ki kézzel.', true);
-                return fajlValasztasJson('fei-fajl');
-            });
-    }
-
-    function runFeiImport() {
-        feiPayloadBetoltese()
-            .then(payload => {
-                const rekordok = payload && payload.externalResults;
-                if (!rekordok || !Object.keys(rekordok).length) throw new Error('hiányzik az externalResults blokk a fájlból');
-
-                const db2 = Object.keys(rekordok).length;
-                const lovasok = new Set(Object.values(rekordok).map(e => e.license)).size;
-                const marVan = Object.keys(rekordok).filter(k => externalResultsCache[k]).length;
-
-                showConfirm('FEI eredmények importálása',
-                    `${db2} nemzetközi eredmény, ${lovasok} versenyzőnél.` +
-                    (marVan ? ` Ebből ${marVan} már szerepel, azok frissülnek.` : '') +
-                    ' Csak az externalResults node-ba ír, a versenyekhez nem nyúl. Elindítod?',
-                    () => feiImportVegrehajtasa(rekordok, payload.meta || {}));
-            })
-            .catch(hiba => showToast('Hiba a FEI adatok betöltésekor: ' + hiba.message, true));
-    }
-
-    function feiImportVegrehajtasa(rekordok, meta) {
-        const btn = document.getElementById('btn-fei-import');
-        if (btn) { btn.disabled = true; btn.innerText = 'Feltöltés folyamatban…'; }
-
-        // Egyetlen update az externalResults alatt - rekordonként teljes objektum, mert ezek
-        // új node-ok (nincs meglévő mező, amit meg kellene őrizni).
-        const updates = {};
-        Object.entries(rekordok).forEach(([kulcs, rekord]) => { updates[sanitizeKey(kulcs)] = rekord; });
-
-        db.ref('externalResults').update(updates).then(() => {
-            // Az audit bejegyzés külön ág, ezért külön írás (a gyökér-update itt nem indokolt).
-            db.ref('importLog/' + Date.now()).set({
-                type: 'fei-external-2026',
-                source: meta.source || 'https://data.fei.org',
-                generated: meta.generated || '',
-                records: Object.keys(rekordok).length,
-                user: (auth.currentUser && auth.currentUser.uid) || 'ismeretlen',
-                at: Date.now()
-            });
-            showToast(`${Object.keys(rekordok).length} FEI eredmény importálva!`);
-            if (btn) { btn.innerText = '✅ Lefutott (a gomb és a függvény törölhető)'; btn.style.background = 'var(--success)'; }
-            ellenorizFeiImport();
-        }).catch(hiba => {
-            showToast('Hiba a feltöltéskor: ' + hiba.message, true);
-            if (btn) { btn.disabled = false; btn.innerText = '🌍 FEI eredmények importálása (egyszer!)'; }
-        });
-    }
-
-    // Az A/2 ellenőrzés: visszaolvassa a node-ot és levezeti a csapatonkénti FEI pontot
-    // ugyanazzal a képlettel, amit a computeTeamChampionship() használ.
-    function ellenorizFeiImport() {
-        const cont = document.getElementById('fei-import-report');
-        return db.ref('externalResults').once('value').then(snap => {
-            const osszes = snap.val() || {};
-            const feiRekordok = Object.values(osszes).filter(e => e.source === 'FEI');
-            const win = getChampionshipWindow(new Date().getFullYear());
-
-            const pontLovasra = {};
-            feiRekordok.filter(e => isDateInWindow(e.date, win)).forEach(e => {
-                pontLovasra[e.license] = (pontLovasra[e.license] || 0)
-                    + getPoints(getPointBand(parseFloat(e.distanceKm) || 0), parseInt(e.place, 10) || null);
-            });
-
-            const sorok = Object.entries(teamsCache).map(([, t]) => {
-                const feiPont = (t.memberLicenses || []).reduce((s, lic) => s + (pontLovasra[lic] || 0), 0);
-                return { nev: t.name, feiPont: feiPont };
-            }).sort((a, b) => b.feiPont - a.feiPont);
-
-            const vart = { 'ENDURANCH Csak Csajok': 392, 'Pannova Horses': 345, 'ENDURANCH Vegyes': 243 };
-            sorok.forEach(s => console.log(s.nev, s.feiPont, vart[s.nev] !== undefined ? '(várt ' + vart[s.nev] + ')' : ''));
-
-            if (!cont) return;
-            let html = `<div class="table-responsive"><table class="ttrack-table"><tr>
-                <th class="col-header" style="text-align:left;">Csapat</th><th class="col-header">FEI pont</th><th class="col-header">Várt</th><th class="col-header">OK?</th></tr>`;
-            sorok.forEach(s => {
-                const v = vart[s.nev];
-                html += `<tr><td style="text-align:left;">${escapeHtml(s.nev)}</td><td><b style="color:var(--primary);">${s.feiPont}</b></td>` +
-                        `<td style="color:var(--text-dim);">${v === undefined ? '–' : v}</td>` +
-                        `<td>${v === undefined ? (s.feiPont === 0 ? '✅' : '⚠️') : (s.feiPont === v ? '✅' : '⚠️')}</td></tr>`;
-            });
-            html += `</table></div>`;
-            html += `<p class="field-hint">${feiRekordok.length} FEI rekord az externalResults alatt. Az egyéni bajnokság állása változatlan: a getAllPastRaceRows() csak a races/mult-ból dolgozik.</p>`;
-            cont.innerHTML = html;
-        }).catch(hiba => showToast('Az ellenőrzés nem futott le: ' + hiba.message, true));
-    }
-
     window.onload = function() {
         let savedMode = localStorage.getItem('currentMode') || 'versenyek';
         if (savedMode === 'terv') savedMode = 'versenyek';
@@ -5415,5 +5569,7 @@
         attachAutocomplete('ext-horse-search', searchHorses, (item) => {
             document.getElementById('ext-horse-search').value = `${item.name} — ${item.startNum}`;
             document.getElementById('ext-horseStartNum').value = item.startNum;
+            // A ló neve a rekordba is bekerül, hogy a profil/lista ne csak a start számot mutassa.
+            document.getElementById('ext-horseName').value = item.name || '';
         });
     };

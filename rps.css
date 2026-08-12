@@ -897,10 +897,61 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 .hely-tobbi { color: var(--primary); }
 .hely-kiesett { color: var(--danger); font-size: 1rem; }
 
+/* Összecsukható törzsadat: mobilon a 12 soros adatlap elvitte az egész képernyőt, és az
+   eredménylistának 1-2 kártyányi hely maradt. Így alapból csukva van, és a versenyek kapják
+   a helyet - nagy képernyőn viszont nyitva nyílik (l. renderProfil, szelesKepernyo()). */
+.profil-torzs, .kulfoldi-verseny { border-bottom: 1px solid var(--border-soft); }
+.profil-torzs > summary, .kulfoldi-verseny > summary {
+    cursor: pointer; list-style: none; padding: 10px 2px; font-weight: 800;
+    display: flex; align-items: center; gap: 8px;
+}
+.profil-torzs > summary::-webkit-details-marker,
+.kulfoldi-verseny > summary::-webkit-details-marker { display: none; }
+.profil-torzs > summary::before, .kulfoldi-verseny > summary::before {
+    content: '▸'; color: var(--primary); font-size: 0.9rem; flex-shrink: 0;
+    transition: transform .18s var(--ease);
+}
+.profil-torzs[open] > summary::before, .kulfoldi-verseny[open] > summary::before { transform: rotate(90deg); }
+.profil-torzs > summary:hover, .kulfoldi-verseny > summary:hover { color: var(--text); }
+.profil-torzs > summary { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; }
+
+/* Beállítások > Nemzetközi versenyek: egy blokk egy verseny, alatta az ott indult lovasok. */
+.kulfoldi-verseny {
+    background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 4px 14px; margin-bottom: 10px;
+}
+.kulfoldi-verseny > summary { font-size: 0.92rem; color: var(--text); flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+    /* A profil töltse ki a képernyőt, és az eredménylista kapja a maradék helyet. */
+    .modal-content { padding: 14px; max-height: 94vh; }
+    .profil { max-height: calc(94vh - 34px); }
+    .profil-eredmenyek { min-height: 40vh; }
+    .profil-fejlec { padding-bottom: 10px; }
+
+    /* Forrásváltó: két egyenlő gomb egy sorban, alatta teljes szélességű évválasztó. */
+    .profil-sav { margin: 10px 0 8px; padding-top: 10px; gap: 6px; }
+    .profil-sav-cim { width: 100%; margin-right: 0; font-size: 0.82rem; }
+    .profil-forras { flex: 1 1 0; min-width: 0; padding: 9px 6px; font-size: 0.8rem; }
+    .profil-ev { flex: 1 1 100%; width: 100%; }
+}
+
 @media (max-width: 560px) {
     .profil-adatok { grid-template-columns: 1fr; }
-    .profil-monogram { width: 52px; height: 52px; font-size: 1.1rem; }
-    .profil-nev { font-size: 1.12rem; }
+    .profil-monogram { width: 46px; height: 46px; font-size: 1rem; }
+    .profil-nev { font-size: 1.08rem; }
+    .profil-alcim { font-size: 0.78rem; }
+
+    /* Tömörebb eredménykártya - egy képernyőre így 4-5 verseny fér ki 2 helyett. */
+    .eredmeny-kartya { margin-bottom: 8px; }
+    .eredmeny-fej { padding: 8px 11px; gap: 8px; }
+    .eredmeny-torzs { padding: 9px 11px; gap: 8px; }
+    .eredmeny-verseny { font-size: 0.92rem; line-height: 1.25; }
+    .eredmeny-alcim { font-size: 0.72rem; }
+    .eredmeny-jobb { font-size: 0.72rem; }
+    .eredmeny-hely { font-size: 1.18rem; }
+    .hely-kiesett { font-size: 0.86rem; }
+    .eredmeny-jobb-oszlop { font-size: 0.76rem; }
 }
 
 .competitor-item {
@@ -1052,10 +1103,23 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
     #print-sticker { display: block !important; border: none !important; padding: 0 !important; width: 100%; font-size: 14pt; page-break-inside: avoid; }
 }
 
-/* --- NAGYOBB KÉPERNYŐK: kicsit tágasabb elrendezés --- */
+/* --- NAGYOBB KÉPERNYŐK: lépcsőzetesen szélesedő hasáb ---
+   A korábbi fix 620px asztali gépen túl szűk volt: a ranglista-táblákat oldalra kellett
+   görgetni, miközben a képernyő két széle üresen állt. Most a hasáb együtt nő a monitorral,
+   a beviteli mezők viszont olvasható szélességen maradnak (különben egy input 1300px lenne). */
 @media (min-width: 1000px) {
-    .container { max-width: 620px; padding: 26px; }
+    .container { max-width: 900px; padding: 26px 30px; }
     .main-wrapper { padding: 40px 24px; }
+    .modal-content { max-width: 840px; }
+    .container input:not([type="checkbox"]):not([type="radio"]),
+    .container select, .container textarea { max-width: 540px; }
+}
+@media (min-width: 1400px) {
+    .container { max-width: 1120px; }
+    .modal-content { max-width: 900px; }
+}
+@media (min-width: 1800px) {
+    .container { max-width: 1320px; }
 }
 
 @media (max-width: 800px) {
