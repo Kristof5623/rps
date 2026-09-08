@@ -25,6 +25,7 @@
     let speedThresholds = {};
     let ridersCache = {}; // riders/{license} - lo-lovas-integracio.md
     let horsesCache = {}; // horses/{startNum}
+    let vetsDbCache = {}; // vetsDb/{nev} - allatorvos torzsadat (versenyfuggetlen)
     let clubsCache = {}; // clubs/{clubKey} - önálló egyesület-törzs
     let uiTheme = 'default'; // admin választja (settings/uiTheme), mindenkinek szinkronban - l. THEME_LIST
     // colors: [primary (dot), bg, card] - a swatch előnézet ebből épül fel (renderThemeSwatches)
@@ -183,6 +184,29 @@
         return Array.from(clubs.values()).filter(c => c.toLowerCase().includes(lq)).map(c => ({ label: c, club: c }));
     }
 
+    // Állatorvos-törzsadat: a vets/ node mindig az AKTUÁLIS verseny orvosait
+    // tartalmazza, a vetsDb/ viszont megőrzi az összes eddig felvitt orvost.
+    // Így új versenynél nem kell újra begépelni a neveket, elég rákeresni.
+    function searchVets(q) {
+        const lq = q.toLowerCase();
+        return Object.values(vetsDbCache)
+            .filter(v => v && v.name && v.name.toLowerCase().includes(lq))
+            .sort((a, b) => a.name.localeCompare(b.name, 'hu'))
+            .map(v => ({ label: v.name, name: v.name }));
+    }
+
+    // A törzsadatba felvétel: a név maga a kulcs (sanitizeKey), így ugyanaz az
+    // orvos nem kerül be kétszer. A már rögzített vizsgálatokban a kiírt név
+    // a hiteles - azt ez soha nem módosítja.
+    function vetTorzsbe(name) {
+        const tiszta = String(name || '').trim().replace(/\s+/g, ' ');
+        if (!tiszta) return;
+        db.ref('vetsDb/' + sanitizeKey(tiszta)).update({
+            name: tiszta,
+            updatedAt: Date.now()
+        }).catch(() => {});
+    }
+
     // Az inputot egy pozicionált wrapperbe csomagolja és alá illeszti a javaslatlistát -
     // a HTML-t nem kell hozzá módosítani, csak egyszer meg kell hívni induláskor.
     function attachAutocomplete(inputId, getSuggestions, onSelect) {
@@ -288,6 +312,11 @@
         });
         attachAutocomplete(p + 'regClub', searchClubs, (item) => {
             document.getElementById(p + 'regClub').value = item.club;
+        });
+        // Állatorvos-név kereső: elég beírni pár betűt a korábbi versenyeken
+        // már szerepelt orvosokból.
+        attachAutocomplete(p + 'regVetName', searchVets, (item) => {
+            document.getElementById(p + 'regVetName').value = item.name;
         });
     }
 
@@ -541,7 +570,15 @@
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
                 const selectedBib = document.getElementById('selectCompetitor').value;
                 const activeEl = document.activeElement;
-                const formContainsFocus = activeEl && document.getElementById('verseny').contains(activeEl);
+                // Csak az ŰRLAPOT nézzük, nem az egész fület. A versenyző-választó
+                // legördülő és a kereső a fülön belül, de az űrlapon KÍVÜL van
+                // (index.html: selectCompetitor a verseny-form-container előtt),
+                // és kiválasztás után rajta marad a fókusz - emiatt az élő
+                // frissítés gyakorlatilag soha nem futott le, és újra kellett
+                // tölteni az oldalt. (Ugyanez a szűkebb ellenőrzés van a
+                // switchSubMode-ban és a refreshVersenyTabIfNeeded-ben is.)
+                const formCont = document.getElementById('verseny-form-container');
+                const formContainsFocus = activeEl && formCont && formCont.contains(activeEl);
                 if (selectedBib && !formContainsFocus) { loadCompetitorData(); }
             }
             if(document.getElementById('beerkeztetes-mod').classList.contains('active')) {
@@ -581,6 +618,8 @@
             if (document.getElementById('torzs-lovak')?.classList.contains('active')) renderTorzsLovakList();
         });
         db.ref('clubs').on('value', snap => { clubsCache = snap.val() || {}; });
+        // Állatorvos-törzsadat: versenyfüggetlen névlista a kereséshez.
+        db.ref('vetsDb').on('value', snap => { vetsDbCache = snap.val() || {}; });
 
         // Sebesség min/max távonként - alapból üres (nincs figyelve), minden eszközön szinkronban
         db.ref('settings/speedThresholds').on('value', snap => {
@@ -593,6 +632,9 @@
 
         // Design téma - alapból "default", minden eszközön szinkronban
         db.ref('settings/uiTheme').on('value', snap => {
+            // Ha ezen az eszközön valaki saját témát választott, azt nem
+            // írjuk felül - a közös téma csak alapértelmezés.
+            if (localStorage.getItem('uiThemeSajat') === '1') { renderThemeSwatches(); return; }
             uiTheme = applyTheme(snap.val() || 'default');
             localStorage.setItem('uiTheme', uiTheme);
             renderThemeSwatches();
@@ -1480,6 +1522,7 @@
         const type = document.getElementById('rm-type').value;
         const id = Date.now().toString();
         db.ref('races/' + type + '/' + modalRaceId + '/vets/' + id).set({ id, name }).then(() => {
+            vetTorzsbe(name); // a torzsadatba is, hogy legkozelebb elég rákeresni
             document.getElementById('rm-regVetName').value = '';
             showAnimatedBtn('rm-saveVetBtn');
         }).catch(e => showToast("Hiba az orvos mentésekor: " + e.message, true));
@@ -1836,7 +1879,8 @@
         function applyForm(target) {
             target.startTime = startTime;
             target.status = statusVal;
-            target.isEliminated = (statusVal !== 'Active');
+            // A RECHECK nem kiesés (l. az élő calcVerseny-nél ugyanez).
+            target.isEliminated = (statusVal !== 'Active' && statusVal !== 'RECHECK');
             lapValues.forEach((lv, i) => {
                 if (!target.laps) target.laps = [];
                 if (!target.laps[i]) target.laps[i] = {};
@@ -2102,10 +2146,32 @@
     function saveVet() {
         const name = document.getElementById('regVetName').value.trim();
         if(!name) { showToast("Add meg az orvos nevét!", true); return; }
+        if (liveVets.some(v => v.name && v.name.toLowerCase() === name.toLowerCase())) {
+            showToast("Ez az orvos már szerepel ennél a versenynél.", true);
+            return;
+        }
         const id = Date.now().toString();
         db.ref('vets/' + id).set({ id: id, name: name });
+        vetTorzsbe(name); // a torzsadatba is, hogy legkozelebb elég rákeresni
         document.getElementById('regVetName').value = '';
         showToast("Állatorvos sikeresen hozzáadva!");
+    }
+
+    // Új verseny indításakor az előző verseny orvosai ne maradjanak bent.
+    // A törzsadat (vetsDb) érintetlen marad, tehát bármikor visszakereshetők.
+    function clearLiveVets() {
+        if (!liveVets.length) { showToast("Nincs mit törölni.", true); return; }
+        showConfirm(
+            "Orvoslista ürítése",
+            `Törlöd mind a(z) ${liveVets.length} orvost EBBŐL a versenyből? ` +
+            `A nevek a törzsadatban megmaradnak, később rákereséssel ` +
+            `bármikor visszatehetők.`,
+            () => {
+                db.ref('vets').remove()
+                    .then(() => showToast("Az orvoslista kiürítve."))
+                    .catch(e => showToast("Hiba: " + e.message, true));
+            }
+        );
     }
 
     function deleteVet(id) {
@@ -2194,6 +2260,13 @@
             renderWarningBanner('orv-recovery-warning', getRecoveryWarning(toSec(l.h, l.m, l.s), toSec(l.oh, l.om, l.os), isFinalLap));
         }
 
+        // Re-check mezők + a javasolt idő / figyelmeztetés kiírása
+        document.getElementById('orv-rch').value = l.rch || '';
+        document.getElementById('orv-rcm').value = l.rcm || '';
+        document.getElementById('orv-rcs').value = l.rcs || '';
+        renderRecheckInfo(l);
+        frissitRecheckLathatosag();
+
         // Adatok betöltése
         document.getElementById('orv-pulse').value = l.pulse || '';
         document.getElementById('orv-hrri').value = l.hrri || '';
@@ -2249,6 +2322,107 @@
         return Array.from(cont.querySelectorAll('input:checked')).map(i => i.value);
     }
 
+    // --- RE-CHECK ---
+    // Ha az állatorvos nem enged tovább azonnal, a lovat újra be kell mutatni.
+    // A re-check a KIINDULÁS (nextStart) előtt kb. 15 perccel esedékes:
+    //     nextStart = (orvosi vagy beérkezés) + 40 perc      (rps.js recalc)
+    //     re-check  = nextStart - 15 perc
+    const RECHECK_ELOTTE_SEC = 15 * 60;
+
+    function recheckJavasoltSec(l) {
+        const alap = toSec(l.oh, l.om, l.os) || toSec(l.h, l.m, l.s);
+        if (!alap) return 0;
+        const nextStart = (alap + 2400) % 86400;
+        return { nextStart, javasolt: (nextStart - RECHECK_ELOTTE_SEC + 86400) % 86400 };
+    }
+
+    // Aktuális idő beírása egy óra/perc/mp mezőhármasba. A beérkeztetésnél és
+    // az orvosi időnél is ez fut, hogy ne kelljen kézzel gépelni az időt.
+    function setIdoNow(hId, mId, sId) {
+        const n = new Date();
+        const h = document.getElementById(hId);
+        const m = document.getElementById(mId);
+        const s = document.getElementById(sId);
+        if (h) h.value = String(n.getHours()).padStart(2, '0');
+        if (m) m.value = String(n.getMinutes()).padStart(2, '0');
+        if (s) s.value = String(n.getSeconds()).padStart(2, '0');
+    }
+
+    function setRecheckNow() {
+        setIdoNow('orv-rch', 'orv-rcm', 'orv-rcs');
+        renderRecheckInfoFromForm();
+    }
+
+    // A re-check doboz csak akkor látszik, ha a ló RE-CHECK státuszban van
+    // (mentve, vagy épp most állította át rá az orvos a legördülőben).
+    function frissitRecheckLathatosag() {
+        const box = document.getElementById('orv-recheck-box');
+        if (!box) return;
+        const sel = document.getElementById('orvStatusSelect');
+        const bib = document.getElementById('sel-orvosi').value;
+        const comp = competitors.find(c => c.bib == bib);
+        const mentett = comp && comp.status === 'RECHECK';
+        const kivalasztott = sel && sel.value === 'RECHECK';
+        box.style.display = (mentett || kivalasztott) ? 'block' : 'none';
+    }
+
+    function clearRecheck() {
+        ['orv-rch', 'orv-rcm', 'orv-rcs'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = '';
+        });
+        renderRecheckInfoFromForm();
+    }
+
+    // A doboz szövege: rögzített re-check, vagy a javasolt idő; ha a javasolt
+    // idő már elmúlt és nincs rögzítve, figyelmeztet (a ló nem jelent meg).
+    function renderRecheckInfo(l) {
+        const box = document.getElementById('orv-recheck-info');
+        if (!box) return;
+        const rc = toSec(l.rch, l.rcm, l.rcs);
+        const info = recheckJavasoltSec(l);
+
+        if (rc > 0) {
+            box.innerText = info
+                ? `Re-check rögzítve: ${toTimeStr(rc)}  (javasolt volt: ${toTimeStr(info.javasolt)})`
+                : `Re-check rögzítve: ${toTimeStr(rc)}`;
+            box.style.color = 'var(--success)';
+            return;
+        }
+        if (!info) {
+            box.innerText = 'Re-check: előbb beérkezési vagy orvosi idő kell.';
+            box.style.color = 'var(--text-dim)';
+            return;
+        }
+        const n = new Date();
+        const mostSec = n.getHours() * 3600 + n.getMinutes() * 60 + n.getSeconds();
+        let elteltMp = mostSec - info.javasolt;
+        if (elteltMp < -12 * 3600) elteltMp += 86400;   // éjfél-átfordulás
+
+        if (elteltMp > 0) {
+            box.innerText = `⚠ Re-check ideje ELMÚLT (${toTimeStr(info.javasolt)}), `
+                + `még nincs rögzítve. Kiindulás: ${toTimeStr(info.nextStart)}`;
+            box.style.color = 'var(--danger)';
+        } else {
+            box.innerText = `Re-check javasolt ideje: ${toTimeStr(info.javasolt)}  `
+                + `(kiindulás: ${toTimeStr(info.nextStart)})`;
+            box.style.color = 'var(--text-dim)';
+        }
+    }
+
+    // A form aktuális mezőiből frissít (gombnyomás után, mentés nélkül).
+    function renderRecheckInfoFromForm() {
+        const bib = document.getElementById('sel-orvosi').value;
+        const comp = competitors.find(c => c.bib == bib);
+        if (!comp) return;
+        const idx = getVetLapIndex(comp);
+        const l = (idx === -1) ? (comp.preVet || {}) : ((comp.laps || [])[idx] || {});
+        renderRecheckInfo(Object.assign({}, l, {
+            rch: document.getElementById('orv-rch').value,
+            rcm: document.getElementById('orv-rcm').value,
+            rcs: document.getElementById('orv-rcs').value
+        }));
+    }
+
     function saveOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
 
@@ -2264,6 +2438,9 @@
         const vetNotes = document.getElementById('orv-notes').value;
         const decision = document.getElementById('orvStatusSelect').value;
         const extraCodes = getCheckedExtraCodes();
+        const rch = document.getElementById('orv-rch').value;
+        const rcm = document.getElementById('orv-rcm').value;
+        const rcs = document.getElementById('orv-rcs').value;
 
         db.ref('competitors/' + bib).transaction(currentComp => {
             if (!currentComp) return currentComp;
@@ -2289,12 +2466,23 @@
             targetObj.mozgas = mozgas;
             targetObj.vetName = vetName;
             targetObj.vetNotes = vetNotes;
+            // Re-check idő (üresen hagyva törlődik)
+            targetObj.rch = rch;
+            targetObj.rcm = rcm;
+            targetObj.rcs = rcs;
 
             // JAVÍTÁS: Itt is az 'Active' a zöld utat jelentő kód!
             if (decision === 'Active' || decision === 'Passed') {
                 currentComp.isEliminated = false;
                 currentComp.status = 'Active';
                 targetObj.vetDecision = "Továbbengedve";
+                currentComp.extraCodes = [];
+            } else if (decision === 'RECHECK') {
+                // A re-check NEM kiesés: a ló versenyben marad, csak a
+                // kiindulás előtt újra be kell mutatni az orvosnak.
+                currentComp.isEliminated = false;
+                currentComp.status = 'RECHECK';
+                targetObj.vetDecision = "Re-check (újra bemutatandó)";
                 currentComp.extraCodes = [];
             } else {
                 currentComp.isEliminated = true;
@@ -2714,20 +2902,60 @@
     }
 
     // --- BEÁLLÍTÁSOK FÜL: design téma választó (kártyák) ---
+    // A téma SZEMÉLYES beállítás: csak ezen az eszközön érvényes, nem írja
+    // felül másokét. Az admin által beállított téma marad az alapértelmezés
+    // (settings/uiTheme) mindenkinek, aki még nem választott magának.
     function setUiTheme(key) {
-        db.ref('settings/uiTheme').set(key).catch(e => showToast('Hiba: ' + e.message, true));
+        uiTheme = applyTheme(key);
+        localStorage.setItem('uiTheme', uiTheme);
+        localStorage.setItem('uiThemeSajat', '1');
+        renderThemeSwatches();
+        showToast('Téma beállítva (csak ezen az eszközön).');
+    }
+
+    // Visszatérés a verseny közös témájához.
+    function resetUiTheme() {
+        localStorage.removeItem('uiThemeSajat');
+        db.ref('settings/uiTheme').once('value').then(snap => {
+            uiTheme = applyTheme(snap.val() || 'default');
+            localStorage.setItem('uiTheme', uiTheme);
+            renderThemeSwatches();
+            showToast('Visszaálltál a verseny közös témájára.');
+        }).catch(() => {});
+    }
+
+    // Csak adminnak: az alapértelmezett témát állítja mindenkinek, aki nem
+    // választott magának sajátot.
+    function setKozosUiTheme(key) {
+        db.ref('settings/uiTheme').set(key)
+            .then(() => showToast('Közös téma beállítva mindenkinek.'))
+            .catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function temaSwatchHtml(t, aktiv, fn) {
+        return `
+            <div class="theme-swatch ${aktiv ? 'active' : ''}" onclick="${fn}('${t.key}')">
+                <div class="theme-swatch-preview" style="background:linear-gradient(135deg, ${t.colors[1]} 0%, ${t.colors[2]} 100%);"><div class="dot" style="background:${t.colors[0]}; color:${t.colors[0]};"></div></div>
+                <div class="theme-swatch-label">${t.label}</div>
+                <div class="theme-swatch-check">✓ Aktív</div>
+            </div>`;
     }
 
     function renderThemeSwatches() {
         const cont = document.getElementById('themeSwatchRow');
-        if (!cont) return;
-        cont.innerHTML = THEME_LIST.map(t => `
-            <div class="theme-swatch ${uiTheme === t.key ? 'active' : ''}" onclick="setUiTheme('${t.key}')">
-                <div class="theme-swatch-preview" style="background:linear-gradient(135deg, ${t.colors[1]} 0%, ${t.colors[2]} 100%);"><div class="dot" style="background:${t.colors[0]}; color:${t.colors[0]};"></div></div>
-                <div class="theme-swatch-label">${t.label}</div>
-                <div class="theme-swatch-check">✓ Aktív</div>
-            </div>
-        `).join('');
+        if (cont) {
+            cont.innerHTML = THEME_LIST
+                .map(t => temaSwatchHtml(t, uiTheme === t.key, 'setUiTheme')).join('');
+        }
+        // Admin: a közös alapértelmezett téma külön sorban
+        const kozos = document.getElementById('kozosThemeSwatchRow');
+        if (kozos) {
+            db.ref('settings/uiTheme').once('value').then(snap => {
+                const kozosKulcs = ervenyesTemaKulcs(snap.val() || 'default');
+                kozos.innerHTML = THEME_LIST
+                    .map(t => temaSwatchHtml(t, kozosKulcs === t.key, 'setKozosUiTheme')).join('');
+            }).catch(() => {});
+        }
     }
 
     // --- BEÁLLÍTÁSOK FÜL: sebesség min/max távonként ---
@@ -2939,71 +3167,20 @@
             document.getElementById('vsR').value = cfg.s || '';
         }
 
+        // A körtávakat a versenykiírásból töltjük, ha a versenyzőnél még
+        // nincs saját érték - korábban üresen maradtak, és a kalkuláció
+        // nem tudott mit kezdeni velük.
+        const cfgLaps = cfg.laps || [];
         const lapsArr = comp.laps || [];
-        lapsArr.forEach((l, i) => {
+        for (let i = 0; i < cfgLaps.length; i++) {
             const idx = i + 1;
-            if(document.getElementById(`vd${idx}`)) {
-                if(l.d) document.getElementById(`vd${idx}`).value = l.d; 
-                document.getElementById(`vh${idx}`).value = l.h || ''; document.getElementById(`vm${idx}`).value = l.m || ''; document.getElementById(`vs${idx}`).value = l.s || '';
-                document.getElementById(`voh${idx}`).value = l.oh || ''; document.getElementById(`vom${idx}`).value = l.om || ''; document.getElementById(`vos${idx}`).value = l.os || '';
-            }
-        });
-        
-        calcVerseny(false);
-    }
-
-    function loadCompetitorData() {
-        const bib = document.getElementById('selectCompetitor').value;
-        const formCont = document.getElementById('verseny-form-container');
-        if (!bib) {
-            formCont.style.display = 'none';
-            document.querySelectorAll('#verseny-form-container input').forEach(i => i.value = '');
-            document.getElementById('res2').style.display = 'none';
-            return;
+            const mezoD = document.getElementById(`vd${idx}`);
+            if (!mezoD) continue;
+            const l = lapsArr[i] || {};
+            mezoD.value = l.d || cfgLaps[i] || '';
+            document.getElementById(`vh${idx}`).value = l.h || ''; document.getElementById(`vm${idx}`).value = l.m || ''; document.getElementById(`vs${idx}`).value = l.s || '';
+            document.getElementById(`voh${idx}`).value = l.oh || ''; document.getElementById(`vom${idx}`).value = l.om || ''; document.getElementById(`vos${idx}`).value = l.os || '';
         }
-        formCont.style.display = 'block';
-
-        const comp = competitors.find(c => c.bib == bib);
-        if(!comp) return;
-
-        document.getElementById('totalDist').value = comp.dist;
-        autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v', false);
-
-        // --- HIBATŰRŐ STÁTUSZ BEÁLLÍTÁS ---
-        let s = comp.status || (comp.isEliminated ? 'FTQ-ME' : 'Active');
-        if (s === 'Passed') s = 'Active';
-        if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME';
-        if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
-        let sel = document.getElementById('compStatusSelect');
-        if (sel) {
-            let exists = Array.from(sel.options).some(opt => opt.value === s);
-            sel.value = exists ? s : 'Active';
-        }
-        // ----------------------------------
-
-        const baseDist = comp.dist.replace('j', '');
-        const cfg = raceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
-
-        // HIÁNYZÓ IDŐK PÓTLÁSA A VERSENYKIÍRÁSBÓL
-        if (comp.startTime && comp.startTime.h !== undefined && comp.startTime.h !== '') {
-            document.getElementById('vhR').value = comp.startTime.h;
-            document.getElementById('vmR').value = comp.startTime.m || '00';
-            document.getElementById('vsR').value = comp.startTime.s || '00';
-        } else {
-            document.getElementById('vhR').value = cfg.h || '';
-            document.getElementById('vmR').value = cfg.m || '';
-            document.getElementById('vsR').value = cfg.s || '';
-        }
-
-        const lapsArr = comp.laps || [];
-        lapsArr.forEach((l, i) => {
-            const idx = i + 1;
-            if(document.getElementById(`vd${idx}`)) {
-                if(l.d) document.getElementById(`vd${idx}`).value = l.d; 
-                document.getElementById(`vh${idx}`).value = l.h || ''; document.getElementById(`vm${idx}`).value = l.m || ''; document.getElementById(`vs${idx}`).value = l.s || '';
-                document.getElementById(`voh${idx}`).value = l.oh || ''; document.getElementById(`vom${idx}`).value = l.om || ''; document.getElementById(`vos${idx}`).value = l.os || '';
-            }
-        });
         
         calcVerseny(false);
     }
@@ -3074,6 +3251,7 @@
         // ugyanazokat az értékeket alkalmazzák, bármelyik "comp" objektumon hívjuk is meg.
         const startTime = { h: document.getElementById('vhR').value, m: document.getElementById('vmR').value, s: document.getElementById('vsR').value };
         const statusVal = document.getElementById('compStatusSelect').value;
+        const distVal = document.getElementById('totalDist').value;
         const lapValues = [];
         for (let i = 0; i < count; i++) {
             lapValues.push({
@@ -3087,14 +3265,40 @@
             });
         }
         function applyForm(target) {
-            target.startTime = startTime;
+            // A TÁV is a form része. Enélkül a "Teljes verseny" nézetben
+            // elvégzett távváltás soha nem mentődött el (a totalDist onchange
+            // csak a körmezőket rajzolta újra), így a versenyző a régi távján
+            // maradt, és a kalkuláció a régi kiírás köreivel/rajtidejével ment.
+            target.dist = distVal;
+            // A saját rajtidőt CSAK akkor mentjük, ha eltér a versenykiírástól.
+            // Enélkül az első mentéskor "befagyott" a kiírásból betöltött idő,
+            // és a versenyző később nem követte a kiírás módosítását. Így a
+            // versenyző alapból a kiírást követi, és csak a tudatosan megadott
+            // egyedi rajtidő (pl. késve induló lovas) marad meg.
+            const cfgTav = raceConfig[String(distVal).replace('j', '')] || {};
+            const egyezikAKiirassal =
+                String(startTime.h || '') === String(cfgTav.h || '') &&
+                String(startTime.m || '') === String(cfgTav.m || '') &&
+                String(startTime.s || '') === String(cfgTav.s || '');
+            if (egyezikAKiirassal) {
+                delete target.startTime;
+            } else {
+                target.startTime = startTime;
+            }
             target.status = statusVal;
-            target.isEliminated = (statusVal !== 'Active');
+            // A RECHECK nem kiesés: a ló versenyben van, csak újra be kell mutatni.
+            target.isEliminated = (statusVal !== 'Active' && statusVal !== 'RECHECK');
             lapValues.forEach((lv, i) => {
                 if (!target.laps) target.laps = [];
                 if (!target.laps[i]) target.laps[i] = {};
                 Object.assign(target.laps[i], lv);
             });
+            // Rövidebb távra váltáskor (pl. 40 km -> 20 km) a régi, immár nem
+            // létező körök adata ottmaradt a laps tömbben, és a kalkuláció
+            // számolt is velük - ettől jöttek a hibás összesítések.
+            if (target.laps && target.laps.length > count) {
+                target.laps = target.laps.slice(0, count);
+            }
             return target;
         }
 
@@ -3309,6 +3513,47 @@
             return `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Kör átlag: ${spd.toFixed(2)} km/h — közelít a ${threshold.min} km/h-s minimumhoz.</span></div>`;
         }
         return '';
+    }
+
+    // A "Teljes verseny" nézetben a táv váltásakor a TELJES kiírást át kell
+    // venni az új távról: a körök számát, a körtávokat ÉS a rajtidőt is.
+    // (A puszta autoSetLaps() csak a körmezőket rajzolta újra, üresen, így a
+    // versenyző a régi táv rajtidejével és távjaival maradt.)
+    // A genLaps() minden körmezőt újragenerál, ezért a versenyző már rögzített
+    // beérkezési/orvosi idejét vissza kell tölteni, különben eltűnne a képről.
+    function versenyTavValtas() {
+        autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v');
+
+        const dist = document.getElementById('totalDist').value;
+        const cfg = raceConfig[String(dist).replace('j', '')] || {};
+        const cfgLaps = cfg.laps || [];
+
+        // Rajtidő az ÚJ táv kiírásából
+        document.getElementById('vhR').value = cfg.h || '';
+        document.getElementById('vmR').value = cfg.m || '';
+        document.getElementById('vsR').value = cfg.s || '';
+
+        const bib = document.getElementById('selectCompetitor').value;
+        const comp = competitors.find(c => c.bib == bib);
+        const lapsArr = (comp && comp.laps) || [];
+
+        for (let i = 0; i < cfgLaps.length; i++) {
+            const n = i + 1;
+            const dEl = document.getElementById(`vd${n}`);
+            if (!dEl) continue;
+            const l = lapsArr[i] || {};
+            // A körtáv az ÚJ kiírásból jön: a régi táv körtávja itt már
+            // értelmetlen lenne.
+            dEl.value = cfgLaps[i] || '';
+            // A ténylegesen mért idők viszont a versenyzőé - megtartjuk.
+            document.getElementById(`vh${n}`).value = l.h || '';
+            document.getElementById(`vm${n}`).value = l.m || '';
+            document.getElementById(`vs${n}`).value = l.s || '';
+            document.getElementById(`voh${n}`).value = l.oh || '';
+            document.getElementById(`vom${n}`).value = l.om || '';
+            document.getElementById(`vos${n}`).value = l.os || '';
+        }
+        calcVerseny(false);
     }
 
  function autoSetLaps(countId, distId, contId, prefix, isModal = false) {
@@ -3635,13 +3880,19 @@
         return ranksInfo;
     }
 
-    function getActiveCategories(comps, config) {
+    // includeEmpty=false: csak azok a távok, amelyekben VAN versenyző. Az
+    // adatlap-listában egy üres kategória csak zavar (pl. ha az utolsó
+    // versenyzőt is átváltottuk róla, a táv mégis ottmaradt, mert a
+    // kiírásban szerepelt egy rajtidő).
+    // includeEmpty=true: a kategóriaváltó modalhoz kell, mert oda üres
+    // kategóriába is át kell tudni váltani.
+    function getActiveCategories(comps, config, includeEmpty = false) {
         let active = [];
         ["100", "100j", "80", "80j", "60", "40", "20"].forEach(d => {
             let hasComp = comps.some(c => c.dist === d);
             let baseDist = d.replace('j','');
             let hasConfig = config[baseDist] && config[baseDist].h !== '';
-            if (hasComp || (!d.includes('j') && hasConfig)) active.push(d);
+            if (hasComp || (includeEmpty && !d.includes('j') && hasConfig)) active.push(d);
         });
         return active;
     }
@@ -3650,7 +3901,8 @@
 
     function openCatSwapModal() {
         const ctx = getAdatlapContext();
-        let activeCats = getActiveCategories(ctx.comps, ctx.config);
+        // Itt az üres (kiírt, de még nevezetlen) kategóriák is kellenek.
+        let activeCats = getActiveCategories(ctx.comps, ctx.config, true);
         let html = "";
         activeCats.forEach(cat => {
             html += `<button class="calc-btn cat-select-btn kicsi" onclick="closeCatSwapModal(); setAdatlapFilter('${cat}')">${catNames[cat]}</button>`;
@@ -3722,9 +3974,13 @@
         const t = speedThresholds[baseDist] || {};
         const hasMax = completedLaps.some(l => l.speedFlagMax || (t.max != null && (l.loopSpd >= t.max || l.phaseSpd >= t.max)));
         const hasMin = completedLaps.some(l => l.speedFlagMin || (t.min != null && (l.loopSpd < t.min || l.phaseSpd < t.min)));
+        // A sebesség-figyelmeztetések csak az adminnak látszanak: ezek belső
+        // kockázatjelzések (SP = sebességtúllépés, OT = időtúllépés kockázata),
+        // a döntést mindig a bíró/orvos hozza meg - a versenyzői listában
+        // félreérthetőek lennének.
         let html = '';
-        if (hasMax) html += `<span class="inline-flag danger">⚠ SP</span>`;
-        if (hasMin) html += `<span class="inline-flag warning">⚠ OT</span>`;
+        if (hasMax) html += `<span class="inline-flag danger admin-only">⚠ SP</span>`;
+        if (hasMin) html += `<span class="inline-flag warning admin-only">⚠ OT</span>`;
         return html;
     }
 
@@ -3740,6 +3996,9 @@
             return parseInt(a.bib) - parseInt(b.bib);
         });
 
+        // A verseny legjobb (legalacsonyabb) pulzusa - mindenkinek látszik.
+        const pulzusBajnok = legjobbPulzus(ctx.comps);
+
         filtered.forEach(c => {
             let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
             let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
@@ -3751,6 +4010,9 @@
                 speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
                 // Admin állítja be távonként (Beállítások fül): max -> SP kockázat, min -> OT kockázat
                 speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
+            }
+            if (pulzusBajnok && pulzusBajnok.bib === String(c.bib)) {
+                speedFlagHtml += `<span class="inline-flag pulzus" title="A verseny legjobb pulzusa">💚 ${pulzusBajnok.pulse} bpm</span>`;
             }
             let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
 
@@ -3997,6 +4259,127 @@
         } catch (err) {
             showToast("Hibás a kód! Biztos, hogy az egészet (a { } zárójelekkel együtt) kimásoltad?", true);
         }
+    }
+
+    // A verseny legalacsonyabb rögzített pulzusa (a legjobb regeneráció).
+    // Csak a versenyben lévő lovak befejezett köreit nézzük - a kiesett
+    // lovak és az előzetes vizsgálat értékei nem versenyeznek ezért.
+    function legjobbPulzus(comps) {
+        let legjobb = null;
+        (comps || []).forEach(c => {
+            if (c.isEliminated) return;
+            (c.laps || []).forEach(l => {
+                if (!l || !l.isComplete) return;
+                const p = parseInt(l.pulse);
+                if (!p || p <= 0) return;
+                if (!legjobb || p < legjobb.pulse) {
+                    legjobb = { bib: String(c.bib), pulse: p, name: c.name, horse: c.internal };
+                }
+            });
+        });
+        return legjobb;
+    }
+
+    // --- EREDMÉNYLISTA NYOMTATÁSA TÁVONKÉNT (nettó idő + átlagsebesség) ---
+    function printEredmenyLista() {
+        const ctx = getAdatlapContext();
+        const comps = ctx.comps || [];
+        if (!comps.length) { showToast("Nincs versenyző az eredménylistához!", true); return; }
+
+        const config = ctx.config;
+        const ranksInfo = calculateCurrentRanks(comps, config);
+        const cats = getActiveCategories(comps, config);
+        const pulzusBajnok = legjobbPulzus(comps);
+        const raceName = ctx.name || (liveRaceMeta ? liveRaceMeta.name : "Élő Verseny");
+
+        // Egy versenyző nettó ideje és átlagsebessége a befejezett körökből.
+        // A 20 km-es táv külön szabály: ott az idő az orvosi kapunál áll meg.
+        function eredmeny(c) {
+            const kesz = (c.laps || []).filter(l => l.isComplete);
+            if (!kesz.length) return { ido: '-', spd: '-' };
+            const utolso = kesz[kesz.length - 1];
+            let sec = utolso.rideTime;
+            if ((c.dist === "20" || c.dist === "20j") && utolso.vetSec > 0) {
+                sec = utolso.loopSec + utolso.pulzusSec;
+            }
+            if (!sec || sec <= 0) return { ido: '-', spd: '-' };
+            const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            const tav = kesz.reduce((ossz, l) => ossz + (parseFloat(l.d) || 0), 0);
+            return {
+                ido: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`,
+                spd: tav > 0 ? (tav / (sec / 3600)).toFixed(2) + ' km/h' : '-'
+            };
+        }
+
+        let html = `<html><head><title>Eredménylista - ${raceName}</title><style>
+            body { font-family:'Segoe UI',Tahoma,Arial,sans-serif; padding:15px; color:#000; background:#fff; font-size:13px; }
+            .header-box { text-align:center; margin-bottom:18px; }
+            h1 { margin:0; font-size:1.5rem; text-transform:uppercase; letter-spacing:1px; }
+            h2 { margin:4px 0 0 0; color:#444; font-size:1.05rem; }
+            table { width:100%; border-collapse:collapse; margin:10px 0 22px 0; border:2px solid #000; }
+            th, td { border:1px solid #666; padding:6px 8px; text-align:left; }
+            th { background:#e0e0e0; font-weight:bold; font-size:.82rem; text-transform:uppercase; text-align:center; }
+            .cat-header { background:#d0d0d0; font-weight:bold; font-size:1.05rem; text-transform:uppercase;
+                          padding:8px 10px; border-top:2px solid #000; border-bottom:2px solid #000; }
+            .rank { font-weight:bold; font-size:1.15rem; text-align:center; width:7%; background:#f9f9f9; }
+            .bib  { font-weight:bold; text-align:center; width:8%; }
+            .num  { text-align:center; font-weight:bold; white-space:nowrap; }
+            .out  { color:#a00; font-style:italic; }
+            .badge-box { border:2px solid #000; padding:10px 14px; margin-bottom:18px; background:#f4f4f4; }
+            .footer { margin-top:14px; text-align:right; font-size:.72rem; color:#666;
+                      border-top:1px solid #ccc; padding-top:8px; }
+            @media print { body { padding:0; } @page { margin:1cm; } }
+        </style></head><body>
+        <div class="header-box"><h1>${raceName}</h1><h2>EREDMÉNYLISTA / RESULTS</h2></div>`;
+
+        if (pulzusBajnok) {
+            html += `<div class="badge-box">💚 <b>A verseny legjobb pulzusa:</b>
+                #${pulzusBajnok.bib} ${pulzusBajnok.name || ''}
+                ${pulzusBajnok.horse ? '(' + pulzusBajnok.horse + ')' : ''}
+                &nbsp;-&nbsp; <b>${pulzusBajnok.pulse} bpm</b></div>`;
+        }
+
+        cats.forEach(cat => {
+            const catComps = comps.filter(c => c.dist === cat).sort((a, b) => {
+                if (a.isEliminated && !b.isEliminated) return 1;
+                if (!a.isEliminated && b.isEliminated) return -1;
+                if (!a.isEliminated && !b.isEliminated) {
+                    return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999);
+                }
+                return parseInt(a.bib) - parseInt(b.bib);
+            });
+            if (!catComps.length) return;
+
+            html += `<table><tr><td colspan="8" class="cat-header">${catNames[cat] || cat}</td></tr>
+                <tr><th>Hely</th><th>Rajtsz.</th><th>Versenyző</th><th>Ló</th>
+                    <th>Egyesület</th><th>Nettó idő</th><th>Átlagseb.</th><th>Megjegyzés</th></tr>`;
+
+            catComps.forEach(c => {
+                const r = eredmeny(c);
+                const kiesett = c.isEliminated;
+                const hely = kiesett ? '-' : (ranksInfo[c.bib]?.rank ?? '-');
+                const pulzusJel = (pulzusBajnok && pulzusBajnok.bib === String(c.bib)) ? ' 💚' : '';
+                html += `<tr${kiesett ? ' class="out"' : ''}>
+                    <td class="rank">${hely}</td>
+                    <td class="bib">${c.bib}</td>
+                    <td>${c.name || ''}${pulzusJel}</td>
+                    <td>${c.internal || ''}</td>
+                    <td>${c.club || ''}</td>
+                    <td class="num">${kiesett ? '-' : r.ido}</td>
+                    <td class="num">${kiesett ? '-' : r.spd}</td>
+                    <td>${kiesett ? (c.status || 'Kiesett') : ''}</td>
+                </tr>`;
+            });
+            html += `</table>`;
+        });
+
+        html += `<div class="footer">Generálva: <b>end-ride.com</b> &nbsp;|&nbsp;
+                 ${new Date().toLocaleString('hu-HU')}</div>
+                 <script>window.onload = function() { window.print(); }<\/script></body></html>`;
+
+        const win = window.open('', '_blank');
+        win.document.write(html);
+        win.document.close();
     }
 
     // --- ADMIN: A4-ES LISTÁK NYOMTATÁSA (KÜLÖNVÁLASZTOTT NEVEZÉSI ÉS RAJTLISTA) ---

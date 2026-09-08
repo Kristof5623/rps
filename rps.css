@@ -1219,6 +1219,11 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 .inline-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
 .inline-flag.danger { background: var(--danger); color: #fff; }
 .inline-flag.warning { background: var(--warning); color: #000; }
+/* A verseny legjobb pulzusa - ez mindenkinek látszik, nem admin-only. */
+.inline-flag.pulzus { background: var(--success); color: #000; }
+/* A jogosultsági szabály display:block-ot adna, ami ezeknél a badge-eknél
+   eltörné a sort - adminnál vissza kell állítani inline-flex-re. */
+.role-admin .inline-flag.admin-only { display: inline-flex !important; }
 
 /* --- DESIGN TÉMA VÁLASZTÓ (kártyák, nem kapcsoló) --- */
 .theme-swatch-row { display: flex; gap: 12px; flex-wrap: wrap; }

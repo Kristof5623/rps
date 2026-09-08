@@ -132,6 +132,7 @@
                         <input type="number" id="bk-h" placeholder="00" oninput="jump(this, 'bk-m'); checkBeerkeztetesSpeed();"> :
                         <input type="number" id="bk-m" placeholder="00" oninput="jump(this, 'bk-s'); checkBeerkeztetesSpeed();"> :
                         <input type="number" id="bk-s" placeholder="00" oninput="checkBeerkeztetesSpeed();">
+                        <button class="calc-btn" style="width:auto; padding:8px 16px; margin:0 0 0 8px;" onclick="setIdoNow('bk-h','bk-m','bk-s'); checkBeerkeztetesSpeed();">Most</button>
                     </div>
                     <div id="bk-speed-warning"></div>
 
@@ -164,6 +165,7 @@
                         <input type="number" id="bk-v-h" placeholder="00" oninput="jump(this, 'bk-v-m'); checkOrvosiIdoRecovery();"> :
                         <input type="number" id="bk-v-m" placeholder="00" oninput="jump(this, 'bk-v-s'); checkOrvosiIdoRecovery();"> :
                         <input type="number" id="bk-v-s" placeholder="00" oninput="checkOrvosiIdoRecovery();">
+                        <button class="calc-btn" style="width:auto; padding:8px 16px; margin:0 0 0 8px;" onclick="setIdoNow('bk-v-h','bk-v-m','bk-v-s'); checkOrvosiIdoRecovery();">Most</button>
                     </div>
                     <div id="orv-ido-recovery-warning"></div>
 
@@ -187,6 +189,18 @@
                 <h4 id="orv-lap-title" style="margin-top:0; color:var(--text);">X. Kör</h4>
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-arr-time">Beérkezett: --:--:--</div>
                 <div style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;" id="orv-vet-time">Orvosi: --:--:--</div>
+
+                <div id="orv-recheck-box" style="display:none; background:var(--card-2); border-radius:10px; padding:10px 12px; margin:10px 0; border-left:3px solid var(--warning);">
+                    <div style="font-size:0.85rem; font-weight:bold;" id="orv-recheck-info">Re-check: --</div>
+                    <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
+                        <input type="number" id="orv-rch" placeholder="óó" style="width:64px; margin-top:0; text-align:center;">
+                        <input type="number" id="orv-rcm" placeholder="pp" style="width:64px; margin-top:0; text-align:center;">
+                        <input type="number" id="orv-rcs" placeholder="mm" style="width:64px; margin-top:0; text-align:center;">
+                        <button class="calc-btn" style="width:auto; padding:8px 16px; margin:0;" onclick="setRecheckNow()">Most</button>
+                        <button class="calc-btn" style="width:auto; padding:8px 12px; margin:0; background:var(--card-3);" onclick="clearRecheck()">Törlés</button>
+                    </div>
+                </div>
+
                 <div id="orv-recovery-warning" style="margin-bottom:15px;"></div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -204,8 +218,9 @@
                 <select id="orv-vet-name"></select>
 
                 <label>Orvosi Döntés / Státusz:</label>
-                <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);" onchange="adjustVetDecisionColors(this)">
+                <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);" onchange="adjustVetDecisionColors(this); frissitRecheckLathatosag();">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
+                    <option value="RECHECK" style="color:var(--warning);">Re-check (újra bemutatandó)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
@@ -233,6 +248,16 @@
 
         <div id="nyomtatas-mod" class="mode-content">
             <h3 style="color:var(--text); margin-bottom: 15px;">🖨️ Nyomtatás</h3>
+
+            <div class="kiiras-card" style="border-left-color: var(--success); margin-top:0; margin-bottom:25px;">
+                <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🏆 Eredménylista (távonként)</h4>
+                <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">
+                    Helyezés, nettó idő és átlagsebesség távonként, egy A4-es listán.
+                    A verseny legjobb pulzusú lova külön jelvényt kap.
+                </p>
+                <button class="calc-btn" style="background:var(--success); color:black; margin-top:0;" onclick="printEredmenyLista()">Eredménylista nyomtatása</button>
+            </div>
+
             <label for="sel-nyomtatas" style="color: var(--text);">Versenyző kiválasztása:</label>
             <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
                 <input type="number" id="nyom-bibInput" placeholder="Keresés (Rajtszám)..." style="flex:1; margin-top:0;" oninput="syncBibInputToSelect('nyom-bibInput', 'sel-nyomtatas')">
@@ -446,11 +471,18 @@
             </div>
 
             <div id="beallitasok-tema" class="sub-mode-content" style="display:block;">
-                <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">Ez a beállítás mindenkinek, minden eszközön (beérkeztető, orvos, admin tabletek) egyszerre érvényes - nem személyes preferencia.</p>
+                <p style="color:var(--text-dim); margin-bottom: 20px; font-size:0.85rem;">A téma személyes beállítás: csak ezen az eszközön változik, másokét nem érinti.</p>
                 <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🎨 Design téma</h4>
-                    <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - azonnal mindenkinél átvált.</p>
+                    <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - csak ezen az eszközön vált át.</p>
                     <div class="theme-swatch-row" id="themeSwatchRow"></div>
+                    <button class="calc-btn" style="background:var(--card-3); margin-top:15px; width:auto; padding:8px 18px;" onclick="resetUiTheme()">Vissza a közös témához</button>
+                </div>
+
+                <div class="kiiras-card admin-only" style="border-left-color: var(--warning);">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">👑 Közös (alapértelmezett) téma</h4>
+                    <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Ezt kapja mindenki, aki még nem választott magának sajátot.</p>
+                    <div class="theme-swatch-row" id="kozosThemeSwatchRow"></div>
                 </div>
             </div>
 
@@ -545,11 +577,15 @@
             <div id="orvosok" class="sub-mode-content" style="display:none;">
                 <h4 style="margin-bottom: 15px; color: var(--text);">ÉLŐ: Állatorvosok felvitele</h4>
                 <label>Állatorvos neve (pl. Dr. Szabó János):</label>
-                <input type="text" id="regVetName" placeholder="Név megadása...">
+                <input type="text" id="regVetName" placeholder="Kezdd el gépelni a nevet..." autocomplete="off">
+                <div style="font-size:0.75rem; color:var(--text-dim); margin:-6px 0 10px 2px;">
+                    A korábbi versenyeken szerepelt orvosok gépelés közben felajánlódnak.
+                </div>
                 <button class="calc-btn add-btn admin-only" onclick="saveVet()">Orvos Hozzáadása</button>
 
-                <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált Állatorvosok:</h4>
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Orvosok ehhez a versenyhez:</h4>
                 <div id="vetListContainer"></div>
+                <button class="calc-btn admin-only" style="background:var(--danger); margin-top:12px;" onclick="clearLiveVets()">Lista ürítése (új versenyhez)</button>
             </div>
             
             <div id="verseny" class="sub-mode-content" style="display:none;">
@@ -566,6 +602,7 @@
                     <label>Versenyző státusza:</label>
                     <select id="compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
+                    <option value="RECHECK" style="color:var(--warning);">Re-check (újra bemutatandó)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
@@ -582,7 +619,7 @@
                 </select>
 
                     <label>Össztáv & Körök:</label>
-                    <select id="totalDist" onchange="autoSetLaps('lapCount', 'totalDist', 'lapInputsContainer', 'v')">
+                    <select id="totalDist" onchange="versenyTavValtas()">
                         <option value="20">20 km</option>
                         <option value="40">40 km</option>
                         <option value="60">60 km</option>
@@ -745,6 +782,7 @@
                 <label>Versenyző státusza:</label>
                 <select id="rm-compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
+                    <option value="RECHECK" style="color:var(--warning);">Re-check (újra bemutatandó)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
