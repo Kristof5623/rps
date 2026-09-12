@@ -549,7 +549,7 @@
             
             if (viewingPastRaceData && document.getElementById('past-race-view').classList.contains('active')) {
                 const updatedRace = localRaces.mult.find(x => x.id === viewingPastRaceData.id);
-                if(updatedRace) { viewingPastRaceData = updatedRace; renderPastAdatlapList(); }
+                if(updatedRace) { viewingPastRaceData = updatedRace; renderPastAdatlapList(); refreshOpenModalIfNeeded(); }
             }
 
             refreshOpenBajnoksagViews();
@@ -558,15 +558,25 @@
         db.ref('raceConfig').on('value', (snapshot) => {
             raceConfig = mergeRaceConfig(snapshot.val());
             renderKiiras();
-            if (!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
+            if (!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active')) { renderAdatlapList(); }
+            refreshOpenModalIfNeeded();
         });
 
         db.ref('competitors').on('value', (snapshot) => {
             competitors = parseCompetitors(snapshot.val());
             updateCompetitorDisplays();
             
-            if(!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active') && currentAdatlapFilter) { renderAdatlapList(); }
-            
+            // A kategória-választó nézet (currentAdatlapFilter === null) is frissüljön:
+            // eddig egy új kategória csak fülváltás után jelent meg.
+            if(!viewingPastRaceData && document.getElementById('adatlapok').classList.contains('active')) { renderAdatlapList(); }
+            refreshOpenModalIfNeeded();
+
+            // A nyomtatási kártya eddig kimaradt a frissítésből: a kiválasztott
+            // versenyzőnél régi időkkel maradt a képernyőn (és úgy is nyílt nyomtatásra).
+            if(document.getElementById('nyomtatas-mod').classList.contains('active')) {
+                if (document.getElementById('sel-nyomtatas').value) loadNyomtatasData();
+            }
+
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
                 const selectedBib = document.getElementById('selectCompetitor').value;
                 const activeEl = document.activeElement;
@@ -2728,7 +2738,7 @@
 
 
     // --- SÖTÉT TÉMÁJÚ ÁLLATORVOSI KARTON (TÖRTÉNET) MODAL ---
-    function openVetHistory(bib) {
+    function openVetHistory(bib, silent = false) {
         let comp = null;
         
         // 1. Először keressük az élő versenyzők között
@@ -2746,7 +2756,7 @@
         }
 
         if(!comp) {
-            showToast("A versenyző orvosi adatai nem találhatók!", true);
+            if (!silent) showToast("A versenyző orvosi adatai nem találhatók!", true);
             return;
         }
 
@@ -2763,19 +2773,19 @@
         }
 
         if (columns.length === 0) {
-            showToast("Még nincs rögzített orvosi adat ehhez a versenyzőhöz.", true);
+            if (!silent) showToast("Még nincs rögzített orvosi adat ehhez a versenyzőhöz.", true);
             return;
         }
 
         let html = `
-            <div style="background:#1c1c1e; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 850px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
+            <div data-live-view="vethistory" data-live-bib="${comp.bib}" style="background:#1c1c1e; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 850px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
                 
                 <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
                     <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${comp.bib} | ${comp.name}</div>
                     <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${comp.internal || "Ló neve hiányzik"}</div>
                 </div>
                 
-                <div style="padding: 20px; overflow-x: auto;">
+                <div data-live-scroll style="padding: 20px; overflow-x: auto;">
                     <table style="width:100%; border-collapse: collapse; text-align:center; font-size:1rem; font-family: sans-serif;">
                         <tr style="background:#137A7F; color:#fff;">
                             <th style="padding:12px; border-bottom:2px solid #1c1c1e; text-align:left; width:30%;">Szakasz</th>
@@ -4006,8 +4016,9 @@
             return parseInt(a.bib) - parseInt(b.bib);
         });
 
-        // A verseny legjobb (legalacsonyabb) pulzusa - mindenkinek látszik.
-        const pulzusBajnok = legjobbPulzus(ctx.comps);
+        // A TÁV legjobb átlagos pulzusideje - mindenkinek látszik.
+        // Szándékosan a már kategóriára szűrt mezőnyből, nem az egész versenyből.
+        const pulzusBajnok = legjobbPulzusIdo(filtered);
 
         filtered.forEach(c => {
             let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
@@ -4022,7 +4033,7 @@
                 speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
             }
             if (pulzusBajnok && pulzusBajnok.bib === String(c.bib)) {
-                speedFlagHtml += `<span class="inline-flag pulzus" title="A verseny legjobb pulzusa">💚 ${pulzusBajnok.pulse} bpm</span>`;
+                speedFlagHtml += `<span class="inline-flag pulzus" title="A táv legjobb átlagos pulzusideje: ${toTimeStr(pulzusBajnok.sec)} (${pulzusBajnok.korok} kör átlaga)">💚</span>`;
             }
             let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
 
@@ -4054,7 +4065,7 @@
         if (c.manualEntry) {
             const placeStr = c.isEliminated ? getElimText(c) : (c.manualPlace ? c.manualPlace + '. hely' : 'nincs rögzített helyezés');
             document.getElementById('modalBody').innerHTML = `
-                <div style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
+                <div data-live-view="adatlap" data-live-bib="${c.bib}" style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
                     <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
                         <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
                         <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${c.internal || "Ló neve hiányzik"}</div>
@@ -4133,7 +4144,7 @@
         }
 
         let html = `
-            <div style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 900px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
+            <div data-live-view="adatlap" data-live-bib="${c.bib}" style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 900px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
                 
                 <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center; position: relative;">
                     <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
@@ -4145,7 +4156,7 @@
                     </div>
                 </div>
                 
-                <div style="padding: 20px; overflow-x: auto;">
+                <div data-live-scroll style="padding: 20px; overflow-x: auto;">
                     <table style="width:100%; border-collapse: collapse; text-align:center; font-size:0.95rem; font-family: sans-serif;">
                         <tr style="background:var(--teal); color:#fff;">
                             <th style="padding:12px; border-bottom:2px solid #fff; text-align:left; width:25%;">Szakasz</th>
@@ -4203,6 +4214,33 @@
     }
 
     function closeAdatlap() { document.getElementById('adatlapModal').style.display = 'none'; }
+
+    // A nyitott adatlap / állatorvosi karton egyszeri renderés volt: ha közben bárki
+    // rögzítette az időket (beérkeztetés, orvosi idő, orvosi döntés - akár másik
+    // eszközről), a kint hagyott adatlap a régi adatokat mutatta, amíg be nem
+    // zárták és újra meg nem nyitották. A kirajzolt kártya megjelöli magát
+    // (data-live-view + data-live-bib), így innen újra tudjuk rajzolni. A jelölő a
+    // #modalBody tartalmában van, ezért bármely más modal-tartalom automatikusan
+    // "kikapcsolja" - nem írjuk felül más nézet tartalmát.
+    function refreshOpenModalIfNeeded() {
+        const modal = document.getElementById('adatlapModal');
+        if (!modal || modal.style.display !== 'flex') return;
+        const card = document.querySelector('#modalBody [data-live-view]');
+        const bib = card ? card.dataset.liveBib : null;
+        if (!bib) return;
+
+        // Görgetési pozíció megőrzése, hogy a frissítés ne ugorjon vissza a tetejére.
+        const oldScroll = document.querySelector('#modalBody [data-live-scroll]');
+        const prevLeft = oldScroll ? oldScroll.scrollLeft : 0;
+        const prevTop = modal.scrollTop;
+
+        if (card.dataset.liveView === 'vethistory') openVetHistory(bib, true);
+        else openAdatlap(bib);
+
+        const newScroll = document.querySelector('#modalBody [data-live-scroll]');
+        if (newScroll) newScroll.scrollLeft = prevLeft;
+        modal.scrollTop = prevTop;
+    }
 
     // --- ESZKÖZÖK ---
     function calcReszido() {
@@ -4271,21 +4309,38 @@
         }
     }
 
-    // A verseny legalacsonyabb rögzített pulzusa (a legjobb regeneráció).
+    // A kapott mezőny legjobb ÁTLAGOS PULZUSIDEJE: a beérkezés és az orvosi kapura
+    // állás között eltelt idő (l.pulzusSec) - ez mutatja meg, milyen gyorsan
+    // regenerálódott a ló. Nem a leolvasott bpm értéket nézzük: az önmagában a
+    // határértékhez való viszonyt mutatja, nem a teljesítményt.
+    // Versenyzőnként az ÖSSZES mért körének ÁTLAGÁT számoljuk, nem a legjobb
+    // egyetlen körét: egy szerencsés kör nem nyerheti meg a díjat az egész
+    // versenyen végig egyenletesen jól regenerálódó ló elől.
+    // MINDIG TÁVONKÉNT kell hívni (egy kategória versenyzőivel): a 20 km és a
+    // 160 km nem összemérhető, egy közös "verseny legjobbja" díjat gyakorlatilag
+    // mindig a legrövidebb táv vitt volna el.
     // Csak a versenyben lévő lovak befejezett köreit nézzük - a kiesett
     // lovak és az előzetes vizsgálat értékei nem versenyeznek ezért.
-    function legjobbPulzus(comps) {
+    function legjobbPulzusIdo(comps) {
         let legjobb = null;
         (comps || []).forEach(c => {
             if (c.isEliminated) return;
+            let ossz = 0, merveK = 0;
             (c.laps || []).forEach(l => {
                 if (!l || !l.isComplete) return;
-                const p = parseInt(l.pulse);
-                if (!p || p <= 0) return;
-                if (!legjobb || p < legjobb.pulse) {
-                    legjobb = { bib: String(c.bib), pulse: p, name: c.name, horse: c.internal };
-                }
+                const sec = parseInt(l.pulzusSec);
+                if (!sec || sec <= 0) return;
+                ossz += sec;
+                merveK++;
             });
+            if (merveK === 0) return;
+            const atlag = ossz / merveK;
+            // Az összehasonlítás a kerekítetlen átlaggal megy (atlagRaw), a kerekített
+            // sec csak a kijelzéshez kell - különben két közeli átlagnál a kerekítés
+            // döntené el a díjat.
+            if (!legjobb || atlag < legjobb.atlagRaw) {
+                legjobb = { bib: String(c.bib), sec: Math.round(atlag), atlagRaw: atlag, korok: merveK, name: c.name, horse: c.internal };
+            }
         });
         return legjobb;
     }
@@ -4299,7 +4354,6 @@
         const config = ctx.config;
         const ranksInfo = calculateCurrentRanks(comps, config);
         const cats = getActiveCategories(comps, config);
-        const pulzusBajnok = legjobbPulzus(comps);
         const raceName = ctx.name || (liveRaceMeta ? liveRaceMeta.name : "Élő Verseny");
 
         // Egy versenyző nettó ideje és átlagsebessége a befejezett körökből.
@@ -4342,13 +4396,6 @@
         </style></head><body>
         <div class="header-box"><h1>${raceName}</h1><h2>EREDMÉNYLISTA / RESULTS</h2></div>`;
 
-        if (pulzusBajnok) {
-            html += `<div class="badge-box">💚 <b>A verseny legjobb pulzusa:</b>
-                #${pulzusBajnok.bib} ${pulzusBajnok.name || ''}
-                ${pulzusBajnok.horse ? '(' + pulzusBajnok.horse + ')' : ''}
-                &nbsp;-&nbsp; <b>${pulzusBajnok.pulse} bpm</b></div>`;
-        }
-
         cats.forEach(cat => {
             const catComps = comps.filter(c => c.dist === cat).sort((a, b) => {
                 if (a.isEliminated && !b.isEliminated) return 1;
@@ -4359,6 +4406,10 @@
                 return parseInt(a.bib) - parseInt(b.bib);
             });
             if (!catComps.length) return;
+
+            // A legjobb átlagos pulzusidő távonkénti díja: minden kategóriának saját
+            // győztese van, és a listán csak a 💚 jelöli - külön kiírt érték nélkül.
+            const pulzusBajnok = legjobbPulzusIdo(catComps);
 
             html += `<table><tr><td colspan="8" class="cat-header">${catNames[cat] || cat}</td></tr>
                 <tr><th>Hely</th><th>Rajtsz.</th><th>Versenyző</th><th>Ló</th>
@@ -4383,7 +4434,8 @@
             html += `</table>`;
         });
 
-        html += `<div class="footer">Generálva: <b>end-ride.com</b> &nbsp;|&nbsp;
+        html += `<div class="footer">💚 = a táv legjobb átlagos pulzusideje &nbsp;|&nbsp;
+                 Generálva: <b>end-ride.com</b> &nbsp;|&nbsp;
                  ${new Date().toLocaleString('hu-HU')}</div>
                  <script>window.onload = function() { window.print(); }<\/script></body></html>`;
 

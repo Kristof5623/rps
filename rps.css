@@ -1219,8 +1219,10 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 .inline-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
 .inline-flag.danger { background: var(--danger); color: #fff; }
 .inline-flag.warning { background: var(--warning); color: #000; }
-/* A verseny legjobb pulzusa - ez mindenkinek látszik, nem admin-only. */
-.inline-flag.pulzus { background: var(--success); color: #000; }
+/* A táv legjobb pulzusideje (beérkezés -> orvosi kapu) - ez mindenkinek
+   látszik, nem admin-only. Csak a szív ikon van benne, a konkrét idő a
+   jelvény tooltipjében olvasható. */
+.inline-flag.pulzus { background: var(--success); color: #000; font-size: 0.8rem; padding: 3px 6px; gap: 0; }
 /* A jogosultsági szabály display:block-ot adna, ami ezeknél a badge-eknél
    eltörné a sort - adminnál vissza kell állítani inline-flex-re. */
 .role-admin .inline-flag.admin-only { display: inline-flex !important; }
