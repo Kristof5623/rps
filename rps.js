@@ -2286,17 +2286,18 @@
             else sel.style.color = 'var(--danger)';
         }
 
-        if (comp.isEliminated || comp.status !== 'Active') {
-            let s = comp.status;
-            if (s === 'Visszalépett' || s === 'Retired' || s === 'DNS') s = 'WD';
-            else if (s === 'Kiesett' || s === 'Eliminated') s = 'FTQ-ME'; 
-            
-            let exists = Array.from(document.getElementById('orvStatusSelect').options).some(opt => opt.value === s);
-            document.getElementById('orvStatusSelect').value = exists ? s : 'FTQ-ME';
-        } else {
-            // ÚJ: Alapértelmezetten a zöld "Active" (Továbbengedve) opciót kapja meg!
-            document.getElementById('orvStatusSelect').value = 'Active';
-        }
+        // --- HIBATŰRŐ STÁTUSZ BEÁLLÍTÁS ---
+        // Az alapértelmezés MINDIG a zöld "Versenyben (Active)". Ha a versenyzőnek
+        // még nincs mentett státusza (pl. frissen nevezett, status: null), vagy a
+        // mentett érték ismeretlen, akkor sem szabad kiesésre állítani a legördülőt.
+        let orvS = comp.status || (comp.isEliminated ? 'FTQ-ME' : 'Active');
+        if (orvS === 'Passed') orvS = 'Active';
+        if (orvS === 'Visszalépett' || orvS === 'Retired' || orvS === 'DNS') orvS = 'WD';
+        if (orvS === 'Kiesett' || orvS === 'Eliminated') orvS = 'FTQ-ME';
+        const orvSel = document.getElementById('orvStatusSelect');
+        const orvExists = Array.from(orvSel.options).some(opt => opt.value === orvS);
+        orvSel.value = orvExists ? orvS : 'Active';
+        // ----------------------------------
         adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
         renderExtraCodesCheckboxes(comp.extraCodes);
 
