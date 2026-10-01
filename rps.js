@@ -19,6 +19,15 @@
     const CALC_LIMIT = 15.99;
     let currentAdatlapFilter = null;
     let dbListenersActive = false;
+    // ÉLŐ PANELEK: MENTETLEN MÓDOSÍTÁS ŐRE (l. setFormDirty / isFormDirty)
+    // Az élő újratöltés korábban a FÓKUSZ alapján döntött: ha a fókusz az űrlapon
+    // belül volt, kihagyta a frissítést. Csakhogy a "Most" és a "Mentés" gomb is az
+    // űrlapon BELÜL van, és kattintás után rajtuk marad a fókusz - vagyis amint a
+    // rendszer vitte fel az időt (Most gomb), az adott panel élő frissítése végleg
+    // leállt, amíg a felhasználó nem kattintott valahova az űrlapon kívülre.
+    // Ezért nem a fókuszt nézzük, hanem azt, van-e TÉNYLEGES mentetlen módosítás.
+    const ELO_FORMOK = ['verseny-form-container', 'beerkeztetes-form', 'orvosi-ido-form', 'orvosi-form'];
+    const formDirty = {};
     let liveVets = [];
     // speedThresholds[dist] = { min, max } km/h, mindkettő opcionális (üres = nincs figyelve az a határ).
     // min: ez alatt időtúllépés (OT) kockázat. max: efölött sebesség miatti kiesés (SP) kockázat, 139. § (2).
@@ -578,36 +587,23 @@
             }
 
             if(document.getElementById('fo-mod').classList.contains('active') && document.getElementById('verseny').style.display === 'block') {
+                // Csak az ŰRLAPOT nézzük, nem az egész fület, és a fókusz helyett a
+                // mentetlen módosítást: a gombok (Most / Mentés) nem blokkolják a
+                // frissítést, csak a ténylegesen beírt, még el nem mentett adat.
                 const selectedBib = document.getElementById('selectCompetitor').value;
-                const activeEl = document.activeElement;
-                // Csak az ŰRLAPOT nézzük, nem az egész fület. A versenyző-választó
-                // legördülő és a kereső a fülön belül, de az űrlapon KÍVÜL van
-                // (index.html: selectCompetitor a verseny-form-container előtt),
-                // és kiválasztás után rajta marad a fókusz - emiatt az élő
-                // frissítés gyakorlatilag soha nem futott le, és újra kellett
-                // tölteni az oldalt. (Ugyanez a szűkebb ellenőrzés van a
-                // switchSubMode-ban és a refreshVersenyTabIfNeeded-ben is.)
-                const formCont = document.getElementById('verseny-form-container');
-                const formContainsFocus = activeEl && formCont && formCont.contains(activeEl);
-                if (selectedBib && !formContainsFocus) { loadCompetitorData(); }
+                if (selectedBib && !isFormDirty('verseny-form-container')) { loadCompetitorData(); }
             }
             if(document.getElementById('beerkeztetes-mod').classList.contains('active')) {
                 const selectedBib = document.getElementById('sel-beerkeztetes').value;
-                const activeEl = document.activeElement;
-                const formContainsFocus = activeEl && document.getElementById('beerkeztetes-form').contains(activeEl);
-                if (selectedBib && !formContainsFocus) { loadBeerkeztetesData(); }
+                if (selectedBib && !isFormDirty('beerkeztetes-form')) { loadBeerkeztetesData(); }
             }
             if(document.getElementById('orvosi-ido-mod').classList.contains('active')) {
                 const selectedBib = document.getElementById('sel-orvosi-ido').value;
-                const activeEl = document.activeElement;
-                const formContainsFocus = activeEl && document.getElementById('orvosi-ido-form').contains(activeEl);
-                if (selectedBib && !formContainsFocus) { loadOrvosiIdoData(); }
+                if (selectedBib && !isFormDirty('orvosi-ido-form')) { loadOrvosiIdoData(); }
             }
             if(document.getElementById('orvosi-mod').classList.contains('active')) {
                 const selectedBib = document.getElementById('sel-orvosi').value;
-                const activeEl = document.activeElement;
-                const formContainsFocus = activeEl && document.getElementById('orvosi-form').contains(activeEl);
-                if (selectedBib && !formContainsFocus) { loadOrvosiData(); }
+                if (selectedBib && !isFormDirty('orvosi-form')) { loadOrvosiData(); }
             }
         });
 
@@ -811,10 +807,7 @@
 
         if (mode === 'verseny') {
             const selectedBib = document.getElementById('selectCompetitor').value;
-            const activeEl = document.activeElement;
-            const formCont = document.getElementById('verseny-form-container');
-            const formContainsFocus = activeEl && formCont && formCont.contains(activeEl);
-            if (selectedBib && !formContainsFocus) {
+            if (selectedBib && !isFormDirty('verseny-form-container')) {
                 loadCompetitorData();
             }
         }
@@ -825,10 +818,7 @@
         if (!versenyTab || versenyTab.style.display !== 'block') return;
         const selectedBib = document.getElementById('selectCompetitor').value;
         if (!selectedBib || selectedBib !== bib) return;
-        const activeEl = document.activeElement;
-        const formCont = document.getElementById('verseny-form-container');
-        const formContainsFocus = activeEl && formCont && formCont.contains(activeEl);
-        if (!formContainsFocus) {
+        if (!isFormDirty('verseny-form-container')) {
             loadCompetitorData();
         }
     }
@@ -1981,13 +1971,33 @@
         const cfg = config[baseDist] || { h:'', m:'', s:'', laps:[] };
         let expectedLaps = cfg.laps ? cfg.laps.length : 1;
         let rajt = toSec(comp.startTime?.h || cfg.h, comp.startTime?.m || cfg.m, comp.startTime?.s || cfg.s);
-        if (rajt === 0) return comp;
-        
+        if (!comp.laps) comp.laps = [];
+
+        // Ha sehol nincs rajtidő (sem a versenyzőnél, sem a kiírásban), korábban itt
+        // azonnal kiléptünk. Emiatt a Beérkeztetés / Orvosi idő panelen felvitt idő
+        // MENTŐDÖTT, de egyetlen származtatott érték sem készült el (arrSec, vetSec,
+        // isComplete, pulzusSec), és az adatlap üresen maradt - úgy tűnt, mintha nem
+        // frissülne. Rajtidő nélkül a kör-/összidő és a sebesség tényleg nem
+        // számolható, de a rögzített időket és a pulzusidőt ki tudjuk tölteni.
+        if (rajt === 0) {
+            for (let i = 0; i < expectedLaps; i++) {
+                let l = comp.laps[i] || { h:'', m:'', s:'', oh:'', om:'', os:'' };
+                l.d = parseFloat(l.d) || parseFloat(cfg.laps[i]) || 0;
+                const arr = toSec(l.h, l.m, l.s);
+                const vet = toSec(l.oh, l.om, l.os);
+                l.startSec = 0;
+                l.arrSec = arr;
+                l.vetSec = vet;
+                l.isComplete = false; // rajtidő nélkül nincs értékelhető kör
+                l.pulzusSec = (arr > 0 && vet > 0) ? rollApply(vet - arr, 'pulzus') : 0;
+                comp.laps[i] = l;
+            }
+            return comp;
+        }
+
         let curStart = rajt;
         let totalPure = 0;
         let totalD = 0;
-        if (!comp.laps) comp.laps = [];
-        
         for (let i = 0; i < expectedLaps; i++) {
             let l = comp.laps[i] || { h:'', m:'', s:'', oh:'', om:'', os:'' };
             l.d = parseFloat(l.d) || parseFloat(cfg.laps[i]) || 0;
@@ -1998,7 +2008,14 @@
             l.arrSec = arr;
             l.vetSec = vet;
             l.isComplete = (l.d > 0 && arr > 0);
-            if (!l.isComplete) { comp.laps[i] = l; continue; }
+            if (!l.isComplete) {
+                // A pulzusidő nem függ a körtávtól, csak a két rögzített időponttól -
+                // ezért akkor is kiszámoljuk, ha a kör a hiányzó körtáv miatt még nem
+                // "teljes" (különben az adatlapon és a legjobb pulzusidőnél elveszne).
+                l.pulzusSec = (arr > 0 && vet > 0) ? rollApply(vet - arr, 'pulzus') : 0;
+                comp.laps[i] = l;
+                continue;
+            }
             
             let loopTime = rollApply(arr - curStart, 'loop');
 
@@ -2057,7 +2074,7 @@
     function loadBeerkeztetesData() {
         const bib = document.getElementById('sel-beerkeztetes').value;
         const form = document.getElementById('beerkeztetes-form');
-        if(!bib) { form.style.display = 'none'; return; }
+        if(!bib) { form.style.display = 'none'; setFormDirty('beerkeztetes-form', false); return; }
         
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
@@ -2071,6 +2088,7 @@
         document.getElementById('bk-s').value = l.s || '';
         
         form.style.display = 'block';
+        setFormDirty('beerkeztetes-form', false); // frissen betöltve: nincs mentetlen módosítás
     }
 
     function saveBeerkeztetesData() {
@@ -2095,6 +2113,7 @@
             document.getElementById('sel-beerkeztetes').value = '';
             document.getElementById('bk-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
             document.getElementById('beerkeztetes-form').style.display = 'none';
+            setFormDirty('beerkeztetes-form', false); // elmentve -> jöhet megint az élő frissítés
             refreshVersenyTabIfNeeded(bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
@@ -2103,7 +2122,7 @@
     function loadOrvosiIdoData() {
         const bib = document.getElementById('sel-orvosi-ido').value;
         const form = document.getElementById('orvosi-ido-form');
-        if(!bib) { form.style.display = 'none'; renderWarningBanner('orv-ido-recovery-warning', null); return; }
+        if(!bib) { form.style.display = 'none'; setFormDirty('orvosi-ido-form', false); renderWarningBanner('orv-ido-recovery-warning', null); return; }
         
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
@@ -2125,6 +2144,7 @@
         document.getElementById('bk-v-s').value = l.os || '';
 
         form.style.display = 'block';
+        setFormDirty('orvosi-ido-form', false); // frissen betöltve: nincs mentetlen módosítás
         checkOrvosiIdoRecovery();
     }
 
@@ -2148,6 +2168,7 @@
             document.getElementById('sel-orvosi-ido').value = '';
             document.getElementById('oi-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
             document.getElementById('orvosi-ido-form').style.display = 'none';
+            setFormDirty('orvosi-ido-form', false); // elmentve -> jöhet megint az élő frissítés
             refreshVersenyTabIfNeeded(bib);
         }).catch(e => showToast("Hiba: " + e.message, true));
     }
@@ -2312,6 +2333,7 @@
         renderExtraCodesCheckboxes(comp.extraCodes);
 
         form.style.display = 'block';
+        setFormDirty('orvosi-form', false); // frissen betöltve: nincs mentetlen módosítás
         checkPulseWarning();
     }
 
@@ -2357,6 +2379,7 @@
         if (h) h.value = String(n.getHours()).padStart(2, '0');
         if (m) m.value = String(n.getMinutes()).padStart(2, '0');
         if (s) s.value = String(n.getSeconds()).padStart(2, '0');
+        markFormDirtyFor(h || m || s);
     }
 
     function setRecheckNow() {
@@ -2507,6 +2530,7 @@
             return result;
         }).then(() => {
             showAnimatedBtn('btn-orv-mentes');
+            setFormDirty('orvosi-form', false); // elmentve -> jöhet megint az élő frissítés
             setTimeout(() => {
                 document.getElementById('sel-orvosi').value = '';
                 document.getElementById('orv-bibInput').value = '';
@@ -3202,6 +3226,7 @@
             document.getElementById(`voh${idx}`).value = l.oh || ''; document.getElementById(`vom${idx}`).value = l.om || ''; document.getElementById(`vos${idx}`).value = l.os || '';
         }
         
+        setFormDirty('verseny-form-container', false); // frissen betöltve: nincs mentetlen módosítás
         calcVerseny(false);
     }
 
@@ -3378,11 +3403,28 @@
                 delete result._timeWarnings; // ideiglenes, kijelzésre való - nem mentjük el
                 return result;
             });
+            setFormDirty('verseny-form-container', false); // elmentve -> jöhet megint az élő frissítés
             showAnimatedBtn('btn-kiertel-mentes');
         }
     }
     // --- ALAPOK ÉS SEGÉDFÜGGVÉNYEK ---
     function jump(c, n) { if (c.value.length >= 2) { const e = document.getElementById(n); if(e) e.focus(); } }
+
+    // --- ÉLŐ PANELEK: MENTETLEN MÓDOSÍTÁS (l. a formDirty megjegyzését fent) ---
+    function setFormDirty(formId, dirty) { formDirty[formId] = !!dirty; }
+    function isFormDirty(formId) { return !!formDirty[formId]; }
+    // Egy elemhez tartozó élő űrlapot jelöli módosítottnak. Azért kell külön hívni a
+    // "Most" gombnál is, mert az programból írja a mezőket, a programból állított
+    // .value pedig nem vált ki input eseményt.
+    function markFormDirtyFor(el) {
+        if (!el) return;
+        ELO_FORMOK.forEach(id => {
+            const f = document.getElementById(id);
+            if (f && f.contains(el)) formDirty[id] = true;
+        });
+    }
+    // Gépelés / választás az űrlapon belül -> mentetlen módosítás.
+    ['input', 'change'].forEach(ev => document.addEventListener(ev, e => markFormDirtyFor(e.target), true));
     
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName.toLowerCase() === 'input') {
