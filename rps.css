@@ -1009,6 +1009,10 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 .eredmeny-indulok { font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
 .eredmeny-jobb-oszlop { text-align: right; font-size: 0.82rem; color: var(--text-dim); }
 .eredmeny-partner { color: var(--text); font-weight: 700; }
+/* A helyezésért kapott bajnoki pont (III. melléklet) a profil-kártyán */
+.eredmeny-pont { color: var(--primary); font-weight: 800; margin-top: 2px; }
+.eredmeny-pont.nulla { color: var(--text-dim-2); font-weight: 600; }
+.eredmeny-pont-reszlet { color: var(--text-dim); font-weight: 600; font-size: 0.75rem; }
 
 .hely-1 { color: var(--arany); }
 .hely-2 { color: var(--ezust); }

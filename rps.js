@@ -122,6 +122,11 @@
     // lehessen bővíteni. Csökkenő táv szerint, a junior változat a felnőtt párja után.
     const DIST_ORDER = ["160", "140", "120", "100", "80", "60", "40", "20"];
 
+    // Az összes nevezhető kategória (junior változattal együtt), csökkenő táv szerint. Helyezés-
+    // számítás, adatlap-lista és sebességhatár mind ebből dolgozik - korábban mindegyik saját,
+    // 100 km-nél megálló listát használt, így egy 120-160 km-es versenyző sosem kapott helyezést.
+    const ALL_CATS = ["160", "140", "120", "120j", "100", "100j", "80", "80j", "60", "40", "20"];
+
     // A körszám a max. 40 km-es körhossz szabályt tartja (48. § (2)).
     function getEmptyRaceConfig() {
         return {
@@ -144,6 +149,32 @@
     // --- LÓ- ÉS LOVAS-TÖRZSADAT (docs/lo-lovas-integracio.md, P1/2) ---
     function sanitizeKey(s) {
         return String(s).trim().replace(/[.#$\[\]]/g, '_');
+    }
+
+    // Nevezéskor a ló/lovas törzsadat frissítése MEZŐSZINTŰ útvonalakkal. Korábban a teljes
+    // riders/{igazolás} és horses/{start szám} rekordot írtuk felül {név, klub, ...}-bal, ami a
+    // multi-path update miatt KITÖRÖLTE a szövetségi adatokat (FEI szám, edző, minősítő pont,
+    // "foreign" jelző...) - így lett üres pl. Bukor Barbara adatlapja, és így került be egy
+    // külföldi a magyar bajnokságba. Üres mezővel nem írunk felül meglévő értéket.
+    function torzsFrissitesek(startNum, loNev, license, lovasNev, club) {
+        const u = {};
+        const most = Date.now();
+        const sn = String(startNum || '').trim();
+        const lic = String(license || '').trim();
+        if (sn) {
+            const p = 'horses/' + sanitizeKey(sn) + '/';
+            u[p + 'startNum'] = sn;
+            u[p + 'updatedAt'] = most;
+            if (String(loNev || '').trim()) u[p + 'name'] = String(loNev).trim();
+        }
+        if (lic) {
+            const p = 'riders/' + sanitizeKey(lic) + '/';
+            u[p + 'license'] = lic;
+            u[p + 'updatedAt'] = most;
+            if (String(lovasNev || '').trim()) u[p + 'name'] = String(lovasNev).trim();
+            if (String(club || '').trim()) u[p + 'club'] = String(club).trim();
+        }
+        return u;
     }
 
     // (A fázis 1-2 egyszeri adatjavítás/migráció lefutott és leellenőrzésre került - 47 lovas, 53 ló,
@@ -1569,19 +1600,15 @@
         
         if (modalEditingBib && modalEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove(); }
 
+        // A régi rekord MINDEN mezője megmarad (obPont, kézi helyezés, finishOrder, ...) - korábban
+        // csak a startTime/laps/isEliminated jött át, a többit egy egyszerű névjavítás is törölte.
         let existingData = { startTime: { h: '', m: '', s: '' }, laps: [], isEliminated: false };
         const targetBib = modalEditingBib ? modalEditingBib : bib;
         const oldComp = modalCompetitors.find(c => c.bib == targetBib);
-        if (oldComp) {
-            existingData.startTime = oldComp.startTime || existingData.startTime;
-            existingData.laps = oldComp.laps || [];
-            existingData.isEliminated = oldComp.isEliminated || false;
-        }
+        if (oldComp) existingData = Object.assign(existingData, oldComp);
 
-        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz)
-        const horseRiderUpdates = {};
-        if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
-        if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
+        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - mezőszinten, l. torzsFrissitesek()
+        const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
         if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
 
         // Tranzakció: ha a célhelyen (ez a bib) időközben már van szerver-oldali adat (laps/startTime),
@@ -1589,7 +1616,8 @@
         db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).transaction(currentComp => {
             const base = currentComp || existingData;
             return {
-                bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club,
+                ...base,
+                bib: bib, name: name.trim(), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
                 startTime: base.startTime || { h: '', m: '', s: '' },
                 laps: base.laps || [],
                 isEliminated: base.isEliminated || false,
@@ -1703,17 +1731,18 @@
         if (modalGyorsEditingBib && modalGyorsEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalGyorsEditingBib).remove(); }
 
         // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - ugyanaz a minta, mint a normál nevezésnél.
-        const horseRiderUpdates = {};
-        if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
-        if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
+        const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
         if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
 
+        // A set() a teljes rekordot cseréli - az OB-pontról való lemondás (obPont: false) ne vesszen el egy javítással.
+        const regiGyors = modalCompetitors.find(c => c.bib == (modalGyorsEditingBib || bib));
         const compData = {
-            bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club,
+            bib: bib, name: name.trim(), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
             status: status, isEliminated: status !== 'Active',
             manualEntry: true,
             manualPlace: isNaN(place) ? null : place,
             totalTimeSec: timeSec > 0 ? timeSec : null,
+            obPont: regiGyors && regiGyors.obPont === false ? false : null,
             laps: []
         };
 
@@ -3012,7 +3041,7 @@
     function renderSpeedThresholds() {
         const cont = document.getElementById('speedThresholdContainer');
         if (!cont) return;
-        const dists = ["20", "40", "60", "80", "80j", "100", "100j"];
+        const dists = ALL_CATS.slice().reverse();
         let html = `<div class="speed-threshold-head"><span>Táv</span><span>Minimum</span><span>Maximum</span></div>`;
         dists.forEach(d => {
             const t = speedThresholds[d] || {};
@@ -3068,19 +3097,14 @@
 
         if (editingBib && editingBib !== bib) { db.ref('competitors/' + editingBib).remove(); }
 
+        // A régi rekord MINDEN mezője megmarad (obPont, finishOrder, ...) - l. saveRmCompetitor().
         let existingData = { startTime: { h: '', m: '', s: '' }, laps: [], isEliminated: false };
         const targetBib = editingBib ? editingBib : bib;
         const oldComp = competitors.find(c => c.bib == targetBib);
-        if (oldComp) {
-            existingData.startTime = oldComp.startTime || existingData.startTime;
-            existingData.laps = oldComp.laps || [];
-            existingData.isEliminated = oldComp.isEliminated || false;
-        }
+        if (oldComp) existingData = Object.assign(existingData, oldComp);
 
-        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - a nevezés csak egy pillanatfelvétel innentől
-        const horseRiderUpdates = {};
-        if (startNum) horseRiderUpdates['horses/' + sanitizeKey(startNum)] = { startNum: startNum, name: internal.trim(), updatedAt: Date.now() };
-        if (license)  horseRiderUpdates['riders/' + sanitizeKey(license)]  = { license: license, name: name.trim(), club: club, updatedAt: Date.now() };
+        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - mezőszinten, l. torzsFrissitesek()
+        const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
         if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
 
         // Tranzakció: ha a célhelyen (ez a bib) időközben már van szerver-oldali adat (laps/startTime,
@@ -3088,7 +3112,8 @@
         db.ref('competitors/' + bib).transaction(currentComp => {
             const base = currentComp || existingData;
             return {
-                bib: bib, name: name, dist: dist, internal: internal, startNum: startNum, license: license, club: club,
+                ...base,
+                bib: bib, name: name.trim(), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
                 startTime: base.startTime || { h: '', m: '', s: '' },
                 laps: base.laps || [],
                 isEliminated: base.isEliminated || false,
@@ -3876,7 +3901,7 @@
 
     function calculateCurrentRanks(comps, config) {
         let ranksInfo = {};
-        ["20", "40", "60", "80", "80j", "100", "100j"].forEach(dist => {
+        ALL_CATS.forEach(dist => {
             let catComps = comps.filter(c => c.dist === dist);
             catComps.sort((a, b) => {
                 if (a.isEliminated && !b.isEliminated) return 1;
@@ -3950,7 +3975,7 @@
     // kategóriába is át kell tudni váltani.
     function getActiveCategories(comps, config, includeEmpty = false) {
         let active = [];
-        ["100", "100j", "80", "80j", "60", "40", "20"].forEach(d => {
+        ALL_CATS.forEach(d => {
             let hasComp = comps.some(c => c.dist === d);
             let baseDist = d.replace('j','');
             let hasConfig = config[baseDist] && config[baseDist].h !== '';
@@ -4845,10 +4870,12 @@
                 if (!baseDist) return;
                 const rInfo = ranks[c.bib];
                 const place = (!c.isEliminated && rInfo && typeof rInfo.rank === 'number') ? rInfo.rank : null;
+                // trim(): régi felvitelekben sok név/klub végén szóköz vagy tab maradt ("PANNOVA HORSES Kft.\t"),
+                // ami a klub-bontásban külön egyesületnek, a listában furcsa névnek látszott.
                 rows.push({
                     raceId: race.id, raceDate: race.date || '', raceName: race.name, isObRound: race.isObRound !== false,
-                    bib: c.bib, name: c.name, license: c.license || '', club: c.club || '',
-                    startNum: c.startNum || '', horseName: c.internal || '',
+                    bib: c.bib, name: String(c.name || '').trim(), license: String(c.license || '').trim(), club: String(c.club || '').trim(),
+                    startNum: String(c.startNum || '').trim(), horseName: String(c.internal || '').trim(),
                     dist: c.dist, km: parseInt(baseDist, 10),
                     completedKm: getCompletedKm(c, cfg), place: place, isEliminated: !!c.isEliminated,
                     status: c.status || (c.isEliminated ? 'FTQ-ME' : 'Active'), extraCodes: c.extraCodes || [],
@@ -4985,16 +5012,23 @@
     function profilSajatEredmenyek() {
         const { tipus, id } = profilAllapot;
         const sorok = tipus === 'lovas' ? getRiderHistory(id) : getHorseHistory(id);
-        return sorok.map(r => ({
-            ev: (r.raceDate || '').slice(0, 4),
-            datum: r.raceDate, verseny: r.raceName, alcim: catNames[r.dist] || r.dist, szint: '',
-            hely: r.place, indulok: null, kiesett: r.isEliminated,
-            statuszSzoveg: getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes }),
-            partnerNev: tipus === 'lovas' ? r.horseName : r.name,
-            partnerId: tipus === 'lovas' ? r.startNum : r.license,
-            ido: '', sebesseg: null, minPont: null, buntetes: null,
-            raceId: r.raceId, dist: r.dist, kmKulcs: r.km
-        }));
+        const renumbered = renumberWithoutForeign(getAllPastRaceRows());
+        const cache = {};
+        return sorok.map(r => {
+            // A helyezésért ténylegesen kapott bajnoki pont (lónál a lovasa kapta) - l. getObPontInfo()
+            const ob = getObPontInfo(r, renumbered, cache);
+            return {
+                ev: (r.raceDate || '').slice(0, 4),
+                datum: r.raceDate, verseny: r.raceName, alcim: catNames[r.dist] || r.dist, szint: '',
+                hely: r.place, indulok: null, kiesett: r.isEliminated,
+                statuszSzoveg: getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes }),
+                partnerNev: tipus === 'lovas' ? r.horseName : r.name,
+                partnerId: tipus === 'lovas' ? r.startNum : r.license,
+                ido: '', sebesseg: null, buntetes: null,
+                obPont: ob.points, obHely: ob.place, obOsztaly: ob.classKey, obMegj: ob.note,
+                raceId: r.raceId, dist: r.dist, kmKulcs: r.km
+            };
+        });
     }
 
     function profilHivatalosEredmenyek() {
@@ -5010,14 +5044,20 @@
             // a 2023-2026-os importban lovasnál horseName/horseId, lónál riderName/license.
             const partnerNev = e.partnerName || (tipus === 'lovas' ? e.horseName : e.riderName) || '';
             const partnerAzon = e.partnerId || (tipus === 'lovas' ? e.horseId : e.license) || '';
+            // Olyan versenynél, ami nincs a saját rendszerünkben (pl. 2025 előtti), a III. melléklet
+            // szerinti, a hivatalos helyezéshez tartozó pontot mutatjuk. A szövetség "minPoints"
+            // mezője (minősítő pont) más képlettel készül, azt szándékosan nem írjuk ki.
+            const km = parseFloat(e.distanceKm) || 0;
+            const tablazatPont = (helySzam && !e.status && getPointBand(km)) ? getPoints(getPointBand(km), helySzam) : null;
             return {
+                obPont: tablazatPont, obHely: helySzam, obMegj: '', obTablazat: true,
                 ev: e.year || (e.date || '').slice(0, 4),
                 datum: (e.date || '').replace(/\//g, '-'), verseny: e.event, alcim: alcim, szint: e.level || '',
                 hely: helySzam, indulok: e.starters, kiesett: !!e.status,
                 statuszSzoveg: [e.status, e.note && e.note !== '0' ? e.note : ''].filter(Boolean).join(' · '),
                 partnerNev: profilPartnerNev(partnerNev), partnerId: partnerAzon,
                 ido: e.time && /^\d/.test(e.time) ? e.time : '', sebesseg: null,
-                minPont: e.minPoints, buntetes: e.penalty, raceId: null, dist: null,
+                buntetes: e.penalty, raceId: null, dist: null,
                 kmKulcs: parseFloat(e.distanceKm) || null
             };
         });
@@ -5038,7 +5078,7 @@
                 partnerNev: e.horseName, partnerId: e.horseStartNum,
                 ido: e.score && /^\d+:\d/.test(e.score) ? e.score : (e.rideTime || ''),
                 sebesseg: e.avgSpeed || (e.score && /^\d+[.,]\d+$/.test(String(e.score)) ? e.score : null),
-                minPont: null, buntetes: null, raceId: null, dist: null,
+                obPont: null, buntetes: null, raceId: null, dist: null,
                 km: e.distanceKm
             }));
     }
@@ -5068,7 +5108,7 @@
             // Kiegészítés, nem felülírás: ami a saját adatban megvan, az marad.
             if (par.indulok == null) par.indulok = h.indulok;
             if (!par.ido) par.ido = h.ido;
-            if (par.minPont == null || par.minPont === '') par.minPont = h.minPont;
+            // A bajnoki pont mindig a saját számításból jön (obPont), a hivatalosból nem vesszük át.
             if (!par.buntetes || par.buntetes === '0') par.buntetes = h.buntetes;
             if (!par.szint) par.szint = h.szint;
             if (!par.partnerNev) { par.partnerNev = h.partnerNev; par.partnerId = h.partnerId; }
@@ -5103,9 +5143,19 @@
         const also = [];
         if (r.ido) also.push(escapeHtml(r.ido));
         if (r.sebesseg) also.push(escapeHtml(r.sebesseg) + ' km/h');
-        if (r.minPont !== null && r.minPont !== undefined && r.minPont !== '') also.push('min.pont ' + escapeHtml(r.minPont));
         if (r.buntetes) also.push('büntető ' + escapeHtml(r.buntetes));
         if (r.km) also.push(escapeHtml(r.km) + ' km');
+
+        // A helyezésért kapott bajnoki pont (III. melléklet) - a régi "min.pont" helyén.
+        let pontHtml = '';
+        if (r.obPont > 0) {
+            const osztaly = r.obOsztaly ? CHAMPIONSHIP_CLASSES[r.obOsztaly].label.replace('Magyar ', '').replace(' Bajnokság', ' OB') : '';
+            const masHely = r.obHely != null && r.hely != null && r.obHely !== r.hely ? `OB-hely: ${r.obHely}.` : '';
+            const reszlet = r.obTablazat ? 'III. melléklet' : [osztaly, masHely].filter(Boolean).join(' · ');
+            pontHtml = `<div class="eredmeny-pont">🏆 ${escapeHtml(r.obPont)} pont${reszlet ? ` <span class="eredmeny-pont-reszlet">(${escapeHtml(reszlet)})</span>` : ''}</div>`;
+        } else if (r.obMegj) {
+            pontHtml = `<div class="eredmeny-pont nulla">0 pont <span class="eredmeny-pont-reszlet">(${escapeHtml(r.obMegj)})</span></div>`;
+        }
 
         return `<div class="eredmeny-kartya">
             <div class="eredmeny-fej">
@@ -5122,6 +5172,7 @@
                 </div>
                 <div class="eredmeny-jobb-oszlop">
                     ${partnerHtml ? `<div class="eredmeny-partner">${partnerHtml}</div>` : ''}
+                    ${pontHtml}
                     ${also.length ? `<div>${also.join(' · ')}</div>` : ''}
                 </div>
             </div>
@@ -5324,14 +5375,31 @@
         `).join('');
     }
 
-    // A riders/{license}.foreign mezőt használja (l. IMPORT_FELADAT_v3.md) - a "K" előtag
-    // ÖNMAGÁBAN NEM külföldiség-jelző, magyar versenyzők is kaphatnak nemzetközi (CEI) K-számot.
-    // Ha a lovas nincs a törzsben, alapból magyarnak vesszük (nem zárjuk ki hiba miatt).
     // Az egyéni bajnokság kizárólag a magyar versenyzőknek szól, még ha egy külföldi vendég be is
-    // fut egy hazai OB-fordulón.
-    function isForeignLicense(license) {
+    // fut egy hazai OB-fordulón. Döntési sorrend:
+    //  1. a riders/{license}.foreign jelző, ha ki van töltve (a szövetségi szinkronból jön - pl. az
+    //     argentin, de magyar licences Jarenko Denis foreign: false, tehát ő magyar);
+    //  2. ha nincs jelző (új, még nem szinkronizált lovas, vagy a régi mentési hiba törölte -
+    //     így került be Mishari Almuamar a bajnokságba): a klub helyén álló 3 betűs országkód
+    //     (AUT, CRO, KSA...), vagy K-betűs igazolási szám, ami nincs a szövetségi adatbázisban.
+    //     A K előtag önmagában NEM elég, magyar versenyző is kaphat nemzetközi (CEI) K-számot -
+    //     ezért csak akkor számít, ha a lovasnak nincs szövetségi (siteSyncedAt) adata.
+    // A jelzőt az admin a Versenyző pontkeresőben kézzel is átállíthatja (toggleForeign).
+    function isForeignLicense(license, club) {
         const rider = ridersCache[sanitizeKey(license || '')];
-        return !!(rider && rider.foreign);
+        if (rider && typeof rider.foreign === 'boolean') return rider.foreign;
+        const klub = String(club || (rider && rider.club) || '').trim();
+        if (/^[A-Z]{3}$/.test(klub) && klub !== 'HUN') return true;
+        if (/^K\d/i.test(String(license || '').trim()) && !(rider && rider.siteSyncedAt)) return true;
+        return false;
+    }
+
+    function toggleForeign(license) {
+        const most = isForeignLicense(license);
+        db.ref('riders/' + sanitizeKey(license) + '/foreign').set(!most).then(() => {
+            showToast(!most ? '🌍 Külföldinek jelölve - kimarad a magyar bajnokságból' : '🇭🇺 Magyarnak jelölve - beszámít a magyar bajnokságba');
+            openRiderPointsBreakdown(license);
+        }).catch(e => showToast('Hiba: ' + e.message, true));
     }
 
     // A hivatalos bajnoki táblázat a külföldiek kihagyása UTÁN újraszámozza a mezőnyt versenyen +
@@ -5352,9 +5420,24 @@
         Object.values(byRaceCat).forEach(list => {
             list.sort((a, b) => a.place - b.place);
             let n = 0;
-            list.forEach(r => { if (!isForeignLicense(r.license)) out.set(r.raceId + '|' + r.bib, ++n); });
+            list.forEach(r => { if (!isForeignLicense(r.license, r.club)) out.set(r.raceId + '|' + r.bib, ++n); });
         });
         return out;
+    }
+
+    // 174. § (2) holtverseny-szabály: pontegyenlőségnél az előrébb, aki több km-t teljesített
+    // eredményesen, utána akinek a pontjai magasabb kategóriájú (hosszabb) versenyről jöttek. Ha
+    // ez sem dönt, holtverseny: azonos helyezés, az utánuk következő hely betöltetlen marad.
+    const SAV_RANG = { band40_49: 1, band50_79: 2, band80_99: 3, band100_119: 4, band120_139: 5, band140_160: 6 };
+
+    function rangsorol(lista) {
+        lista.sort((a, b) => (b.totalPoints - a.totalPoints) || ((b.totalKm || 0) - (a.totalKm || 0)) || ((b.legjobbSav || 0) - (a.legjobbSav || 0)));
+        lista.forEach((r, i) => {
+            const elozo = lista[i - 1];
+            const holtverseny = elozo && elozo.totalPoints === r.totalPoints && (elozo.totalKm || 0) === (r.totalKm || 0) && (elozo.legjobbSav || 0) === (r.legjobbSav || 0);
+            r.rank = holtverseny ? elozo.rank : i + 1;
+        });
+        return lista;
     }
 
     // --- 1. EGYÉNI BAJNOKSÁG (3 osztály, "legkorábban nevezett N ló" szabály + 174.§(3) dedup) ---
@@ -5367,15 +5450,19 @@
         const win = getChampionshipWindow(year);
         const allRows = getAllPastRaceRows();
         const renumbered = renumberWithoutForeign(allRows);
-        const rows = allRows.filter(r =>
-            r.isObRound && cls.distKeys.includes(r.dist) && r.obPont && r.place != null && isDateInWindow(r.raceDate, win) && !isForeignLicense(r.license)
+        // Minden OB-NEVEZÉS ebben az osztályban - a kiesettek is. A 175. § szerint "az időben
+        // legkorábban benevezett két ló" számít, vagyis egy kiesett rajt is "elhasznál" egy lóhelyet;
+        // korábban csak a helyezést elért rajtokból választottunk lovat, így egy 3. ló is pontot hozhatott.
+        // Az OB-pontról lemondott rajt (obPont: false) nem OB-nevezés, az nem foglal lóhelyet.
+        const entries = allRows.filter(r =>
+            r.isObRound && cls.distKeys.includes(r.dist) && r.obPont && isDateInWindow(r.raceDate, win) && !isForeignLicense(r.license, r.club)
         ).map(r => {
-            const newPlace = renumbered.get(r.raceId + '|' + r.bib);
+            const newPlace = r.place != null ? renumbered.get(r.raceId + '|' + r.bib) : null;
             return newPlace != null ? Object.assign({}, r, { place: newPlace }) : r;
         });
 
         const byRider = {};
-        rows.forEach(r => {
+        entries.forEach(r => {
             const key = r.license || ('bib:' + r.bib + ':' + r.name);
             if (!byRider[key]) byRider[key] = { license: r.license, name: r.name, club: r.club, results: [] };
             byRider[key].results.push(r);
@@ -5383,7 +5470,7 @@
             if (r.club) byRider[key].club = r.club;
         });
 
-        const riders = Object.values(byRider).map(rider => {
+        const riders = Object.values(byRider).filter(rider => rider.results.some(r => r.place != null)).map(rider => {
             const byHorse = {};
             rider.results.forEach(r => {
                 const hKey = r.startNum || ('horse:' + r.horseName);
@@ -5393,13 +5480,13 @@
             });
             const horsesSorted = Object.values(byHorse).sort((a, b) => (a.firstDate || '').localeCompare(b.firstDate || ''));
             const usedHorses = horsesSorted.slice(0, cls.maxHorses);
-            const excludedHorseCount = horsesSorted.length - usedHorses.length;
+            const excludedHorseCount = horsesSorted.slice(cls.maxHorses).filter(h => h.results.some(r => r.place != null)).length;
 
-            let totalPoints = 0;
+            let totalPoints = 0, totalKm = 0, legjobbSav = 0;
             const horseBreakdown = usedHorses.map(h => {
                 // 174. § (3): azonos verseny, azonos táv-kategória két futamánál csak a jobbik pont számít
                 const byRaceCat = {};
-                h.results.forEach(r => {
+                h.results.filter(r => r.place != null).forEach(r => {
                     const rcKey = r.raceId + '|' + r.dist;
                     const pts = getPoints(getPointBand(r.completedKm), r.place);
                     if (!byRaceCat[rcKey] || pts > byRaceCat[rcKey].points) byRaceCat[rcKey] = Object.assign({ points: pts }, r);
@@ -5407,14 +5494,19 @@
                 const dedupedResults = Object.values(byRaceCat).sort((a, b) => (a.raceDate || '').localeCompare(b.raceDate || ''));
                 const horsePoints = dedupedResults.reduce((s, r) => s + r.points, 0);
                 totalPoints += horsePoints;
+                dedupedResults.forEach(r => {
+                    totalKm += r.completedKm || 0;
+                    if (r.points > 0) legjobbSav = Math.max(legjobbSav, SAV_RANG[getPointBand(r.completedKm)] || 0);
+                });
                 return { startNum: h.startNum, horseName: h.horseName, points: horsePoints, results: dedupedResults };
-            });
+            }).filter(h => h.results.length);
 
-            return { license: rider.license, name: rider.name, club: rider.club, totalPoints, horses: horseBreakdown, excludedHorseCount };
+            // A hivatalos (szövetségi) név az elsődleges - a nevezésben előfordul elírás.
+            const torzsNev = rider.license && (ridersCache[sanitizeKey(rider.license)] || {}).name;
+            return { license: rider.license, name: torzsNev || rider.name, club: rider.club, totalPoints, totalKm: Math.round(totalKm * 100) / 100, legjobbSav, horses: horseBreakdown, excludedHorseCount };
         });
 
-        riders.sort((a, b) => b.totalPoints - a.totalPoints);
-        return riders;
+        return rangsorol(riders);
     }
 
     // Összesített nézet: mindhárom bajnoki osztály eredményét egyetlen ranglistába vonja össze
@@ -5425,14 +5517,70 @@
         Object.keys(CHAMPIONSHIP_CLASSES).forEach(classKey => {
             computeIndividualChampionship(classKey, year).forEach(r => {
                 const key = r.license || r.name;
-                if (!merged[key]) merged[key] = { license: r.license, name: r.name, club: r.club, totalPoints: 0, classBreakdown: [] };
+                if (!merged[key]) merged[key] = { license: r.license, name: r.name, club: r.club, totalPoints: 0, totalKm: 0, legjobbSav: 0, classBreakdown: [] };
                 merged[key].totalPoints += r.totalPoints;
+                merged[key].totalKm += r.totalKm || 0;
+                merged[key].legjobbSav = Math.max(merged[key].legjobbSav, r.legjobbSav || 0);
                 if (r.name) merged[key].name = r.name;
                 if (r.club) merged[key].club = r.club;
                 merged[key].classBreakdown.push({ classKey, label: CHAMPIONSHIP_CLASSES[classKey].label, points: r.totalPoints });
             });
         });
-        return Object.values(merged).sort((a, b) => b.totalPoints - a.totalPoints);
+        return rangsorol(Object.values(merged));
+    }
+
+    // --- Egy saját versenyen elért eredményre TÉNYLEGESEN beszámított bajnoki pont ---
+    // A profil-kártyák és a pontkereső ebből dolgozik, hogy pontosan azt mutassák, ami a hivatalos
+    // táblázatba bekerült (külföldiek nélküli helyezés, max. 2 ló, 174. § (3)) - nem egy nyers
+    // táblázati értéket. A "min.pont" (a szövetség minősítő pontja) helyett ez látszik.
+    function getBajnokiEv(datum) {
+        const ev = parseInt(String(datum || '').slice(0, 4), 10);
+        if (isNaN(ev)) return null;
+        return (!isDateInWindow(datum, getChampionshipWindow(ev)) && isDateInWindow(datum, getChampionshipWindow(ev + 1))) ? ev + 1 : ev;
+    }
+
+    // ev -> { eredmeny: Map("raceId|bib" -> {points, place, classKey}), lovak: Map("osztály|igazolás" -> Set(lókulcs)) }
+    function getBeszamitottEredmenyek(ev) {
+        const eredmeny = new Map();
+        const lovak = new Map();
+        Object.keys(CHAMPIONSHIP_CLASSES).forEach(classKey => {
+            computeIndividualChampionship(classKey, ev).forEach(rider => {
+                lovak.set(classKey + '|' + rider.license, new Set(rider.horses.map(h => h.startNum || ('horse:' + h.horseName))));
+                rider.horses.forEach(h => h.results.forEach(r => {
+                    eredmeny.set(r.raceId + '|' + r.bib, { points: r.points, place: r.place, classKey });
+                }));
+            });
+        });
+        return { eredmeny, lovak };
+    }
+
+    // r: getAllPastRaceRows() sor. cache: { ev -> getBeszamitottEredmenyek(ev) } (hívásonként újra-
+    // használva, mert egy profilban sok sor van). Visszaad: { points, place (OB-helyezés), classKey, note }.
+    function getObPontInfo(r, renumbered, cache) {
+        const kulcs = r.raceId + '|' + r.bib;
+        const obHely = renumbered.has(kulcs) ? renumbered.get(kulcs) : r.place;
+        const classKey = Object.keys(CHAMPIONSHIP_CLASSES).find(k => CHAMPIONSHIP_CLASSES[k].distKeys.includes(r.dist)) || null;
+        const ev = getBajnokiEv(r.raceDate);
+        if (ev != null && !cache[ev]) cache[ev] = getBeszamitottEredmenyek(ev);
+        const besz = ev != null ? cache[ev] : null;
+        const talalat = besz && besz.eredmeny.get(kulcs);
+        if (talalat) return { points: talalat.points, place: talalat.place, classKey: talalat.classKey, note: '' };
+
+        let note = '';
+        if (!r.isObRound) note = 'nem OB-forduló';
+        else if (!classKey) note = (catNames[r.dist] || r.dist) + ': nem bajnoki táv';
+        else if (isForeignLicense(r.license, r.club)) note = 'külföldi versenyző';
+        else if (!r.obPont) note = 'lemondott az OB-pontról';
+        else if (r.isEliminated || r.place == null) note = 'nincs helyezés';
+        else if (!getPointBand(r.completedKm)) note = 'nincs megtett km (hiányzó kör-adat)';
+        else {
+            const lovai = besz && besz.lovak.get(classKey + '|' + r.license);
+            const loKulcs = r.startNum || ('horse:' + r.horseName);
+            note = lovai && !lovai.has(loKulcs)
+                ? 'nem számít: legfeljebb 2 ló (175. §)'
+                : 'nem számít: ugyanazon a versenyen csak a jobbik (174. § (3))';
+        }
+        return { points: 0, place: obHely, classKey, note };
     }
 
     // --- 2. LÓ-RANGLISTA (a lo-lovas-integracio.md törzsadatára épül - minden kategóriájú verseny számít) ---
@@ -5564,7 +5712,7 @@
             html += `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">Összesített ranglista</h4><p class="field-hint" style="margin-bottom:0;">Mindhárom bajnoki osztály (Távlovas, Rövidtávú, Junior) összpontjai egyben, osztály-szűrés nélkül - mindenki rajta van, akinek van pontja.</p></div>`;
         } else {
             const cls = CHAMPIONSHIP_CLASSES[egyeniClassKey];
-            html += `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">${cls.label}</h4><p class="field-hint" style="margin-bottom:0;">${cls.sub} · legfeljebb ${cls.maxHorses} ló pontjai számítanak lovasonként · csak magyar versenyzők (a lovas törzsadatában "külföldi"-nek jelöltek kimaradnak)</p></div>`;
+            html += `<div class="kiiras-card" style="border-left-color:var(--primary); margin-top:0;"><h4 style="margin:0; color:var(--text);">${cls.label}</h4><p class="field-hint" style="margin-bottom:0;">${cls.sub} · a legkorábban benevezett ${cls.maxHorses} ló pontjai számítanak lovasonként · csak magyar versenyzők (a külföldiek kimaradnak, a mögöttük végzők előrébb lépnek) · pontegyenlőségnél a több teljesített km dönt (174. § (2))</p></div>`;
         }
 
         if (riders.length === 0) {
@@ -5578,7 +5726,7 @@
             html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header">Összpont</th><th class="col-header" style="text-align:left;">Egyesület</th><th class="col-header">Osztályok</th></tr>`;
             riders.forEach((r, i) => {
                 const clsStr = r.classBreakdown.map(c => `${c.label.replace('Magyar ', '').replace(' Bajnokság', '')}: ${c.points} p`).join(', ');
-                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${clsStr}</td></tr>`;
+                html += `<tr><td>${r.rank}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${clsStr}</td></tr>`;
             });
             html += `</table></div>`;
         } else {
@@ -5586,7 +5734,7 @@
             riders.forEach((r, i) => {
                 const horseStr = r.horses.map(h => `${horseLink(h.horseName, h.startNum)} (${h.points} p)`).join(', ');
                 const excl = r.excludedHorseCount > 0 ? ` <span style="color:var(--text-dim-2); font-size:0.78rem;">(+${r.excludedHorseCount} ló nem számít)</span>` : '';
-                html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${horseStr}${excl}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td></tr>`;
+                html += `<tr><td>${r.rank}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${horseStr}${excl}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td></tr>`;
             });
             html += `</table></div>`;
         }
@@ -5828,21 +5976,13 @@
     // Ugyanazt a külföldi-nélküli újraszámozást használja, mint a hivatalos egyéni bajnokság
     // (renumberWithoutForeign) - így ez a diagnosztikai nézet pontosan azt a helyezést és pontot
     // mutatja, ami a hivatalos táblázatban is szerepelni fog, nem a nyers versenyeredményt.
+    // A pont a ténylegesen beszámított érték (getObPontInfo) - a max. 2 ló és a 174. § (3) is benne van.
     function getRiderPointsBreakdown(license) {
         const renumbered = renumberWithoutForeign(getAllPastRaceRows());
+        const cache = {};
         return getRiderHistory(license).map(r => {
-            const place = renumbered.has(r.raceId + '|' + r.bib) ? renumbered.get(r.raceId + '|' + r.bib) : r.place;
-            let points = 0, note = '';
-            if (!r.isObRound) note = 'nem OB-forduló';
-            else if (isForeignLicense(license)) note = 'külföldi versenyző';
-            else if (!r.obPont) note = 'lemondott az OB-pontról';
-            else if (r.isEliminated || place == null) note = 'nincs helyezés';
-            else {
-                const band = getPointBand(r.completedKm);
-                if (!band) note = 'túl rövid táv a ponttáblázathoz';
-                else points = getPoints(band, place);
-            }
-            return Object.assign({}, r, { points, note, place });
+            const info = getObPontInfo(r, renumbered, cache);
+            return Object.assign({}, r, { points: info.points, note: info.note, place: info.place, versenyHely: r.place });
         });
     }
 
@@ -5873,6 +6013,7 @@
             <div style="text-align:center; margin-bottom:15px;">
                 <h3 style="color:var(--primary); margin:0;">${rider.name || license}</h3>
                 <p style="color:var(--text-dim); margin-top:4px;">${rider.club ? rider.club + ' · ' : ''}Ig. szám: ${license}</p>
+                <button class="admin-only" style="width:auto; padding:6px 16px; border-radius:20px; border:none; cursor:pointer; font-weight:700; font-size:0.8rem; margin-top:6px; background:${isForeignLicense(license) ? 'var(--warning)' : 'var(--card-3)'}; color:${isForeignLicense(license) ? 'black' : 'var(--text)'};" onclick="toggleForeign('${escapeHtml(license)}')">${isForeignLicense(license) ? '🌍 Külföldi – kimarad a magyar bajnokságból' : '🇭🇺 Magyar versenyző'} (kattints a váltáshoz)</button>
             </div>
         `;
 
@@ -5886,7 +6027,10 @@
                 <th class="col-header">Pont</th>
             </tr>`;
             breakdown.forEach(r => {
-                const placeStr = (!r.isEliminated && r.place != null) ? `${r.place}. hely` : getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes });
+                // Ha a külföldiek kihagyása miatt az OB-helyezés eltér a versenyen elérttől, mindkettő látszik.
+                const placeStr = (!r.isEliminated && r.place != null)
+                    ? `${r.place}. hely${r.versenyHely != null && r.versenyHely !== r.place ? ` <span style="color:var(--text-dim-2); font-size:0.75rem;">(versenyen: ${r.versenyHely}.)</span>` : ''}`
+                    : getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes });
                 const pointsStr = r.points > 0 ? `<b style="color:var(--primary);">${r.points}</b>` : `<span style="color:var(--text-dim-2); font-size:0.78rem;">0${r.note ? ' · ' + r.note : ''}</span>`;
                 html += `<tr>
                     <td style="text-align:left;"><b style="color:var(--primary); cursor:pointer; text-decoration:underline;" onclick="goToRaceResults('${r.raceId}', '${r.dist}')">${r.raceName || '-'}</b><br><span style="color:var(--text-dim); font-size:0.78rem;">${r.raceDate || '-'}</span></td>
@@ -5896,7 +6040,7 @@
                 </tr>`;
             });
             html += `</table></div>
-            <div class="summary-total" style="text-align:center;">Nyers pontösszeg (a fenti sorok összege - nem a hivatalos, lovankénti korlátozással számolt végeredmény): <b style="color:var(--primary); font-size:1.2rem;">${totalPoints}</b></div>`;
+            <div class="summary-total" style="text-align:center;">A fenti sorokban a bajnokságba beszámított pontok összege (minden év, minden osztály): <b style="color:var(--primary); font-size:1.2rem;">${totalPoints}</b></div>`;
         }
 
         document.getElementById('modalBody').innerHTML = html;

@@ -1,0 +1,4 @@
+# Csak helyi használatra - nem kerül fel a GitHubra (és így a weboldalra sem)
+tests/
+mentes/
+.claude/
