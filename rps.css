@@ -1579,3 +1579,19 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
 .nyomtatvany-kartya span { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
 .nyomtatvany-kartya:hover:not(:disabled) { border-color: var(--primary); }
 .nyomtatvany-kartya:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Új verzió sáv (bejelentkezett stábnál / mentetlen munkánál nem töltjük újra az oldalt a felhasználó feje fölött) */
+#uj-verzio-sav {
+    position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 10000;
+    display: flex; align-items: center; gap: 12px; max-width: calc(100% - 24px);
+    background: var(--warning); color: #000; font-weight: 700; font-size: 0.88rem;
+    padding: 10px 12px 10px 16px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+#uj-verzio-sav button { background: #000; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+#uj-verzio-sav button.kesobb { background: transparent; color: #000; border: 1px solid rgba(0,0,0,.45); }
+/* Telefonon teljes szélesség (a left:50% miatt különben csak a fél képernyőre zsugorodik): szöveg felül, gombok egymás mellett */
+@media (max-width: 600px) {
+    #uj-verzio-sav { left: 10px; right: 10px; top: 10px; transform: none; max-width: none; flex-wrap: wrap; gap: 8px; font-size: 0.82rem; padding: 10px 12px; }
+    #uj-verzio-sav span { flex: 1 1 100%; }
+    #uj-verzio-sav button { flex: 1 1 0; }
+}

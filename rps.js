@@ -8162,7 +8162,85 @@
         ujNavFrissit();
     }
 
+    // ============================================================================
+    // ÚJ VERZIÓ ÉSZLELÉSE: ha közben új verzió került fel, a nyitva hagyott (vagy a böngésző
+    // gyorsítótárából betöltött) oldal ne ragadjon a régin. Az index.html <meta name="app-verzio">
+    // számát hasonlítjuk az épp futó változatéhoz - megnyitáskor, félóránként és amikor a fül újra
+    // előtérbe kerül (ez csak egy kis lekérés, az oldalhoz nem nyúl). Újratöltés csak valódi új
+    // verziónál lehet, és:
+    //  - bejelentkezett stábnál (orvos, beérkeztető, bíró, admin) SOHA nem magától - csak egy sáv
+    //    szól "Frissítés" / "Később" gombbal, és ők döntik el, mikor (pl. két ló között);
+    //  - nézőknél magától, de csak ha épp nem gépelnek / nincs nyitott ablak;
+    //  - nyitott TV módban (kivetítő) egyáltalán nem - az újratöltés kidobná a teljes képernyőből.
+    // A "Később" után fél óráig nem szólunk újra (fülváltáskor sem).
+    // A fájlcímekben lévő ?v= miatt az új oldal biztosan az új rps.js / rps.css fájlokat kapja.
+    // ============================================================================
+    const APP_VERZIO = (document.querySelector('meta[name="app-verzio"]') || {}).content || '';
+    const VERZIO_PROBALVA = 'rps-verzio-probalva';
+    const VERZIO_KESOBB = 'rps-verzio-kesobb';
+    const VERZIO_PERIODUS = 30 * 60 * 1000;
+
+    function vanMentetlenMunka() {
+        if (Object.values(formDirty).some(Boolean)) return true;
+        const nyitottAblak = [...document.querySelectorAll('.modal, #customConfirm')].some(m => m.style.display === 'flex' || m.style.display === 'block');
+        const fokuszMezo = document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+        return nyitottAblak || fokuszMezo;
+    }
+
+    function ujVerzioBetoltes(uj) {
+        try { sessionStorage.setItem(VERZIO_PROBALVA, uj); } catch (e) {}
+        const url = new URL(location.href);
+        url.searchParams.set('v', uj);   // új cím -> a böngésző nem a gyorsítótárból adja az oldalt
+        location.replace(url.toString());
+    }
+
+    function ujVerzioSav(uj) {
+        if (document.getElementById('uj-verzio-sav')) return;
+        const sav = document.createElement('div');
+        sav.id = 'uj-verzio-sav';
+        sav.innerHTML = `<span>Új verzió érhető el. Frissíts, amikor épp nincs folyamatban munka (mentsd el, amit írsz).</span>
+            <button type="button" onclick="ujVerzioBetoltes('${String(uj).replace(/[^\w.-]/g, '')}')">Frissítés</button>
+            <button type="button" class="kesobb" onclick="ujVerzioKesobb(this)">Később</button>`;
+        document.body.appendChild(sav);
+    }
+
+    function ujVerzioKesobb(gomb) {
+        try { sessionStorage.setItem(VERZIO_KESOBB, String(Date.now())); } catch (e) {}
+        gomb.parentElement.remove();
+    }
+
+    function verzioEllenorzes() {
+        if (!APP_VERZIO || document.hidden) return;
+        if (document.getElementById('fullscreenLiveOverlay')?.classList.contains('active')) return;
+        let kesobb = 0;
+        try { kesobb = Number(sessionStorage.getItem(VERZIO_KESOBB)) || 0; } catch (e) {}
+        if (Date.now() - kesobb < VERZIO_PERIODUS) return;
+        fetch('index.html?verzio=' + Date.now(), { cache: 'no-store' })
+            .then(r => (r.ok ? r.text() : ''))
+            .then(html => {
+                const m = html.match(/<meta name="app-verzio" content="([^"]+)"/);
+                if (!m || m[1] === APP_VERZIO) return;
+                let probalva = null;
+                try { probalva = sessionStorage.getItem(VERZIO_PROBALVA); } catch (e) {}
+                // Ha erre a verzióra már újratöltöttünk, és mégis a régi jött (pl. a szerver még nem
+                // frissült), ne legyen végtelen újratöltés - elég a sáv.
+                // Bejelentkezett stábnál soha nem töltünk újra magától (verseny közben ne szakadjon meg a munka).
+                const stab = !!(auth && auth.currentUser);
+                if (stab || probalva === m[1] || vanMentetlenMunka()) { ujVerzioSav(m[1]); return; }
+                ujVerzioBetoltes(m[1]);
+            })
+            .catch(() => {});
+    }
+
+    function verzioFigyelesInditas() {
+        if (!APP_VERZIO) return;
+        setTimeout(verzioEllenorzes, 4000);
+        setInterval(verzioEllenorzes, VERZIO_PERIODUS);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) verzioEllenorzes(); });
+    }
+
     window.onload = function() {
+        verzioFigyelesInditas();
         ujDizajnInditas();
         ujDizajnKapcsoloFrissit();
         let savedMode = localStorage.getItem('currentMode') || (ujDizajnAktiv() ? 'kezdolap' : 'versenyek');
