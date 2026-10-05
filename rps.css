@@ -1432,3 +1432,150 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
 
 /* Kétsoros menüfelirat ("ÉLŐ Verseny Kezelés"): a második sor a szöveg alá kerüljön, ne az ikon alá */
 .sidebar-btn { padding-left: calc(12px + 1.55em); text-indent: -1.55em; }
+
+/* Nemzeti minősítés (171. §) */
+.minosites-jel { display: inline-block; white-space: nowrap; padding: 3px 9px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; }
+.minosites-jel.szint-1 { background: var(--primary); color: var(--on-primary, #fff); }
+.minosites-jel.szint-2 { background: var(--success); color: #000; }
+.minosites-jel.szint-3 { background: var(--warning); color: #000; }
+.minosites-tetelek summary { cursor: pointer; color: var(--primary); font-size: 0.8rem; white-space: nowrap; }
+.minosites-tetelek div { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; margin-top: 3px; }
+
+/* Ló versenymentes időszaka (140. §) és FEI újonc minősülés (134. §) a profilban */
+.profil-piheno { margin: 10px 0; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.45; border-left: 4px solid var(--border); background: var(--card-2); color: var(--text); }
+.profil-piheno.pihen { border-left-color: var(--warning); }
+.profil-piheno.szabad { border-left-color: var(--success); }
+.profil-piheno-ok { color: var(--text-dim); font-size: 0.78rem; margin-top: 3px; }
+.profil-piheno-megj { color: var(--text-dim-2); font-weight: 400; }
+.profil-ujonc-lista { font-size: 0.78rem; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+.profil-ujonc-lista b { color: var(--text); display: block; margin-bottom: 2px; }
+
+/* RFID kapuk (admin) */
+.rfid-osszesito { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 12px 0; }
+.rfid-osszesito > div { background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.rfid-osszesito b { display: block; font-size: 1.35rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.rfid-osszesito span { font-size: 0.75rem; color: var(--text-dim); }
+.rfid-osszesito .van-figy b { color: var(--danger); }
+.rfid-feed { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto; }
+.rfid-esemeny { display: grid; grid-template-columns: 52px 1fr auto auto auto; gap: 10px; align-items: center; padding: 8px 10px;
+    background: var(--card-2); border-radius: var(--radius-sm); border-left: 4px solid var(--primary); font-size: 0.85rem; }
+.rfid-esemeny.kapu-orvosi { border-left-color: var(--success); }
+.rfid-esemeny.kapu-recheck { border-left-color: var(--warning); }
+.rfid-esemeny.uj { animation: rfid-villan 2.4s ease-out; }
+@keyframes rfid-villan { 0%, 30% { background: var(--primary-dim); } 100% { background: var(--card-2); } }
+.rfid-bib { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.rfid-nev small { color: var(--text-dim); font-weight: 400; }
+.rfid-kapu { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
+.rfid-ido { font-weight: 800; font-variant-numeric: tabular-nums; }
+.rfid-miota { color: var(--text-dim-2); font-size: 0.75rem; white-space: nowrap; min-width: 62px; text-align: right; }
+.rfid-lista { display: flex; flex-direction: column; gap: 6px; }
+.rfid-sor { background: var(--card-2); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
+.rfid-sor.sarga { border-left-color: var(--warning); }
+.rfid-sor.piros { border-left-color: var(--danger); }
+.rfid-sor-fej { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rfid-sor-fej .rfid-nev { flex: 1; min-width: 160px; }
+.rfid-korok { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.rfid-kor { font-size: 0.72rem; font-weight: 800; padding: 3px 7px; border-radius: 6px; background: var(--card-3); color: var(--text-dim-2); }
+.rfid-kor small { font-weight: 600; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.rfid-kor.felig { background: rgba(255, 159, 10, 0.18); color: var(--warning); }
+.rfid-kor.kesz { background: rgba(50, 215, 75, 0.16); color: var(--success); }
+.rfid-figy { margin-top: 6px; font-size: 0.8rem; font-weight: 700; color: var(--warning); }
+.rfid-sor.piros .rfid-figy { color: var(--danger); }
+@media (max-width: 600px) {
+    .rfid-esemeny { grid-template-columns: 44px 1fr auto; }
+    .rfid-esemeny .rfid-kapu { grid-column: 2; }
+    .rfid-esemeny .rfid-miota { grid-column: 3; }
+}
+
+/* Versenyáttekintő telefonon: versenyzőnként kártya a széles táblázat helyett */
+.att-mobil { display: none; }
+@media (max-width: 700px) {
+    .att-asztali { display: none; }
+    .att-mobil { display: flex; flex-direction: column; gap: 10px; }
+}
+.att-kartya { background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; }
+.att-kartya-fej { display: flex; align-items: center; gap: 10px; }
+.att-hely { min-width: 38px; text-align: center; font-weight: 900; font-size: 1.05rem; color: var(--primary); }
+.att-nev { flex: 1; min-width: 0; }
+.att-nev b { display: block; font-size: 0.95rem; color: var(--text); overflow-wrap: anywhere; }
+.att-nev small { color: var(--text-dim); font-size: 0.78rem; }
+.att-ossz { margin: 8px 0 6px; font-size: 0.82rem; color: var(--text-dim); }
+.att-ossz b { color: var(--text); }
+.att-ossz .gyors, .att-korok .gyors { color: var(--danger); font-weight: 800; }
+.att-korok { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.att-korok th { text-align: left; font-size: 0.68rem; color: var(--text-dim); font-weight: 700; padding: 4px 4px; border-bottom: 1px solid var(--border); }
+.att-korok td { padding: 6px 4px; border-bottom: 1px solid var(--border-soft, var(--border)); color: var(--text); font-weight: 700; vertical-align: top; }
+.att-korok small { display: block; font-size: 0.72rem; color: var(--text-dim); font-weight: 600; }
+.att-korok tr.ures td { color: var(--text-dim-2); font-weight: 600; }
+.att-kartya .edit-btn { margin-top: 8px; width: 100%; }
+
+/* ============================================================================
+   VERSENYKÁRTYA (2026-10) - laikusnak is áttekinthető: balra naptárlap, mellette a
+   verseny neve / helye / állapota, alatta a távok nevezőkkel, lezárt versenynél a
+   győztesek és a teljesítési arány, végül egy nagy fő gomb. Az admin-gombok egy
+   lenyitható "Kezelés" alá kerültek, hogy ne zsúfolják a kártyát.
+   ============================================================================ */
+.race-card.rc { margin-bottom: 16px; }
+.rc-fo { display: flex; gap: 14px; padding: 18px 16px 4px; align-items: flex-start; }
+.rc-datum {
+    flex: 0 0 64px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 8px 4px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border);
+    line-height: 1.05; text-align: center;
+}
+.rc-nap { font-size: 1.7rem; font-weight: 900; color: var(--text); font-variant-numeric: tabular-nums; }
+.rc-ho { font-size: 0.72rem; font-weight: 800; letter-spacing: .06em; color: var(--status-color, var(--primary)); margin-top: 3px; }
+.rc-ev { font-size: 0.66rem; color: var(--text-dim-2); margin-top: 2px; }
+.rc-info { flex: 1; min-width: 0; }
+.rc-felso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rc-ob { font-size: 0.68rem; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: var(--primary-dim); color: var(--primary); white-space: nowrap; }
+.rc-hatra { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); }
+.rc-most { color: var(--success); font-weight: 800; }
+.rc-cim { margin: 8px 0 4px; font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1.25; overflow-wrap: anywhere; }
+.rc-hely { font-size: 0.85rem; color: var(--text-dim); }
+.rc-tavok { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; padding: 12px 16px 0; }
+.rc-tav { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); }
+.rc-tav b { display: block; font-size: 0.9rem; color: var(--text); }
+.rc-tav span { font-size: 0.72rem; color: var(--text-dim); }
+.rc-tav.is-empty { opacity: .55; }
+.rc-gyoztesek { margin: 12px 16px 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); }
+.rc-szekcio-cim { font-size: 0.68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim-2); margin-bottom: 4px; }
+.rc-gyoztes { display: flex; gap: 10px; align-items: baseline; font-size: 0.86rem; padding: 3px 0; color: var(--text); }
+.rc-gy-tav { flex: 0 0 92px; font-size: 0.75rem; font-weight: 700; color: var(--text-dim); }
+.rc-gyoztes small { color: var(--text-dim); }
+.rc-osszeg { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px 0; font-size: 0.8rem; color: var(--text-dim); }
+.rc-osszeg b { color: var(--text); font-size: 0.95rem; }
+.rc-osszeg .ok b { color: var(--success); }
+.rc-osszeg .ki b { color: var(--danger); }
+.rc-akcio { padding: 14px 16px 16px; }
+.rc-akcio .calc-btn { width: 100%; margin: 0; min-height: 46px; font-size: 0.95rem; }
+.rc-akcio .calc-btn:not(.add-btn) { background: var(--primary); color: var(--on-primary, #fff); border: none; }
+.rc-admin { border-top: 1px dashed var(--border); background: var(--card-2); }
+.rc-admin > summary { cursor: pointer; padding: 10px 16px; font-size: 0.8rem; font-weight: 700; color: var(--text-dim); list-style: none; }
+.rc-admin > summary::-webkit-details-marker { display: none; }
+.rc-admin > summary::after { content: ' ▾'; }
+.rc-admin[open] > summary::after { content: ' ▴'; }
+.rc-admin .race-admin-controls { border-top: none; padding-top: 0; }
+@media (max-width: 600px) {
+    .rc-fo { padding: 16px 13px 4px; gap: 12px; }
+    .rc-datum { flex-basis: 56px; }
+    .rc-nap { font-size: 1.45rem; }
+    .rc-tavok, .rc-osszeg { padding-left: 13px; padding-right: 13px; }
+    .rc-gyoztesek { margin-left: 13px; margin-right: 13px; }
+    .rc-gyoztes { flex-direction: column; gap: 0; }
+    .rc-gy-tav { flex-basis: auto; }
+    .rc-akcio { padding: 12px 13px 14px; }
+}
+
+/* Az új dizájn elemei (rps-uj.css) a régi felületen nem látszanak */
+#uj-fejlec, #uj-also-sav { display: none; }
+
+/* A4 nyomtatványok oldal */
+.nyomtatvany-racs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.nyomtatvany-kartya {
+    display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer;
+    background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; color: var(--text);
+}
+.nyomtatvany-kartya b { font-size: 0.95rem; }
+.nyomtatvany-kartya span { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
+.nyomtatvany-kartya:hover:not(:disabled) { border-color: var(--primary); }
+.nyomtatvany-kartya:disabled { opacity: .45; cursor: not-allowed; }
