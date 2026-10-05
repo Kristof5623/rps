@@ -141,9 +141,64 @@
         };
     }
 
+    // KÖTELEZŐ PIHENŐIDŐ (53. §) körönként: cfg.holds[i] = az i. kör UTÁNI pihenő percben,
+    // a kiírásban (élőben is) admin állítja. Ha nincs megadva: 40 perc, de 100 km és afölötti
+    // távon az utolsó pihenő (az utolsó kör előtti) 50 perc - 53. § (3): legalább az egyik
+    // pihenőnek 50 percesnek kell lennie. Az utolsó kör után nincs pihenő (cél).
+    const ALAP_PIHENO_PERC = 40;
+
+    function alapPihenoPerc(dist, lapIdx, lapCount) {
+        const km = parseInt(String(dist || '').replace('j', ''), 10) || 0;
+        if (km >= 100 && lapCount >= 2 && lapIdx === lapCount - 2) return 50;
+        return ALAP_PIHENO_PERC;
+    }
+
+    function getPihenoPerc(cfg, dist, lapIdx) {
+        const lapCount = ((cfg && cfg.laps) || []).length;
+        const v = cfg && cfg.holds ? parseFloat(cfg.holds[lapIdx]) : NaN;
+        return (!isNaN(v) && v > 0) ? v : alapPihenoPerc(dist, lapIdx, lapCount);
+    }
+
     function parseCompetitors(data) {
         if (!data) return [];
-        return Object.values(data).filter(c => c && c.bib !== undefined);
+        // FNR (teljesítette, de helyezés nélkül - II. melléklet) NEM kiesés: régebbi adatban
+        // isEliminated=true-val is előfordul, ezt itt egységesen kiegyenesítjük.
+        return Object.values(data).filter(c => c && c.bib !== undefined).map(c => {
+            if (c.status === 'FNR' && c.isEliminated) c.isEliminated = false;
+            return c;
+        });
+    }
+
+    // Helyezés kiírása: "3." / "FNR" / "ELIM" - a fok-jel ("3º") magyarul hibás.
+    function helyezesCimke(c, rank) {
+        if (c.isEliminated) return 'ELIM';
+        if (c.status === 'FNR' || rank === 'FNR') return 'FNR';
+        return (rank === undefined || rank === null || rank === '-' || rank === '') ? '-' : rank + '.';
+    }
+
+    // Sorrend a listákban: helyezettek, utánuk az FNR (teljesítette, helyezés nélkül), végül a kiesettek.
+    function eredmenyCsoport(c) {
+        if (c.isEliminated) return 2;
+        if (c.status === 'FNR') return 1;
+        return 0;
+    }
+
+    function eredmenyRendezo(ranksInfo) {
+        return (a, b) => {
+            const ga = eredmenyCsoport(a), gb = eredmenyCsoport(b);
+            if (ga !== gb) return ga - gb;
+            if (ga === 0) {
+                const ra = typeof ranksInfo[a.bib]?.rank === 'number' ? ranksInfo[a.bib].rank : 999;
+                const rb = typeof ranksInfo[b.bib]?.rank === 'number' ? ranksInfo[b.bib].rank : 999;
+                if (ra !== rb) return ra - rb;
+            }
+            return parseInt(a.bib) - parseInt(b.bib);
+        };
+    }
+
+    // km/h magyar formában (tizedesvessző).
+    function kmh(v, jegy = 2) {
+        return (typeof v === 'number' && isFinite(v)) ? v.toFixed(jegy).replace('.', ',') : '-';
     }
 
     // --- LÓ- ÉS LOVAS-TÖRZSADAT (docs/lo-lovas-integracio.md, P1/2) ---
@@ -371,10 +426,16 @@
                 if(dbConfig[k].laps && Array.isArray(dbConfig[k].laps)) {
                     safeCfg[k].laps = [...dbConfig[k].laps];
                 } else if(dbConfig[k].laps) {
-                    safeCfg[k].laps = Object.values(dbConfig[k].laps); 
+                    safeCfg[k].laps = Object.values(dbConfig[k].laps);
                 }
                 for(let i=0; i<safeCfg[k].laps.length; i++) {
                     if(safeCfg[k].laps[i] === undefined) safeCfg[k].laps[i] = '';
+                }
+                // Körönkénti pihenőidő (perc) - l. getPihenoPerc(). A Firebase a ritka tömböt
+                // objektumként adhatja vissza, ezért kulcs szerint másoljuk.
+                if (dbConfig[k].holds) {
+                    const h = dbConfig[k].holds;
+                    safeCfg[k].holds = safeCfg[k].laps.map((_, i) => (h[i] === undefined || h[i] === null) ? '' : h[i]);
                 }
             }
         }
@@ -434,14 +495,17 @@
     }
 
     function forceMoveToLive(sourceType, id) {
-        showConfirm("Verseny Élesítése", "Biztosan ÉLŐ-be teszed ezt a versenyt?\n(A jelenlegi élő futam automatikusan lezárul és átkerül a múltba!)", () => {
+        const uzenet = "Biztosan ÉLŐ-be teszed ezt a versenyt?\n(A jelenlegi élő futam automatikusan lezárul és átkerül a múltba!)" +
+            (liveRaceMeta ? befejezetlenFigyelmeztetes(competitors, raceConfig, 'a lezáruló élő versenyben') : '');
+        showConfirm("Verseny Élesítése", uzenet, () => {
             // Célzott olvasások a "/" gyökér helyett - lásd forceMoveRace megjegyzését.
             Promise.all([
                 db.ref('liveRaceMeta').once('value'),
                 db.ref('raceConfig').once('value'),
                 db.ref('competitors').once('value'),
-                db.ref('races/' + sourceType + '/' + id).once('value')
-            ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, sourceSnap]) => {
+                db.ref('races/' + sourceType + '/' + id).once('value'),
+                db.ref('vets').once('value')
+            ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, sourceSnap, vetsSnap]) => {
                 let updates = {};
                 let curLiveMeta = liveMetaSnap.val();
                 let curRaceConfig = raceConfigSnap.val();
@@ -453,7 +517,9 @@
                         id: oldId, name: curLiveMeta.name, loc: curLiveMeta.loc, date: curLiveMeta.date, desc: curLiveMeta.desc || "",
                         isObRound: curLiveMeta.isObRound !== false,
                         raceConfig: curRaceConfig || getEmptyRaceConfig(),
-                        competitors: curCompetitors || null
+                        competitors: curCompetitors || null,
+                        // Az élő verseny orvosai a lezárt versenyhez kerülnek (korábban elvesztek).
+                        vets: vetsSnap.val() || null
                     };
                 }
 
@@ -462,6 +528,8 @@
                     updates['liveRaceMeta'] = { id: sourceRace.id, name: sourceRace.name, loc: sourceRace.loc, date: sourceRace.date, desc: sourceRace.desc || "", isObRound: sourceRace.isObRound !== false };
                     updates['raceConfig'] = sourceRace.raceConfig || getEmptyRaceConfig();
                     updates['competitors'] = sourceRace.competitors || null;
+                    // A versenyhez felvett orvosok lesznek az élő orvoslista - nem az előző verseny orvosai.
+                    updates['vets'] = sourceRace.vets || null;
                     updates['races/' + sourceType + '/' + id] = null;
                 }
 
@@ -473,14 +541,39 @@
         });
     }
 
+    // Lezárt versenyben helyezést kapna, pedig nem teljesítette a távot: nincs kiesve, nem FNR,
+    // nem "Gyors eredmény", és kevesebb kész köre van, mint amennyi a kiírásban szerepel (ide
+    // tartozik az is, aki el sem indult, de nem kapott WD-t). A rangsort ez nem írja át - a valódi
+    // adatban ilyen eddig nem fordult elő -, csak lezáráskor és exportkor figyelmeztetünk rá.
+    function befejezetlenVersenyzok(comps, cfg) {
+        return (comps || []).filter(c => {
+            if (!c || c.isEliminated || c.status === 'FNR' || c.manualEntry) return false;
+            const vart = (((cfg || {})[String(c.dist || '').replace('j', '')] || {}).laps || []).length;
+            const kesz = (c.laps || []).filter(l => l && l.isComplete).length;
+            return vart > 0 && kesz < vart;
+        });
+    }
+    function befejezetlenFigyelmeztetes(comps, cfg, mi) {
+        const lista = befejezetlenVersenyzok(comps, cfg);
+        if (!lista.length) return '';
+        const nevek = lista.map(c => {
+            const vart = ((cfg[String(c.dist).replace('j', '')] || {}).laps || []).length;
+            const kesz = (c.laps || []).filter(l => l && l.isComplete).length;
+            return `#${c.bib} ${c.name} (${catNames[c.dist] || c.dist}, ${kesz}/${vart} kör)`;
+        }).join(', ');
+        return `\n\n⚠️ ${lista.length} versenyző nem fejezte be a távot, és nincs kiesési státusza, ezért ${mi} helyezést kapna: ${nevek}. Előbb érdemes beállítani a státuszát (pl. WD, RET vagy FTQ).`;
+    }
+
     function forceMoveToPastFromLive() {
-        showConfirm("Verseny Lezárása", "Biztosan a Múltbéli versenyek közé rakod a jelenlegi ÉLŐ versenyt?", () => {
+        const uzenet = "Biztosan a Múltbéli versenyek közé rakod a jelenlegi ÉLŐ versenyt?" + befejezetlenFigyelmeztetes(competitors, raceConfig, 'a lezárt versenyben');
+        showConfirm("Verseny Lezárása", uzenet, () => {
             // Célzott olvasások a "/" gyökér helyett - lásd forceMoveRace megjegyzését.
             Promise.all([
                 db.ref('liveRaceMeta').once('value'),
                 db.ref('raceConfig').once('value'),
-                db.ref('competitors').once('value')
-            ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap]) => {
+                db.ref('competitors').once('value'),
+                db.ref('vets').once('value')
+            ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, vetsSnap]) => {
                 let curLiveMeta = liveMetaSnap.val();
                 if (!curLiveMeta) return;
 
@@ -491,12 +584,14 @@
                     id: oldId, name: curLiveMeta.name, loc: curLiveMeta.loc, date: curLiveMeta.date, desc: curLiveMeta.desc || "",
                     isObRound: curLiveMeta.isObRound !== false,
                     raceConfig: raceConfigSnap.val() || getEmptyRaceConfig(),
-                    competitors: competitorsSnap.val() || null
+                    competitors: competitorsSnap.val() || null,
+                    vets: vetsSnap.val() || null
                 };
 
                 updates['liveRaceMeta'] = null;
                 updates['raceConfig'] = getEmptyRaceConfig();
                 updates['competitors'] = null;
+                updates['vets'] = null;
 
                 db.ref('/').update(updates).then(() => {
                     showToast("Verseny sikeresen lezárva és átmozgatva a Múltba!");
@@ -512,10 +607,12 @@
             db.ref('liveRaceMeta').once('value'),
             db.ref('raceConfig').once('value'),
             db.ref('competitors').once('value'),
-            db.ref('races/jovo').once('value')
-        ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, jovoSnap]) => {
+            db.ref('races/jovo').once('value'),
+            db.ref('vets').once('value')
+        ]).then(([liveMetaSnap, raceConfigSnap, competitorsSnap, jovoSnap, vetsSnap]) => {
             let curRaceConfig = raceConfigSnap.val();
             let curCompetitors = competitorsSnap.val();
+            let curVets = vetsSnap.val();
 
             // Helyi időzóna szerinti pontos dátum (Magyar idő)
             let d = new Date();
@@ -532,10 +629,12 @@
                     id: id, name: meta.name, loc: meta.loc, date: meta.date, desc: meta.desc || "",
                     isObRound: meta.isObRound !== false,
                     raceConfig: curRaceConfig || getEmptyRaceConfig(),
-                    competitors: curCompetitors || {}
+                    competitors: curCompetitors || {},
+                    vets: curVets || null
                 };
                 updates['raceConfig'] = getEmptyRaceConfig();
                 updates['competitors'] = {};
+                updates['vets'] = null;
                 updates['liveRaceMeta'] = null;
                 meta = null;
                 needsUpdate = true;
@@ -548,6 +647,8 @@
                     updates['liveRaceMeta'] = { id: r.id, name: r.name, loc: r.loc, date: r.date, desc: r.desc || "", isObRound: r.isObRound !== false };
                     updates['raceConfig'] = r.raceConfig || getEmptyRaceConfig();
                     updates['competitors'] = r.competitors || {};
+                    // A versenyhez előre felvett orvosok lesznek az élő orvoslista.
+                    updates['vets'] = r.vets || null;
                     updates['races/jovo/' + toMoveId] = null;
                     needsUpdate = true;
                 }
@@ -605,6 +706,7 @@
         db.ref('competitors').on('value', (snapshot) => {
             competitors = parseCompetitors(snapshot.val());
             updateCompetitorDisplays();
+            if (attekintoForras === 'live' && document.getElementById('attekinto-mod')?.classList.contains('active')) renderAttekinto();
             
             // A kategória-választó nézet (currentAdatlapFilter === null) is frissüljön:
             // eddig egy új kategória csak fülváltás után jelent meg.
@@ -656,7 +758,10 @@
         });
         db.ref('clubs').on('value', snap => { clubsCache = snap.val() || {}; });
         // Állatorvos-törzsadat: versenyfüggetlen névlista a kereséshez.
-        db.ref('vetsDb').on('value', snap => { vetsDbCache = snap.val() || {}; });
+        db.ref('vetsDb').on('value', snap => {
+            vetsDbCache = snap.val() || {};
+            if (document.getElementById('beallitasok-vetek')?.style.display === 'block') renderVetTorzs();
+        });
 
         // Sebesség min/max távonként - alapból üres (nincs figyelve), minden eszközön szinkronban
         db.ref('settings/speedThresholds').on('value', snap => {
@@ -694,11 +799,17 @@
             if (document.getElementById('csapat-datum')?.style.display === 'block') renderBajnokavatasDatumSettings();
         }
         if (document.getElementById('beallitasok-kulfoldi')?.style.display === 'block') renderKulfoldiKezelo();
+        if (document.getElementById('attekinto-mod')?.classList.contains('active')) renderAttekinto();
+        if (document.getElementById('beallitasok-vetek')?.style.display === 'block') renderVetTorzs();
     }
 
     startDatabaseListeners();
 
     // --- AUTENTIKÁCIÓ ÉS JOGOSULTSÁGOK ---
+    // Csak bejelentkezve (és a megfelelő szerepkörrel) elérhető nézetek - kijelentkezve
+    // ezekről a Versenyek oldalra visszük a látogatót (l. applyAuthUI).
+    const BELSO_NEZETEK = ['fo-mod', 'beallitasok-mod', 'export-mod', 'beerkeztetes-mod', 'orvosi-ido-mod', 'orvosi-mod', 'nyomtatas-mod', 'attekinto-mod'];
+
     auth.onAuthStateChanged((user) => {
         if (user) {
             db.ref('users/' + user.uid + '/role').once('value').then((snapshot) => {
@@ -770,6 +881,12 @@
         } else {
             document.getElementById('login-section').style.display = 'block';
             document.getElementById('logout-section').style.display = 'none';
+            // Kijelentkezett látogató ne maradjon (vagy újratöltéskor ne kerüljön vissza) egy belső
+            // nézetre, pl. az állatorvosi űrlapra - a currentMode a localStorage-ból jön vissza.
+            const aktiv = document.querySelector('.mode-content.active');
+            if (aktiv && BELSO_NEZETEK.includes(aktiv.id)) {
+                switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
+            }
         }
     }
 
@@ -787,7 +904,9 @@
             })
             .catch(() => {
                 err.style.display = 'block';
-                setTimeout(() => { err.style.display = 'none'; }, 3000);
+                // Telefonon a menü alján, a látható részen kívülre esett az üzenet.
+                if (err.scrollIntoView) err.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                setTimeout(() => { err.style.display = 'none'; }, 4000);
                 document.getElementById('loginPass').value = '';
             });
     }
@@ -807,7 +926,7 @@
     // Ezekben a nézetekben széles, nem törhető ranglista-tábla van (.ttrack-table), ezért nagy
     // kijelzőn kitágul alattuk a hasáb. Mindenhol máshol az űrlapokhoz szabott keskeny hasáb
     // marad - egy input nem lesz szebb attól, ha 1300px széles (l. .szeles-nezet a CSS-ben).
-    const SZELES_NEZETEK = ['bajnoksag-egyeni', 'bajnoksag-lo', 'bajnoksag-csapat'];
+    const SZELES_NEZETEK = ['bajnoksag-egyeni', 'bajnoksag-lo', 'bajnoksag-csapat', 'attekinto-mod'];
 
     function switchSidebarMode(targetId, btn) {
         if(btn && btn.id === 'btn-menu-adatlapok') { viewingPastRaceData = null; }
@@ -820,6 +939,8 @@
         if(window.innerWidth <= 800) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
         
         if (targetId === 'adatlapok') renderAdatlapList();
+        if (targetId === 'elo-rajtok') frissitEloKiindulasok();
+        if (targetId === 'attekinto-mod') renderAttekinto();
         if (targetId === 'export-mod') renderExportList();
         if (targetId === 'torzs-lovasok') renderTorzsLovasokList();
         if (targetId === 'torzs-lovak') renderTorzsLovakList();
@@ -871,7 +992,10 @@
         document.getElementById('infoModalTitle').innerText = catNames[dist] + " Információk";
         let html = `<strong>Kategória rajtja:</strong><br><span style="font-size:1.5rem; color:var(--text); font-family:monospace;">${toTimeStr(toSec(catConf.h, catConf.m, catConf.s))}</span><br><br><strong>Körök távolságai:</strong><br><div style="display:inline-block; text-align:left; margin-top:5px;">`;
         if(catConf.laps && catConf.laps.length > 0) {
-            catConf.laps.forEach((l, i) => { html += `<b>${i+1}. kör:</b> &nbsp;&nbsp;${l || '0'} km<br>`; });
+            catConf.laps.forEach((l, i) => {
+                const piheno = i < catConf.laps.length - 1 ? ` <small style="color:var(--text-dim);">· utána ${String(getPihenoPerc(catConf, dist, i)).replace('.', ',')} perc pihenő</small>` : '';
+                html += `<b>${i+1}. kör:</b> &nbsp;&nbsp;${l || '0'} km${piheno}<br>`;
+            });
         } else {
             html += `Nincsenek körök beállítva.`;
         }
@@ -930,139 +1054,239 @@
         });
     }
 
-    function exportSpecificRaceToCSV(id) {
+    // --- PIHENŐNAPOK (kötelező versenymentes időszak, 140. §) ---
+    // Alap a ténylegesen megtett táv szerint: 54 km-ig 5, 106 km-ig 12, 126 km-ig 19, 146 km-ig 26,
+    // fölötte 33 nap. Kiegészítő napok (140. § (2)): 20 km/h feletti átlag +7; második metabolikus
+    // kiesés egy göngyölített éven belül +14, harmadik vagy további +60; harmadik vagy további
+    // sántaság miatti kiesés +180; súlyos mozgásszervi sérülés +180, súlyos metabolikus +60.
+    // Aki el sem indult (WD/DNS rajt előtt, vagy az előzetes vizsgálaton nem felelt meg): 0.
+    function pihenoAlapNap(km) {
+        if (km > 146) return 33;
+        if (km > 126) return 26;
+        if (km > 106) return 19;
+        if (km > 54) return 12;
+        return 5;
+    }
+
+    // A kiesési kódok egy versenyzőnél: a státusz + a kombinált kódok, egységes alakban (ME, GA, SIMUSCO...).
+    function kiesesiKodok(c) {
+        const st = String(c.status || '');
+        const kodok = [st.replace(/^FTQ-/, ''), ...(c.extraCodes || [])];
+        return new Set(kodok.map(k => String(k).replace(/\s+/g, '').toUpperCase()).filter(Boolean));
+    }
+
+    // Egy ló ME / GA kiesései a verseny előtti 365 napban (göngyölített év): a saját versenyeinkből
+    // és - ha be van töltve - a szövetségi lóeredményekből (ott a kód szabad szöveg, pl. "GA 40km").
+    // Ugyanazon a napon a saját adatunk az irányadó (ne számoljuk kétszer).
+    function loKorabbiKiesesei(startNum, datum, kivevaRaceId, hivatalosSorok) {
+        const eredmeny = { ME: 0, GA: 0 };
+        if (!startNum || !datum) return eredmeny;
+        const d0 = new Date(datum + 'T00:00:00'); d0.setDate(d0.getDate() - 365);
+        const tol = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
+        const sajatNapok = new Set();
+        localRaces.mult.forEach(r => {
+            if (!r.date || r.id === kivevaRaceId || r.date < tol || r.date >= datum) return;
+            parseCompetitors(r.competitors).forEach(c => {
+                if (String(c.startNum || '').trim() !== String(startNum)) return;
+                sajatNapok.add(r.date);
+                if (!c.isEliminated) return;
+                const k = kiesesiKodok(c);
+                if (k.has('ME') || k.has('SIMETA')) eredmeny.ME++;
+                if (k.has('GA')) eredmeny.GA++;
+            });
+        });
+        (hivatalosSorok || []).forEach(e => {
+            const nap = String(e.date || '').replace(/\//g, '-');
+            if (!nap || nap < tol || nap >= datum || sajatNapok.has(nap) || !e.status) return;
+            const szoveg = String(e.penalty || '').toUpperCase();
+            if (/\bME\b/.test(szoveg)) eredmeny.ME++;
+            if (/\bGA\b/.test(szoveg)) eredmeny.GA++;
+        });
+        return eredmeny;
+    }
+
+    function pihenonapok(c, config, elozmeny) {
+        const st = c.status || (c.isEliminated ? 'FTQ-ME' : 'Active');
+        const laps = (c.laps || []).filter(Boolean);
+        const lovagolt = laps.some(l => l.h || l.isComplete);
+        const preVetBukott = !lovagolt && c.preVet && c.preVet.vetDecision && !/Továbbengedve|Passed|Active/i.test(c.preVet.vetDecision);
+        const elindult = c.manualEntry
+            ? !['WD', 'DNS'].includes(st)
+            : (lovagolt || st === 'RET' || (c.isEliminated && !['WD', 'DNS'].includes(st) && !preVetBukott));
+        if (!elindult) return 0;
+
+        const nevleges = parseInt(String(c.dist || '').replace('j', ''), 10) || 0;
+        // Gyors eredménynél nincs kör-adat: kiesettnél a megtett táv nem ismert, ilyenkor a legkisebb sáv.
+        const km = c.manualEntry ? (c.isEliminated ? 0 : nevleges) : getCompletedKm(c, config);
+        let nap = pihenoAlapNap(km);
+
+        let atlag = 0;
+        if (c.manualEntry) atlag = (c.totalTimeSec > 0 && km > 0) ? km / (c.totalTimeSec / 3600) : 0;
+        else { const kesz = laps.filter(l => l.isComplete); const ut = kesz[kesz.length - 1]; atlag = ut ? (ut.rideSpd || 0) : 0; }
+        if (atlag > 20) nap += 7;
+
+        const kodok = kiesesiKodok(c);
+        if (kodok.has('SIMUSCO')) nap += 180;
+        if (kodok.has('SIMETA')) nap += 60;
+        const e = elozmeny || { ME: 0, GA: 0 };
+        if (c.isEliminated && kodok.has('ME')) nap += e.ME >= 2 ? 60 : (e.ME === 1 ? 14 : 0);
+        if (c.isEliminated && kodok.has('GA') && e.GA >= 2) nap += 180;
+        return nap;
+    }
+
+    function idoHhMmSs(sec) {
+        if (!(sec > 0)) return '-';
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // Az ExcelJS csak exportkor töltődik be (kb. 1 MB) - a versenyzők telefonján nem kell.
+    let exceljsIgeret = null;
+    function exceljsBetolt() {
+        if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+        if (!exceljsIgeret) {
+            exceljsIgeret = new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+                s.onload = () => window.ExcelJS ? res(window.ExcelJS) : rej(new Error('Az Excel-modul nem töltődött be.'));
+                s.onerror = () => { exceljsIgeret = null; rej(new Error('Nem sikerült letölteni az Excel-modult (van internet?).')); };
+                document.head.appendChild(s);
+            });
+        }
+        return exceljsIgeret;
+    }
+
+    // Egy verseny eredménylistájának sorai (kategóriánként) - az Excel exporthoz, és a tesztekhez.
+    function exportSorok(race, hivatalos = {}) {
+        const comps = parseCompetitors(race.competitors);
+        const config = mergeRaceConfig(race.raceConfig);
+        const ranksInfo = calculateCurrentRanks(comps, config);
+        return getActiveCategories(comps, config).map(cat => ({
+            cat,
+            cim: `${cat.replace('j', '')} km-es ${cat.endsWith('j') ? 'junior ' : ''}verseny`,
+            sorok: comps.filter(c => c.dist === cat).sort(eredmenyRendezo(ranksInfo)).map(c => {
+                const rInfo = ranksInfo[c.bib] || { rank: '-' };
+                const kiesett = c.isEliminated;
+                const fnr = !kiesett && c.status === 'FNR';
+                const kesz = (c.laps || []).filter(l => l && l.isComplete);
+                let ido = '-';
+                if (!kiesett) {
+                    if (c.manualEntry) ido = idoHhMmSs(c.totalTimeSec);
+                    else if (kesz.length) {
+                        const ut = kesz[kesz.length - 1];
+                        ido = idoHhMmSs((c.dist === '20' || c.dist === '20j') && ut.vetSec > 0 ? ut.loopSec + ut.pulzusSec : ut.rideTime);
+                    }
+                } else {
+                    ido = getElimText(c);
+                }
+                let megj = '0';
+                if (fnr) megj = 'FNR';
+                else if (kiesett) {
+                    if (c.status && c.status.startsWith('FTQ-')) megj = c.status.replace('FTQ-', '');
+                    else if (['WD', 'RET', 'DSQ'].includes(c.status)) megj = c.status;
+                    else if (['Visszalépett', 'Retired', 'DNS'].includes(c.status)) megj = 'WD';
+                    else megj = 'ELIM';
+                    if ((c.extraCodes || []).length) megj += ' + ' + c.extraCodes.join(' + ');
+                    const megjegyzes = (c.laps || []).slice().reverse().find(l => l && l.vetNotes);
+                    if (megjegyzes) megj += ' (' + megjegyzes.vetNotes + ')';
+                }
+                let kategoria = 'Nyitott';
+                if (cat.includes('j')) kategoria = 'Junior';
+                else if (parseInt(cat, 10) >= 80) kategoria = 'Felnőtt';
+                const sn = String(c.startNum || '').trim();
+                return {
+                    bib: String(c.bib), license: c.license || '', name: c.name || '', startNum: c.startNum || '',
+                    horse: c.internal || '', club: c.club || '', kategoria,
+                    // Hely: helyezettnél szám, kiesettnél és FNR-nél "-" (a hivatalos lista így kéri).
+                    hely: (kiesett || fnr || typeof rInfo.rank !== 'number') ? '-' : rInfo.rank,
+                    ido, buntetes: 0, megj, sargalap: '',
+                    pihenonap: pihenonapok(c, config, loKorabbiKiesesei(sn, race.date, race.id, hivatalos[sn]))
+                };
+            })
+        }));
+    }
+
+    // A tavlovasok.hu eredménylista-formátuma VALÓDI .xlsx fájlban. Korábban egy .xls kiterjesztésű
+    // HTML ment ki: gépen az Excel "a fájl formátuma és kiterjesztése nem egyezik" üzenetet adott,
+    // telefonon meg sem nyílt.
+    async function exportSpecificRaceToCSV(id, megerositve = false) {
         const race = localRaces.mult.find(x => x.id === id);
         if(!race) { showToast("A verseny nem található!", true); return; }
-        
-        let comps = parseCompetitors(race.competitors);
-        let config = mergeRaceConfig(race.raceConfig);
-        
-        if(!comps || comps.length === 0) { showToast("Nincs exportálható adat ebben a versenyben!", true); return; }
+        const comps = parseCompetitors(race.competitors);
+        if(!comps.length) { showToast("Nincs exportálható adat ebben a versenyben!", true); return; }
+        const figyelmeztetes = befejezetlenFigyelmeztetes(comps, mergeRaceConfig(race.raceConfig), 'a hivatalos listában is');
+        if (figyelmeztetes && !megerositve) {
+            showConfirm("Befejezetlen versenyzők", "Exportálod így is?" + figyelmeztetes, () => exportSpecificRaceToCSV(id, true));
+            return;
+        }
 
-        let activeCats = getActiveCategories(comps, config);
-        let ranksInfo = calculateCurrentRanks(comps, config);
-        let raceName = race.name || "Eredmenyek";
-        
-        let html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel">
-        <head><meta charset="utf-8"></head><body>`;
+        showToast("Excel készítése...");
+        let ExcelJS;
+        try { ExcelJS = await exceljsBetolt(); }
+        catch (e) { showToast(e.message, true); return; }
 
-        activeCats.forEach((cat, index) => {
-            let catNameStr = catNames[cat] || (cat+" km"); 
+        // A lovak szövetségi eredményei a göngyölített éves kiesés-számításhoz (pihenőnap-pótlék).
+        const startszamok = [...new Set(comps.map(c => String(c.startNum || '').trim()).filter(Boolean))];
+        const hivatalos = {};
+        await Promise.all(startszamok.map(sn => db.ref('horseResults/' + sanitizeKey(sn)).once('value')
+            .then(snap => { const v = snap.val() || []; hivatalos[sn] = (Array.isArray(v) ? v : Object.values(v)).filter(Boolean); })
+            .catch(() => { hivatalos[sn] = []; })));
 
-            html += `<table border="1" style="border-collapse: collapse; font-family: Calibri, sans-serif;">`;
-            html += `<tr><td colspan="13" style="font-size: 14pt;"><b>${raceName}</b></td></tr>`;
-            html += `<tr><td colspan="13" style="font-size: 12pt;"><b>${index + 1}.vrsz.-${catNameStr}-es verseny</b></td></tr>`;
-            html += `<tr><td colspan="13"></td></tr>`;
-            html += `<tr><td colspan="13">www.tavlovasok.hu</td></tr>`;
-            html += `<tr><td colspan="13">Elbírálás: Távlovaglás</td></tr>`;
-            html += `<tr><td colspan="13"></td></tr>`;
-            html += `<tr><td colspan="13"></td></tr>`;
+        const raceName = race.name || "Eredmenyek";
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'Távlovas versenyrendszer';
+        wb.created = new Date();
+        const ws = wb.addWorksheet('Eredmények', { pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+        const fejlec = ['Rajtszám', 'Igazolási szám', 'Versenyző', 'Ló Startszám', 'Ló', 'Egyesület', 'Kategória', 'Hely', 'Végeredmény (Idő)', 'Büntetőpont', 'Megj. (Kiesés)', 'Sárgalap', 'Pihenőnap'];
+        ws.columns = [9, 14, 28, 12, 26, 26, 11, 7, 22, 11, 22, 9, 10].map(w => ({ width: w }));
+        const keret = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
-            // LILA HÁTTERES, VASTAG FEJLÉCEK (Rajtszám az első!)
-            html += `<tr>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Rajtszám</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Igazolási szám</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Versenyző</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Ló Startszám</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Ló</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Egyesület</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Kategória</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Hely</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Végeredmény (Idő)</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Büntetőpont</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Megj. (Kiesés)</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Sárgalap</th>
-                <th style="background-color:#D9D2E9; border:1px solid #000;">Pihenőnap</th>
-            </tr>`;
-
-            let catComps = comps.filter(c => c.dist === cat);
-            
-            catComps.sort((a,b) => {
-                if (a.isEliminated && !b.isEliminated) return 1;
-                if (!a.isEliminated && b.isEliminated) return -1;
-                if (!a.isEliminated && !b.isEliminated) { return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999); }
-                return parseInt(a.bib) - parseInt(b.bib);
+        exportSorok(race, hivatalos).forEach((blokk, index) => {
+            const cim = ws.addRow([raceName]); cim.font = { bold: true, size: 14 };
+            const vrsz = ws.addRow([`${index + 1}.vrsz.-${blokk.cim}`]); vrsz.font = { bold: true, size: 12 };
+            ws.addRow([]);
+            ws.addRow(['www.tavlovasok.hu']);
+            ws.addRow(['Elbírálás: Távlovaglás']);
+            ws.addRow([]); ws.addRow([]);
+            const fej = ws.addRow(fejlec);
+            fej.eachCell(cell => {
+                cell.font = { bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } };
+                cell.border = keret;
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
-            
-            catComps.forEach(c => {
-                let rInfo = ranksInfo[c.bib] || { rank: "-" };
-                let rankStr = rInfo.rank;
-                let isKiesett = c.isEliminated || rankStr === "Kiesett";
-                
-                let totalTimeStr = "-";
-                let megjStr = ""; 
-                
-                let completedLaps = (c.laps || []).filter(l => l.isComplete);
-                if (completedLaps.length > 0 && !isKiesett) {
-                    let lastLap = completedLaps[completedLaps.length - 1];
-                    if ((c.dist === "20" || c.dist === "20j") && lastLap.vetSec > 0) {
-                        totalTimeStr = toTimeStr(lastLap.loopSec + lastLap.pulzusSec);
-                    } else {
-                        let s = lastLap.rideTime;
-                        const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sc = s % 60;
-                        totalTimeStr = String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(sc).padStart(2, '0');
-                    }
-                    megjStr = "0";
-                } else if (isKiesett) {
-                    totalTimeStr = getElimText(c);
-                    let lastLap = c.laps && c.laps.length > 0 ? c.laps.slice().reverse().find(l => l.vetNotes) : null;
-                    
-                    // ÚJ EXPORT LOGIKA: Közvetlenül a kód kiírása (FTQ- előtag eltávolításával)
-                    if (c.status && c.status.startsWith('FTQ-')) {
-                        megjStr = c.status.replace('FTQ-', ''); // Pl. "FTQ-GA" -> "GA"
-                    } else if (['WD', 'RET', 'DSQ', 'FNR'].includes(c.status)) {
-                        megjStr = c.status;
-                    } else if (c.status === "Visszalépett" || c.status === "Retired" || c.status === "DNS") {
-                        megjStr = "WD";
-                    } else {
-                        megjStr = "ELIM";
-                    }
-
-                    // Ha a doki beírt valami extra megjegyzést, hozzáfűzzük a kód mellé
-                    if (lastLap && lastLap.vetNotes) {
-                        megjStr += " (" + lastLap.vetNotes + ")";
-                    }
-                }
-
-                let kategoria = "Nyitott";
-                if (cat.includes('j')) { kategoria = "Junior"; }
-                else if (parseInt(cat) >= 80) { kategoria = "Felnőtt"; }
-
-                html += `<tr>
-                    <td style="font-weight:bold; border:1px solid #000; text-align:center;">${c.bib}</td>
-                    <td style="border:1px solid #000; text-align:center;">${c.license || ''}</td>
-                    <td style="border:1px solid #000;">${c.name}</td>
-                    <td style="border:1px solid #000; text-align:center;">${c.startNum || ''}</td>
-                    <td style="border:1px solid #000;">${c.internal || ''}</td>
-                    <td style="border:1px solid #000;">${c.club || ''}</td>
-                    <td style="border:1px solid #000; text-align:center;">${kategoria}</td>
-                    <td style="border:1px solid #000; text-align:center;">${isKiesett ? '-' : rankStr}</td>
-                    <td style="font-weight:bold; border:1px solid #000; text-align:center;">${totalTimeStr}</td>
-                    <td style="border:1px solid #000; text-align:center;">0</td>
-                    <td style="border:1px solid #000; text-align:center;">${megjStr}</td>
-                    <td style="border:1px solid #000;"></td>
-                    <td style="border:1px solid #000; text-align:center;">12</td>
-                </tr>`;
+            blokk.sorok.forEach(s => {
+                const sor = ws.addRow([s.bib, s.license, s.name, s.startNum, s.horse, s.club, s.kategoria, s.hely, s.ido, s.buntetes, s.megj, s.sargalap, s.pihenonap]);
+                sor.eachCell({ includeEmpty: true }, (cell, col) => {
+                    cell.border = keret;
+                    cell.alignment = { vertical: 'middle', horizontal: [3, 5, 6, 11].includes(col) ? 'left' : 'center', wrapText: col === 11 };
+                    if (col === 1 || col === 9) cell.font = { bold: true };
+                });
             });
-            
-            html += `<tr><td colspan="13"></td></tr>`;
-            html += `</table><br><br>`;
+            ws.addRow([]); ws.addRow([]);
         });
 
-        html += `</body></html>`;
-
-        let blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
-        let url = URL.createObjectURL(blob);
-        let a = document.createElement('a');
-        a.href = url;
-        a.download = raceName.replace(/ /g, '_') + '_Hivatalos_Eredmenyek.xls';
-        a.click();
-        showToast("Eredmények sikeresen exportálva!");
+        try {
+            const buf = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = raceName.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') + '_Hivatalos_Eredmenyek.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            showToast("Eredmények sikeresen exportálva!");
+        } catch (e) {
+            showToast("Hiba az Excel készítésekor: " + e.message, true);
+        }
     }
 
     // --- LISTÁK (Múlt / Jövő / Jelenlegi) ---
     function obBadge(r) {
-        return r && r.isObRound !== false ? `<span style="background:var(--primary-dim); color:var(--primary); font-size:0.7rem; font-weight:800; padding:3px 9px; border-radius:20px; margin-left:8px; vertical-align:middle;">🏆 OB-FORDULÓ</span>` : '';
+        // nowrap + inline-block: keskeny kijelzőn a kötőjelnél kettétört ("OB-" / "FORDULÓ").
+        return r && r.isObRound !== false ? `<span style="background:var(--primary-dim); color:var(--primary); font-size:0.7rem; font-weight:800; padding:3px 9px; border-radius:20px; margin-left:8px; vertical-align:middle; white-space:nowrap; display:inline-block;">🏆 OB-FORDULÓ</span>` : '';
     }
 
     // --- TÖLTÉS-JELZÉS ----------------------------------------------------------
@@ -1092,9 +1316,10 @@
     // --- VERSENY-KÁRTYA: egy közös renderelő a három állapotra ------------------
     // A státusz (élő / következő / lezárult) adja a felső csík színét és a pill szövegét,
     // a gombokat pedig az opts-ban kapja - így a kártya szerkezete egy helyen van.
+    // A "KÖVETKEZŐ" csak a legközelebbi jövőbeli versenyre kerül (opts.cimke), a többi "TERVEZETT".
     const RACE_STATUS = {
         live: { osztaly: 'is-live',   cimke: 'ÉLŐ' },
-        jovo: { osztaly: 'is-future', cimke: 'KÖVETKEZŐ' },
+        jovo: { osztaly: 'is-future', cimke: 'TERVEZETT' },
         mult: { osztaly: 'is-past',   cimke: 'LEZÁRULT' }
     };
 
@@ -1129,7 +1354,7 @@
         return `<div class="race-card ${st.osztaly}">
             <div class="race-card-head">
                 <div class="race-card-title">${escapeHtml(r.name || 'Névtelen verseny')}${obBadge(r)}</div>
-                <span class="race-status">${st.cimke}</span>
+                <span class="race-status">${opts.cimke || st.cimke}</span>
             </div>
             ${meta ? `<div class="race-card-meta">${meta}</div>` : ''}
             ${raceCardTavChips(cfg, comps)}
@@ -1162,7 +1387,7 @@
             });
         } else {
             jelenCont.innerHTML = betoltesAllapot.live
-                ? '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nincs futó automatikus verseny.</div>'
+                ? '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Jelenleg nincs élő verseny.</div>'
                 : skeletonVersenyKartyak(1);
         }
 
@@ -1177,8 +1402,9 @@
             });
         });
 
-        localRaces.jovo.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(r => {
+        localRaces.jovo.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach((r, i) => {
             jovoCont.innerHTML += raceCardHTML(r, 'jovo', {
+                cimke: i === 0 ? 'KÖVETKEZŐ' : undefined,
                 fooGomb: `<button class="calc-btn" onclick="showFutureInfo('${r.id}')">ℹ️ Részletek megtekintése</button>`,
                 adminGombok: `
                     <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Szerkesztés</button>
@@ -1224,14 +1450,7 @@
             let catComps = comps.filter(c => c.dist === pastAdatlapFilter);
             let total = catComps.length;
             let elim = catComps.filter(c => c.isEliminated).length;
-            let qual = 0;
-            catComps.forEach(c => {
-                if (c.isEliminated) return;
-                let baseDist = c.dist.replace('j', '');
-                let expectedLaps = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 3;
-                let completed = (c.laps || []).filter(l => l.isComplete).length;
-                if (completed >= expectedLaps) qual++;
-            });
+            let qual = catComps.filter(c => teljesitetteE(c, config)).length;
 
             let elimPct = total > 0 ? ((elim/total)*100).toFixed(1) : 0;
             let qualPct = total > 0 ? ((qual/total)*100).toFixed(1) : 0;
@@ -1257,22 +1476,17 @@
             const itemsCont = document.getElementById('pastAdatlapItemsContainer');
             let ranksInfo = calculateCurrentRanks(comps, config);
 
-            catComps.sort((a,b) => {
-                if (a.isEliminated && !b.isEliminated) return 1;
-                if (!a.isEliminated && b.isEliminated) return -1;
-                if (!a.isEliminated && !b.isEliminated) { return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999); }
-                return parseInt(a.bib) - parseInt(b.bib);
-            });
+            catComps.sort(eredmenyRendezo(ranksInfo));
 
             catComps.forEach(c => {
                 let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
-                let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
-                let rankDisplay = c.isEliminated ? "ELIM" : rankStr + "º";
+                let rankClass = c.isEliminated ? "kiesett" : (c.status === 'FNR' ? "fnr" : "");
+                let rankDisplay = helyezesCimke(c, info.rank);
                 let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás: ${info.gapStr}</div>` : '';
                 let speedStr = ""; let speedFlagHtml = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
                 if (completedLaps.length > 0) {
                     let lastLap = completedLaps[completedLaps.length - 1];
-                    speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
+                    speedStr = `Átlag: ${kmh(lastLap.rideSpd)} km/h`;
                     speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
                 }
                 let speedHtml = speedStr ? `<div class="adatlap-speed-badge">${speedStr}</div>` : '';
@@ -1365,7 +1579,9 @@
         
         db.ref('races/' + type + '/' + id).update(raceData).then(() => {
             document.getElementById('rm-id').value = id;
-            modalRaceId = id; 
+            modalRaceId = id;
+            // Mentés után már nem "új" a verseny - a cím a szerkesztést mutassa.
+            document.getElementById('raceModalTitle').innerText = `${type === 'mult' ? 'Múltbéli' : 'Jövőbeli'} verseny szerkesztése`;
             document.getElementById('rm-tab-btn-kiiras').style.display = 'block';
             document.getElementById('rm-tab-btn-versenyzok').style.display = 'block';
             document.getElementById('rm-tab-btn-verseny').style.display = type === 'jovo' ? 'none' : 'block';
@@ -1452,22 +1668,79 @@
         modalEditingBib = null;
     }
 
-    // --- MODAL: KIÍRÁS FUNKCIÓK ÉS DINAMIKUS KÖRÖK ---
-    function changeRmLapCount(dist, count) {
-        let currentLaps = modalRaceConfig[dist].laps || [];
-        let newCount = parseInt(count);
-        if (newCount > currentLaps.length) {
-            for(let i = currentLaps.length; i < newCount; i++) currentLaps.push('');
-        } else if (newCount < currentLaps.length) {
-            currentLaps = currentLaps.slice(0, newCount);
-        }
-        modalRaceConfig[dist].laps = currentLaps;
-        renderRmKiiras();
+    // --- KIÍRÁS: az élő (prefix '') és a versenyszerkesztő (prefix 'rm-') közös logikája ---
+    function kiirasCfg(prefix) { return prefix === 'rm-' ? modalRaceConfig : raceConfig; }
+
+    function kiirasKorszamValtas(prefix, dist, count) {
+        const cfg = kiirasCfg(prefix)[dist];
+        let laps = cfg.laps || [];
+        const n = parseInt(count, 10);
+        if (n > laps.length) { for (let i = laps.length; i < n; i++) laps.push(''); }
+        else laps = laps.slice(0, n);
+        cfg.laps = laps;
+        // Pihenő csak a körök között van (az utolsó kör után cél), ezért eggyel kevesebb.
+        if (cfg.holds) cfg.holds = laps.slice(0, -1).map((_, i) => (cfg.holds[i] !== undefined && cfg.holds[i] !== null ? cfg.holds[i] : ''));
+        if (prefix === 'rm-') renderRmKiiras(); else renderKiiras();
+    }
+    function changeRmLapCount(dist, count) { kiirasKorszamValtas('rm-', dist, count); }
+
+    // Egy mező módosítása (h/m/s, körtáv, pihenő) - azonnal frissíti a táv figyelmeztetését is,
+    // nem csak mentés után.
+    function kiirasMezo(prefix, dist, mezo, idx, val) {
+        const cfg = kiirasCfg(prefix)[dist];
+        if (!cfg) return;
+        if (mezo === 'lap') { if (!cfg.laps) cfg.laps = []; cfg.laps[idx] = val; }
+        else if (mezo === 'hold') { if (!cfg.holds) cfg.holds = (cfg.laps || []).slice(0, -1).map(() => ''); cfg.holds[idx] = val; }
+        else cfg[mezo] = val;
+        kiirasOsszegzoFrissit(prefix, dist);
+    }
+    function updateRmRaceConfig(dist, field, val) { kiirasMezo('rm-', dist, field, null, val); }
+    function updateRmRaceLap(dist, idx, val) { kiirasMezo('rm-', dist, 'lap', idx, val); }
+
+    function kiirasOsszegzoFrissit(prefix, dist) {
+        const span = document.getElementById(prefix + 'kiiras-hiany-' + dist);
+        if (!span) return;
+        const h = kiirasHianyLeiras(kiirasCfg(prefix)[dist], dist);
+        span.textContent = h ? '⚠️ ' + h : '';
+        span.style.display = h ? '' : 'none';
+    }
+
+    // Rajtidő: óra 0-23, perc/mp 0-59 (korábban akár "080000" is elmenthető volt).
+    function kiirasIdoErvenyes(cfg) {
+        const ok = (v, max) => {
+            const s = String(v === undefined || v === null ? '' : v).trim();
+            return s === '' || (/^\d{1,2}$/.test(s) && parseInt(s, 10) <= max);
+        };
+        return ok(cfg.h, 23) && ok(cfg.m, 59) && ok(cfg.s, 59);
+    }
+
+    // Mentést akadályozó hibák (minden távra). Üres tömb = menthető.
+    function kiirasHibak(config) {
+        const hibak = [];
+        DIST_ORDER.forEach(d => {
+            const cfg = config[d];
+            if (!cfg) return;
+            const nev = catNames[d] || d + ' km';
+            if (!kiirasIdoErvenyes(cfg)) hibak.push(`${nev}: hibás rajtidő (óra 0-23, perc és mp 0-59)`);
+            (cfg.laps || []).forEach((l, i) => {
+                if (String(l).trim() === '') return;
+                const v = parseFloat(l);
+                if (!(v > 0 && v <= 200)) hibak.push(`${nev}: hibás ${i + 1}. körtáv (${l})`);
+            });
+            (cfg.holds || []).forEach((h, i) => {
+                if (String(h).trim() === '' || i >= (cfg.laps || []).length - 1) return;
+                const v = parseFloat(h);
+                if (!(v > 0 && v <= 120)) hibak.push(`${nev}: hibás pihenőidő a ${i + 1}. kör után (${h} perc)`);
+            });
+        });
+        return hibak;
     }
 
     // Mit hiányol ez a táv? Csukott blokknál is ki kell írni, különben észrevétlen marad a
     // hiányzó körtáv - pont ez okozta a Husztót Kupánál a néma 0 pontot (l. getSilentZeroWarnings).
-    function kiirasHianyLeiras(cfg) {
+    // A pihenőidőnél az 53. § szabályait is jelzi (20-29 km-es kör után min. 30 perc, 30 km-nél
+    // hosszabb kör után km-enként 1 perc, egynapos versenyen legfeljebb 60 perc).
+    function kiirasHianyLeiras(cfg, dist) {
         const laps = (cfg && cfg.laps) || [];
         const ures = laps.filter(l => l === '' || l === null || l === undefined).length;
         const hianyok = [];
@@ -1476,6 +1749,17 @@
         else if (ures) hianyok.push(`${ures} kör távja hiányzik`);
         const rajtUres = ['h', 'm', 's'].every(k => String((cfg && cfg[k]) || '').trim() === '');
         if (rajtUres) hianyok.push('nincs rajtidő');
+        else if (cfg && !kiirasIdoErvenyes(cfg)) hianyok.push('hibás rajtidő');
+        if (laps.some(l => String(l).trim() !== '' && !(parseFloat(l) > 0 && parseFloat(l) <= 200))) hianyok.push('hibás körtáv');
+        if (cfg && dist) {
+            for (let i = 0; i < laps.length - 1; i++) {
+                const km = parseFloat(laps[i]);
+                const perc = getPihenoPerc(cfg, dist, i);
+                const min = km > 30 ? Math.ceil(km) : (km >= 20 ? 30 : 0);
+                if (min && perc < min) hianyok.push(`${i + 1}. kör után min. ${min} perc pihenő kell`);
+                if (perc > 60) hianyok.push(`${i + 1}. pihenő 60 percnél hosszabb`);
+            }
+        }
         return hianyok.join(' · ');
     }
 
@@ -1497,30 +1781,41 @@
     }
 
     // Az élő kiírás (renderKiiras) és a verseny-szerkesztő modal (renderRmKiiras) ugyanazt a
-    // szerkezetet rajzolja, csak más állapotot ír és más callbackeket hív - ezért közös builder.
-    function kiirasTavBlokkHtml(d, cfg, fn, idElotag) {
+    // szerkezetet rajzolja, csak más állapotot ír - ezért közös builder (p = mező-előtag).
+    function kiirasTavBlokkHtml(d, cfg, p) {
         const lapCount = (cfg.laps || []).length;
-        const hiany = kiirasHianyLeiras(cfg);
+        const hiany = kiirasHianyLeiras(cfg, d);
+        const ertek = v => (v === undefined || v === null) ? '' : String(v).replace(/"/g, '&quot;');
         const korInputok = (cfg.laps || []).map((lapDist, idx) =>
-            `<input type="number" step="0.1" placeholder="${idx + 1}. kör" value="${lapDist}" style="width:65px;" onchange="${fn.lap}('${d}', ${idx}, this.value)">`
+            `<input type="number" step="0.1" min="0.1" max="200" inputmode="decimal" placeholder="${idx + 1}. kör" value="${ertek(lapDist)}" style="width:65px;" oninput="kiirasMezo('${p}', '${d}', 'lap', ${idx}, this.value)">`
+        ).join('');
+        // Az utolsó kör után nincs pihenő (cél). Üres mező = alapérték (a placeholderben látszik).
+        const pihenoInputok = (cfg.laps || []).slice(0, -1).map((_, idx) =>
+            `<label class="piheno-mezo"><span>${idx + 1}. kör után</span>
+                <input type="number" min="1" max="120" step="1" inputmode="numeric" placeholder="${alapPihenoPerc(d, idx, lapCount)}" value="${ertek(cfg.holds ? cfg.holds[idx] : '')}" oninput="kiirasMezo('${p}', '${d}', 'hold', ${idx}, this.value)"> perc
+            </label>`
         ).join('');
 
         return `<details class="kiiras-card"${kiirasNyitvaE(d) ? ' open' : ''} ontoggle="kiirasToggle('${d}', this.open)">
-            <summary>${catNames[d] || d + ' km'} Kategória${hiany ? `<span class="kiiras-hiany">⚠️ ${hiany}</span>` : ''}</summary>
+            <summary>${catNames[d] || d + ' km'} Kategória<span class="kiiras-hiany" id="${p}kiiras-hiany-${d}"${hiany ? '' : ' style="display:none"'}>${hiany ? '⚠️ ' + hiany : ''}</span></summary>
             <div class="kiiras-tartalom">
                 <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-                    <select class="admin-only kiiras-korszam" onchange="${fn.lapCount}('${d}', this.value)">
+                    <select class="admin-only kiiras-korszam" onchange="kiirasKorszamValtas('${p}', '${d}', this.value)">
                         ${[1,2,3,4,5,6,7,8].map(num => `<option value="${num}" ${lapCount === num ? 'selected' : ''}>${num} kör</option>`).join('')}
                     </select>
                 </div>
                 <label>Hivatalos Rajt:</label>
                 <div class="time-group">
-                    <input type="number" placeholder="00" value="${cfg.h}" onchange="${fn.config}('${d}', 'h', this.value)" oninput="jump(this, '${idElotag}kr_${d}_m')"> :
-                    <input type="number" id="${idElotag}kr_${d}_m" placeholder="00" value="${cfg.m}" onchange="${fn.config}('${d}', 'm', this.value)" oninput="jump(this, '${idElotag}kr_${d}_s')"> :
-                    <input type="number" id="${idElotag}kr_${d}_s" placeholder="00" value="${cfg.s}" onchange="${fn.config}('${d}', 's', this.value)">
+                    <input type="number" min="0" max="23" step="1" inputmode="numeric" placeholder="00" value="${ertek(cfg.h)}" oninput="kiirasMezo('${p}', '${d}', 'h', null, this.value); jump(this, '${p}kr_${d}_m')"> :
+                    <input type="number" min="0" max="59" step="1" inputmode="numeric" id="${p}kr_${d}_m" placeholder="00" value="${ertek(cfg.m)}" oninput="kiirasMezo('${p}', '${d}', 'm', null, this.value); jump(this, '${p}kr_${d}_s')"> :
+                    <input type="number" min="0" max="59" step="1" inputmode="numeric" id="${p}kr_${d}_s" placeholder="00" value="${ertek(cfg.s)}" oninput="kiirasMezo('${p}', '${d}', 's', null, this.value)">
                 </div>
                 <label>Körök távolságai (km):</label>
                 <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">${korInputok}</div>
+                ${lapCount > 1 ? `
+                <label>Kötelező pihenőidő (perc):</label>
+                <p class="field-hint" style="margin:2px 0 6px 0;">Üresen hagyva az alapérték: 40 perc, 100 km-től az utolsó pihenő 50 perc. Verseny közben is módosítható - mentéskor a már rögzített kiindulási idők újraszámolódnak.</p>
+                <div class="piheno-sor">${pihenoInputok}</div>` : ''}
             </div>
         </details>`;
     }
@@ -1528,28 +1823,45 @@
     function renderRmKiiras() {
         const cont = document.getElementById('rm-kiirasContainer');
         if (!cont) return;
-        cont.innerHTML = DIST_ORDER.filter(d => modalRaceConfig[d]).map(d =>
-            kiirasTavBlokkHtml(d, modalRaceConfig[d],
-                { lapCount: 'changeRmLapCount', config: 'updateRmRaceConfig', lap: 'updateRmRaceLap' }, 'rm-')
-        ).join('');
+        cont.innerHTML = DIST_ORDER.filter(d => modalRaceConfig[d]).map(d => kiirasTavBlokkHtml(d, modalRaceConfig[d], 'rm-')).join('');
     }
-    function updateRmRaceConfig(dist, field, val) { modalRaceConfig[dist][field] = val; }
-    function updateRmRaceLap(dist, idx, val) { 
-        if(!modalRaceConfig[dist].laps) modalRaceConfig[dist].laps = [];
-        modalRaceConfig[dist].laps[idx] = val; 
+
+    // A kiírás (körtáv, rajtidő, pihenő) változása után a versenyzők már rögzített köreit
+    // újra kell számolni - különben a kiindulási idők és sebességek a régi kiírást tükröznék.
+    // Tranzakció versenyzőnként, hogy a közben érkező beérkeztetés/orvosi mentések ne vesszenek el.
+    // A "Gyors eredmény"-nyel (kör-adatok nélkül) rögzítetteket kihagyjuk.
+    function versenyzokUjraszamolasa(utvonal, comps, config) {
+        return Promise.all(comps.filter(c => c && !c.manualEntry).map(c =>
+            db.ref(utvonal + '/' + c.bib).transaction(currentComp => {
+                if (!currentComp || currentComp.manualEntry) return currentComp;
+                const result = recalcCompetitorData(currentComp, config);
+                delete result._timeWarnings;
+                return result;
+            })
+        ));
     }
+
     function saveRmKiiras() {
         if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
+        const hibak = kiirasHibak(modalRaceConfig);
+        if (hibak.length) { showToast(hibak[0], true); return; }
         const type = document.getElementById('rm-type').value;
-        db.ref('races/' + type + '/' + modalRaceId + '/raceConfig').set(modalRaceConfig).then(() => {
+        const utvonal = 'races/' + type + '/' + modalRaceId;
+        db.ref(utvonal + '/raceConfig').set(modalRaceConfig).then(() => {
             showAnimatedBtn('saveRmKiirasBtn');
+            return versenyzokUjraszamolasa(utvonal + '/competitors', modalCompetitors, modalRaceConfig);
         }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
     }
 
     function saveRmVet() {
         if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
-        const name = document.getElementById('rm-regVetName').value.trim();
+        const name = document.getElementById('rm-regVetName').value.trim().replace(/\s+/g, ' ');
         if(!name) { showToast("Add meg az orvos nevét!", true); return; }
+        // Ugyanaz a duplikáció-szűrés, mint az élő orvoslistánál (saveVet).
+        if (modalVets.some(v => v.name && v.name.toLowerCase() === name.toLowerCase())) {
+            showToast("Ez az orvos már szerepel ennél a versenynél.", true);
+            return;
+        }
         const type = document.getElementById('rm-type').value;
         const id = Date.now().toString();
         db.ref('races/' + type + '/' + modalRaceId + '/vets/' + id).set({ id, name }).then(() => {
@@ -1582,57 +1894,81 @@
         });
     }
 
-    // --- MODAL: VERSENYZŐ FUNKCIÓK ---
-    function saveRmCompetitor() {
-        if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
-        const type = document.getElementById('rm-type').value;
-        
-        // ÚJ: Beolvassuk az összes mezőt (ezek hiányoztak!)
-        const bib = document.getElementById('rm-regBib').value;
-        const name = document.getElementById('rm-regName').value;
-        const startNum = document.getElementById('rm-regStartNum').value; 
-        const license = document.getElementById('rm-regLicense').value;   
-        const club = document.getElementById('rm-regClub').value;         
-        const dist = document.getElementById('rm-regDist').value;
-        const internal = document.getElementById('rm-regInternal').value; 
-        
-        if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
-        
-        if (modalEditingBib && modalEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalEditingBib).remove(); }
+    // --- RAJTSZÁM-ÜTKÖZÉS ---
+    // Új versenyző (vagy rajtszám-csere) csak SZABAD rajtszámra kerülhet. Korábban a foglalt
+    // számon lévő versenyzőt szó nélkül felülírta - élőben az új ember még a régi köreit és
+    // eredményét is "megörökölte".
+    function rajtszamFoglalo(comps, bib, sajatBib) {
+        if (sajatBib && String(sajatBib) === String(bib)) return null;
+        return (comps || []).find(c => c && String(c.bib) === String(bib)) || null;
+    }
 
-        // A régi rekord MINDEN mezője megmarad (obPont, kézi helyezés, finishOrder, ...) - korábban
-        // csak a startTime/laps/isEliminated jött át, a többit egy egyszerű névjavítás is törölte.
-        let existingData = { startTime: { h: '', m: '', s: '' }, laps: [], isEliminated: false };
-        const targetBib = modalEditingBib ? modalEditingBib : bib;
-        const oldComp = modalCompetitors.find(c => c.bib == targetBib);
-        if (oldComp) existingData = Object.assign(existingData, oldComp);
+    // A rajtszám a Firebase-ben kulcs: . # $ [ ] / nem lehet benne.
+    function rajtszamErvenyes(bib) { return /^[0-9A-Za-z_-]{1,10}$/.test(String(bib)); }
 
-        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - mezőszinten, l. torzsFrissitesek()
-        const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
-        if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
-
-        // Tranzakció: ha a célhelyen (ez a bib) időközben már van szerver-oldali adat (laps/startTime),
-        // azt tartjuk meg - a helyi existingData csak akkor esik latba, ha a hely még valóban üres.
-        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).transaction(currentComp => {
+    // A nevezés közös mentése (élő és versenyszerkesztő). ut = '.../competitors/'.
+    // - foglalt rajtszámra nem ír (akkor sem, ha közben egy másik eszköz foglalta el - tranzakció);
+    // - rajtszám-cserénél előbb az újat menti, és csak siker után törli a régit;
+    // - a régi rekord MINDEN mezője megmarad (köradatok, orvosi döntés, obPont, kézi helyezés...).
+    function versenyzoMentes({ ut, comps, szerkesztettBib, mezok, gombId, utana }) {
+        const bib = mezok.bib;
+        if (!rajtszamErvenyes(bib)) { showToast('A rajtszám csak számot, betűt, kötőjelet tartalmazhat (max. 10 karakter).', true); return; }
+        const foglalo = rajtszamFoglalo(comps, bib, szerkesztettBib);
+        if (foglalo) { showToast(`A(z) ${bib}. rajtszám már foglalt: ${foglalo.name}. Adj meg másikat!`, true); return; }
+        const sajatHelyen = !!szerkesztettBib && String(szerkesztettBib) === String(bib);
+        const regiBib = szerkesztettBib && !sajatHelyen ? szerkesztettBib : null;
+        const oldComp = (comps || []).find(c => c && String(c.bib) === String(szerkesztettBib || bib));
+        const existingData = Object.assign({ startTime: { h: '', m: '', s: '' }, laps: [], isEliminated: false }, sajatHelyen || regiBib ? oldComp : {});
+        let utkozott = false;
+        db.ref(ut + bib).transaction(currentComp => {
+            utkozott = false;
+            if (currentComp && !sajatHelyen) { utkozott = true; return; }   // foglalt -> nem írunk
             const base = currentComp || existingData;
             return {
                 ...base,
-                bib: bib, name: name.trim(), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
+                ...mezok,
                 startTime: base.startTime || { h: '', m: '', s: '' },
                 laps: base.laps || [],
                 isEliminated: base.isEliminated || false,
                 // A nevezés csak egy pillanatfelvétel - ezek nélkül a mentés törölné az orvosi
                 // döntést, ha az korábban már megvolt (idomodell-es-hibak.md, A rész).
-                // A Firebase SDK nem fogad el "undefined" mezőértéket, ezért null a biztonságos alap
-                // (null = a kulcs egyszerűen nem jön létre, pont mint eddig, ha még nem volt orvosi adat).
+                // null (nem undefined!) a biztonságos alap, mert a Firebase SDK undefined mezőértékre hibát dob.
                 status: base.status || null,
                 extraCodes: base.extraCodes || [],
                 preVet: base.preVet || null
             };
-        }).then(() => {
-            showAnimatedBtn('rm-addCompBtn');
-            cancelRmEdit();
+        }).then(res => {
+            if (utkozott || (res && res.committed === false)) {
+                showToast(`A(z) ${bib}. rajtszámot közben más foglalta el - nem mentettem.`, true);
+                return;
+            }
+            if (regiBib) db.ref(ut + regiBib).remove();
+            // Ló/lovas törzsadat (mezőszinten, l. torzsFrissitesek) - csak sikeres mentés után.
+            const torzs = torzsFrissitesek(mezok.startNum, mezok.internal, mezok.license, mezok.name, mezok.club);
+            if (Object.keys(torzs).length) db.ref('/').update(torzs);
+            showAnimatedBtn(gombId);
+            utana();
         }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
+    }
+
+    function nevezesMezok(elotag) {
+        const v = id => String(document.getElementById(elotag + id).value || '').trim();
+        return {
+            bib: v('regBib'), name: v('regName').replace(/\s+/g, ' '), startNum: v('regStartNum'),
+            license: v('regLicense'), club: v('regClub').replace(/\s+/g, ' '), dist: v('regDist'), internal: v('regInternal').replace(/\s+/g, ' ')
+        };
+    }
+
+    // --- MODAL: VERSENYZŐ FUNKCIÓK ---
+    function saveRmCompetitor() {
+        if(!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
+        const type = document.getElementById('rm-type').value;
+        const mezok = nevezesMezok('rm-');
+        if (!mezok.bib || !mezok.name) { showToast("Név és rajtszám kötelező!", true); return; }
+        versenyzoMentes({
+            ut: 'races/' + type + '/' + modalRaceId + '/competitors/', comps: modalCompetitors,
+            szerkesztettBib: modalEditingBib, mezok, gombId: 'rm-addCompBtn', utana: cancelRmEdit
+        });
     }
     
     function editRmCompetitor(bib) {
@@ -1726,27 +2062,57 @@
         const place = parseInt(document.getElementById('rm-gy-place').value, 10);
         const timeSec = toSec(document.getElementById('rm-gy-h').value, document.getElementById('rm-gy-m').value, document.getElementById('rm-gy-s').value);
 
-        if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
+        if (!String(bib).trim() || !String(name).trim()) { showToast("Név és rajtszám kötelező!", true); return; }
+        if (!rajtszamErvenyes(String(bib).trim())) { showToast('A rajtszám csak számot, betűt, kötőjelet tartalmazhat (max. 10 karakter).', true); return; }
 
-        if (modalGyorsEditingBib && modalGyorsEditingBib !== bib) { db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + modalGyorsEditingBib).remove(); }
+        // Foglalt rajtszámra nem írunk (a set() a teljes rekordot cserélné - egy időmért versenyző
+        // köradatai is elvesztek így).
+        const foglalo = rajtszamFoglalo(modalCompetitors, bib, modalGyorsEditingBib);
+        if (foglalo) { showToast(`A(z) ${bib}. rajtszám már foglalt: ${foglalo.name}. Adj meg másikat!`, true); return; }
+        const regiGyors = modalCompetitors.find(c => String(c.bib) === String(modalGyorsEditingBib || bib));
+        if (regiGyors && !regiGyors.manualEntry && (regiGyors.laps || []).some(l => l && (l.h || l.oh))) {
+            showToast(`${regiGyors.name} részletes köradatokkal szerepel - az Eredmények fülön szerkeszd.`, true);
+            return;
+        }
 
-        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - ugyanaz a minta, mint a normál nevezésnél.
-        const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
-        if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
+        // Helyezést csak a "versenyben / célba ért" státusz kaphat; FNR és kiesés helyezés nélkül.
+        const helyezett = status === 'Active';
+        if (helyezett && !isNaN(place)) {
+            if (place < 1) { showToast('A helyezés legalább 1 legyen.', true); return; }
+            const masok = modalCompetitors.filter(c => c.dist === dist && String(c.bib) !== String(modalGyorsEditingBib || bib));
+            // A köradatokkal rögzítettek helyezése az időkből számolódik (calculateCurrentRanks) - egy
+            // kézi helyezés ugyanazon a távon dupla helyezést adna velük (pl. két 2. hely).
+            const idomert = masok.find(c => !c.manualEntry && !c.isEliminated && c.status !== 'FNR' && (c.laps || []).some(l => l && l.isComplete));
+            if (idomert) { showToast(`Ezen a távon köradatokkal rögzített versenyző is van (pl. ${idomert.name}), az ő helyezése az időkből számolódik - kézi helyezés itt összeakadna vele. Az Eredmények fülön vedd fel köridőkkel.`, true); return; }
+            const utkozo = masok.find(c => c.manualEntry && !c.isEliminated && c.status !== 'FNR' && c.manualPlace === place);
+            if (utkozo) { showToast(`A(z) ${place}. hely ezen a távon már foglalt: ${utkozo.name}.`, true); return; }
+        }
 
-        // A set() a teljes rekordot cseréli - az OB-pontról való lemondás (obPont: false) ne vesszen el egy javítással.
-        const regiGyors = modalCompetitors.find(c => c.bib == (modalGyorsEditingBib || bib));
         const compData = {
-            bib: bib, name: name.trim(), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
-            status: status, isEliminated: status !== 'Active',
+            bib: String(bib).trim(), name: name.trim().replace(/\s+/g, ' '), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
+            status: status, isEliminated: !(status === 'Active' || status === 'FNR'),
             manualEntry: true,
-            manualPlace: isNaN(place) ? null : place,
+            manualPlace: helyezett && !isNaN(place) ? place : null,
             totalTimeSec: timeSec > 0 ? timeSec : null,
+            // A set() a teljes rekordot cseréli - az OB-pontról való lemondás (obPont: false) ne vesszen el egy javítással.
             obPont: regiGyors && regiGyors.obPont === false ? false : null,
             laps: []
         };
 
-        db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + bib).set(compData).then(() => {
+        const ut = 'races/' + type + '/' + modalRaceId + '/competitors/';
+        const sajatHelyen = !!modalGyorsEditingBib && String(modalGyorsEditingBib) === String(compData.bib);
+        const regiBib = modalGyorsEditingBib && !sajatHelyen ? modalGyorsEditingBib : null;
+        let utkozott = false;
+        db.ref(ut + compData.bib).transaction(currentComp => {
+            utkozott = false;
+            if (currentComp && !sajatHelyen) { utkozott = true; return; }
+            return compData;
+        }).then(res => {
+            if (utkozott || (res && res.committed === false)) { showToast(`A(z) ${compData.bib}. rajtszámot közben más foglalta el - nem mentettem.`, true); return; }
+            if (regiBib) db.ref(ut + regiBib).remove();
+            // Ló/lovas törzsadat upsert (mezőszinten) - csak sikeres mentés után.
+            const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
+            if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
             showAnimatedBtn('rm-gy-addBtn');
             cancelRmGyorsEdit();
         }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
@@ -1841,49 +2207,10 @@
     }
 
     // --- MODAL: TELJES VERSENY (EREDMÉNYEK) ---
-    function loadRmCompetitorData() {
-        const bib = document.getElementById('rm-selectCompetitor').value;
-        const formCont = document.getElementById('rm-verseny-form-container');
-        if (!bib) {
-            formCont.style.display = 'none';
-            document.querySelectorAll('#rm-verseny-form-container input').forEach(i => i.value = '');
-            document.getElementById('rm-res2').style.display = 'none';
-            return;
-        }
-        formCont.style.display = 'block';
-        
-        const comp = modalCompetitors.find(c => c.bib == bib);
-        if(!comp) return;
-
-        document.getElementById('rm-totalDist').value = comp.dist;
-        autoSetLaps('rm-lapCount', 'rm-totalDist', 'rm-lapInputsContainer', 'rm-v', true);
-
-        if (comp.status) document.getElementById('rm-compStatusSelect').value = comp.status;
-        else document.getElementById('rm-compStatusSelect').value = comp.isEliminated ? 'Kiesett' : 'Active';
-
-        const baseDist = comp.dist.replace('j', '');
-        const cfg = modalRaceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
-        
-        document.getElementById('rm-vhR').value = comp.startTime.h || cfg.h;
-        document.getElementById('rm-vmR').value = comp.startTime.m || cfg.m;
-        document.getElementById('rm-vsR').value = comp.startTime.s || cfg.s;
-
-        const lapsArr = comp.laps || [];
-        lapsArr.forEach((l, i) => {
-            const idx = i + 1;
-            if(document.getElementById(`rm-vd${idx}`)) {
-                document.getElementById(`rm-vd${idx}`).value = l.d || '';
-                document.getElementById(`rm-vh${idx}`).value = l.h || ''; document.getElementById(`rm-vm${idx}`).value = l.m || ''; document.getElementById(`rm-vs${idx}`).value = l.s || '';
-                document.getElementById(`rm-voh${idx}`).value = l.oh || ''; document.getElementById(`rm-vom${idx}`).value = l.om || ''; document.getElementById(`rm-vos${idx}`).value = l.os || '';
-            }
-        });
-        if(lapsArr.length === 0) {
-            (cfg.laps || []).forEach((ld, i) => { if(document.getElementById(`rm-vd${i+1}`)) document.getElementById(`rm-vd${i+1}`).value = ld; });
-        }
-        calcRmVerseny();
-    }
-
-    function calcRmVerseny() {
+    // (A versenyző betöltése - loadRmCompetitorData - lejjebb van; itt korábban egy régi,
+    // felülírt példánya is ült.) saveToDb=false: csak számol és kijelez, NEM ment - a puszta
+    // kiválasztás / megnézés korábban az adatbázisba írt, és "Sikeresen mentve"-t mutatott.
+    function calcRmVerseny(saveToDb = true) {
         const count = parseInt(document.getElementById('rm-lapCount').value);
         const bib = document.getElementById('rm-selectCompetitor').value;
         const rajt = toSec(document.getElementById('rm-vhR').value, document.getElementById('rm-vmR').value, document.getElementById('rm-vsR').value);
@@ -1908,8 +2235,8 @@
         function applyForm(target) {
             target.startTime = startTime;
             target.status = statusVal;
-            // A RECHECK nem kiesés (l. az élő calcVerseny-nél ugyanez).
-            target.isEliminated = (statusVal !== 'Active' && statusVal !== 'RECHECK');
+            // A RECHECK és az FNR (teljesítette, helyezés nélkül) nem kiesés (l. az élő calcVerseny-t).
+            target.isEliminated = !['Active', 'RECHECK', 'FNR'].includes(statusVal);
             lapValues.forEach((lv, i) => {
                 if (!target.laps) target.laps = [];
                 if (!target.laps[i]) target.laps[i] = {};
@@ -1963,7 +2290,7 @@
             }
         }
         document.getElementById('rm-res2').style.display='block'; document.getElementById('rm-res2').innerHTML = html;
-        if (comp) {
+        if (saveToDb && comp) {
             const type = document.getElementById('rm-type').value;
             db.ref('races/' + type + '/' + modalRaceId + '/competitors/' + comp.bib).transaction(currentComp => {
                 if (!currentComp) return currentComp;
@@ -1971,8 +2298,8 @@
                 delete result._timeWarnings; // ideiglenes, kijelzésre való - nem mentjük el
                 return result;
             });
+            showAnimatedBtn('rm-btn-kiertel-mentes');
         }
-        showAnimatedBtn('rm-btn-kiertel-mentes');
     }
 
     // --- IDŐMODELL: ÉJFÉL KÖRÜLI ÁTFORDULÁS vs. ELGÉPELÉS (idomodell-es-hibak.md, B rész) ---
@@ -2076,8 +2403,9 @@
             totalD += l.d;
             l.rideTime = totalPure;
             l.rideSpd = totalD / (totalPure/3600);
+            // Kötelező pihenő a kiírásból (53. §, alapból 40 perc, 100 km-től az utolsó 50) - korábban fix 40.
             // normalizálva 0-86399 közé, hogy éjfél körül ne "24:xx:xx"-ként jelenjen meg és a várakozó-státusz ne ragadjon be (P0/2)
-            l.nextStart = ((vet > 0 ? vet : arr) + 2400) % 86400;
+            l.nextStart = ((vet > 0 ? vet : arr) + Math.round(getPihenoPerc(cfg, comp.dist, i) * 60)) % 86400;
 
             curStart = l.nextStart;
             comp.laps[i] = l;
@@ -2123,6 +2451,8 @@
     function saveBeerkeztetesData() {
         const bib = document.getElementById('sel-beerkeztetes').value;
         const h = document.getElementById('bk-h').value, m = document.getElementById('bk-m').value, s = document.getElementById('bk-s').value;
+        // Üres rajtszámmal a tranzakció a teljes competitors ágon futna le.
+        if (!bib) { showToast('Válassz versenyzőt!', true); return; }
 
         // Tranzakció: a szerveren lévő legfrissebb állapotot olvassa be és azon hajtja végre
         // ugyanezt a módosítást - ha közben más (pl. az orvos) is írt, nem veszik el az ő mentése.
@@ -2180,6 +2510,7 @@
     function saveOrvosiIdoData() {
         const bib = document.getElementById('sel-orvosi-ido').value;
         const oh = document.getElementById('bk-v-h').value, om = document.getElementById('bk-v-m').value, os = document.getElementById('bk-v-s').value;
+        if (!bib) { showToast('Válassz versenyzőt!', true); return; }
 
         db.ref('competitors/' + bib).transaction(currentComp => {
             if (!currentComp) return currentComp;
@@ -2204,7 +2535,8 @@
 
     // --- ÁLLATORVOSOK FELVITELE (ÚJ FUNKCIÓK) ---
     function saveVet() {
-        const name = document.getElementById('regVetName').value.trim();
+        // Mint a versenyszerkesztőben (saveRmVet): a dupla szóköz se csináljon "új" orvost.
+        const name = document.getElementById('regVetName').value.trim().replace(/\s+/g, ' ');
         if(!name) { showToast("Add meg az orvos nevét!", true); return; }
         if (liveVets.some(v => v.name && v.name.toLowerCase() === name.toLowerCase())) {
             showToast("Ez az orvos már szerepel ennél a versenynél.", true);
@@ -2338,13 +2670,8 @@
         document.getElementById('orv-mozgas').value = l.mozgas || '';
         document.getElementById('orv-vet-name').value = l.vetName || '';
         document.getElementById('orv-notes').value = l.vetNotes || '';
-        
-        function adjustVetDecisionColors(sel) {
-            const val = sel.value;
-            if(val === 'Passed' || val === 'Active') sel.style.color = 'var(--success)';
-            else if(['WD', 'RET', 'FNR'].includes(val)) sel.style.color = 'var(--warning)';
-            else sel.style.color = 'var(--danger)';
-        }
+        const rcTipusSel = document.getElementById('orv-rc-tipus');
+        if (rcTipusSel) rcTipusSel.value = l.rcTipus || '';
 
         // --- HIBATŰRŐ STÁTUSZ BEÁLLÍTÁS ---
         // Az alapértelmezés MINDIG a zöld "Versenyben (Active)". Ha a versenyzőnek
@@ -2366,6 +2693,25 @@
         checkPulseWarning();
     }
 
+    // Az orvosi döntés legördülőjének színe. Korábban a loadOrvosiData() BELSEJÉBEN volt, így az
+    // index.html onchange-e nem érte el ("not defined" hiba), és a mögötte álló
+    // frissitRecheckLathatosag() sem futott le - Re-check választásakor nem jelent meg az időmező.
+    function adjustVetDecisionColors(sel) {
+        if (!sel) return;
+        const val = sel.value;
+        if (val === 'Passed' || val === 'Active' || val === 'FNR') sel.style.color = 'var(--success)';
+        else if (['WD', 'RET', 'RECHECK'].includes(val)) sel.style.color = 'var(--warning)';
+        else sel.style.color = 'var(--danger)';
+    }
+
+    // Re-check típusai - a FEI orvosi lap (FEI Endurance Vet Gate Card) "Re-Inspection" oszlopa
+    // szerint, a szabályzat megfelelő pontjaival.
+    const RECHECK_TIPUSOK = {
+        HR:   { rovid: 'HR',   nev: 'Pulzus miatt újra bemutatva', szabaly: '100. §' },
+        REQ:  { rovid: 'REQ',  nev: 'Az orvos kérte', szabaly: '92. § (4)' },
+        COMP: { rovid: 'COMP', nev: 'Kötelező ismételt vizsgálat', szabaly: '92. § (3), 101. §' }
+    };
+
     // Kombinálható kiesési kódok checkbox-chip listája (hatralevo-javitasok_1.md, 4. pont)
     function renderExtraCodesCheckboxes(selected) {
         const cont = document.getElementById('orv-extra-codes');
@@ -2386,16 +2732,45 @@
 
     // --- RE-CHECK ---
     // Ha az állatorvos nem enged tovább azonnal, a lovat újra be kell mutatni.
-    // A re-check a KIINDULÁS (nextStart) előtt kb. 15 perccel esedékes:
-    //     nextStart = (orvosi vagy beérkezés) + 40 perc      (rps.js recalc)
+    // A re-check a KIINDULÁS (nextStart) előtti utolsó 15 percben esedékes (92. § (3)-(4)):
+    //     nextStart = (orvosi vagy beérkezés) + a kiírás szerinti pihenő   (recalcCompetitorData)
     //     re-check  = nextStart - 15 perc
     const RECHECK_ELOTTE_SEC = 15 * 60;
 
-    function recheckJavasoltSec(l) {
+    function recheckJavasoltSec(l, pihenoSec = ALAP_PIHENO_PERC * 60) {
         const alap = toSec(l.oh, l.om, l.os) || toSec(l.h, l.m, l.s);
         if (!alap) return 0;
-        const nextStart = (alap + 2400) % 86400;
+        // A mentett kiindulási idő már a kiírás szerinti pihenővel számolt.
+        const nextStart = l.nextStart > 0 ? l.nextStart : (alap + pihenoSec) % 86400;
         return { nextStart, javasolt: (nextStart - RECHECK_ELOTTE_SEC + 86400) % 86400 };
+    }
+
+    // Egy versenyző aktuális re-check információja a nyilvános nézetekhez (adatlap, élő
+    // kiindulások, matrica): melyik kör, milyen típus, mikor esedékes / mikor volt.
+    function recheckInfo(c, config) {
+        if (!c || c.status !== 'RECHECK') return null;
+        const laps = c.laps || [];
+        let idx = -1;
+        laps.forEach((l, i) => { if (l && l.h) idx = i; });
+        const l = idx >= 0 ? laps[idx] : (c.preVet || {});
+        const baseDist = String(c.dist || '').replace('j', '');
+        const cfg = (config && config[baseDist]) || {};
+        const info = idx >= 0 ? recheckJavasoltSec(l, getPihenoPerc(cfg, c.dist, idx) * 60) : 0;
+        const rogzitett = toSec(l.rch, l.rcm, l.rcs);
+        return {
+            kor: idx + 1, tipus: l.rcTipus ? RECHECK_TIPUSOK[l.rcTipus] : null,
+            rogzitett: rogzitett > 0 ? rogzitett : 0,
+            esedekes: info ? info.javasolt : 0,
+            kiindulas: info ? info.nextStart : 0
+        };
+    }
+
+    function recheckSzoveg(ri) {
+        if (!ri) return '';
+        const tipus = ri.tipus ? ` (${ri.tipus.rovid})` : '';
+        if (ri.rogzitett) return `Re-check${tipus} ${toTimeStr(ri.rogzitett)}`;
+        if (ri.esedekes) return `Re-check${tipus} ${toTimeStr(ri.esedekes)}-tól`;
+        return `Re-check${tipus}`;
     }
 
     // Aktuális idő beírása egy óra/perc/mp mezőhármasba. A beérkeztetésnél és
@@ -2504,6 +2879,15 @@
         const rch = document.getElementById('orv-rch').value;
         const rcm = document.getElementById('orv-rcm').value;
         const rcs = document.getElementById('orv-rcs').value;
+        const rcTipus = (document.getElementById('orv-rc-tipus') || {}).value || '';
+
+        if (!bib) { showToast('Válassz versenyzőt!', true); return; }
+        // A vizsgáló orvos neve a hivatalos lap része (FEI vet card: "Vet. initials") - nélküle nem mentünk.
+        if (!vetName) {
+            showToast('Válaszd ki a vizsgáló állatorvost!', true);
+            const vs = document.getElementById('orv-vet-name'); if (vs) vs.focus();
+            return;
+        }
 
         db.ref('competitors/' + bib).transaction(currentComp => {
             if (!currentComp) return currentComp;
@@ -2529,16 +2913,23 @@
             targetObj.mozgas = mozgas;
             targetObj.vetName = vetName;
             targetObj.vetNotes = vetNotes;
-            // Re-check idő (üresen hagyva törlődik)
+            // Re-check idő és típus (HR / REQ / COMP - a FEI lap szerint; üresen hagyva törlődik)
             targetObj.rch = rch;
             targetObj.rcm = rcm;
             targetObj.rcs = rcs;
+            targetObj.rcTipus = rcTipus;
 
             // JAVÍTÁS: Itt is az 'Active' a zöld utat jelentő kód!
             if (decision === 'Active' || decision === 'Passed') {
                 currentComp.isEliminated = false;
                 currentComp.status = 'Active';
                 targetObj.vetDecision = "Továbbengedve";
+                currentComp.extraCodes = [];
+            } else if (decision === 'FNR') {
+                // Teljesítette, minden vizsgálaton megfelelt, csak helyezést nem kap (II. melléklet) - nem kiesés.
+                currentComp.isEliminated = false;
+                currentComp.status = 'FNR';
+                targetObj.vetDecision = "FNR";
                 currentComp.extraCodes = [];
             } else if (decision === 'RECHECK') {
                 // A re-check NEM kiesés: a ló versenyben marad, csak a
@@ -2598,35 +2989,26 @@
 
         let arrStr = l.arrSec > 0 ? toTimeStr(l.arrSec) : '-';
         let inStr = l.vetSec > 0 ? toTimeStr(l.vetSec) : '-';
-        let recStr = (l.arrSec > 0 && l.vetSec > 0) ? toTimeStr(l.vetSec - l.arrSec) : '-';
-        let outStr = (l.nextStart > 0 && !isFinalLap && l.vetDecision !== 'Eliminated') ? toTimeStr(l.nextStart) : (isFinalLap ? 'FINISH' : '-');
+        let recStr = (l.arrSec > 0 && l.vetSec > 0) ? toTimeStr(l.pulzusSec > 0 ? l.pulzusSec : resolveRollover(l.vetSec - l.arrSec).diff) : '-';
+        let outStr = (l.nextStart > 0 && !isFinalLap && !comp.isEliminated) ? toTimeStr(l.nextStart) : (isFinalLap ? 'CÉL' : '-');
+        // Re-check esetén a kiindulás mellé a re-check ideje / típusa is kikerül.
+        const ri = recheckInfo(comp, raceConfig);
+        const recheckSor = ri ? `<div style="font-size: 8pt; font-weight: bold; margin-top: 0.5mm;">${escapeHtml(recheckSzoveg(ri))}</div>` : '';
 
-        // --- ÚJ: SEBESSÉGEK ÉS IDŐK SZÁMÍTÁSA ---
-        let lapDist = (raceConfig[baseDist] && raceConfig[baseDist].laps && raceConfig[baseDist].laps[lastIdxReal]) ? parseFloat(raceConfig[baseDist].laps[lastIdxReal]) : 0;
-        let lapTimeSec = (l.arrSec > 0 && l.startSec > 0) ? (l.arrSec - l.startSec) : 0;
-        let lapTimeStr = lapTimeSec > 0 ? toTimeStr(lapTimeSec) : '-';
-        // A "km/h" kisebb betűvel, külön spanban: a szűk cellában így nem törik két sorba.
-        const fmtSpeed = (v) => `${v.toFixed(2)}<span style="font-size: 6.5pt; font-weight: normal;"> km/h</span>`;
-        let lapSpeed = (lapDist > 0 && lapTimeSec > 0) ? fmtSpeed(lapDist / (lapTimeSec / 3600)) : '-';
-
-        let totalDist = 0; 
-        let totalTimeSec = 0;
-        for(let i=0; i<=lastIdxReal; i++) {
-            let p = comp.laps[i];
-            let d = (raceConfig[baseDist] && raceConfig[baseDist].laps && raceConfig[baseDist].laps[i]) ? parseFloat(raceConfig[baseDist].laps[i]) : 0;
-            if(p && p.arrSec > 0 && p.startSec > 0) { 
-                totalDist += d; 
-                totalTimeSec += (p.arrSec - p.startSec); 
-            }
-        }
-        let avgSpeed = (totalDist > 0 && totalTimeSec > 0) ? fmtSpeed(totalDist / (totalTimeSec / 3600)) : '-';
+        // --- SEBESSÉGEK ÉS IDŐK: ugyanaz a hivatalos számítás, mint az adatlapon és az eredménylistán ---
+        // (Korábban a matrica saját képlettel, a pulzusidők nélkül számolt, így pl. 16,49 km/h-t írt
+        // ugyanarra a versenyzőre, akinek az adatlapon 16,00 km/h állt.)
+        const fmtSpeed = (v) => `${kmh(v)}<span style="font-size: 6.5pt; font-weight: normal;"> km/h</span>`;
+        let lapTimeStr = l.isComplete && l.loopSec > 0 ? toTimeStr(l.loopSec) : '-';
+        let lapSpeed = l.isComplete && l.loopSpd > 0 ? fmtSpeed(l.loopSpd) : '-';
+        let avgSpeed = l.isComplete && l.rideSpd > 0 ? fmtSpeed(l.rideSpd) : '-';
 
         let raceNameStr = liveRaceMeta ? liveRaceMeta.name : "Élő Verseny";
 
-        // --- ÚJ: HELYEZÉS ÉS LEMARADÁS ---
+        // --- HELYEZÉS ÉS LEMARADÁS ---
         let ranksInfo = calculateCurrentRanks(competitors, raceConfig);
         let myRankInfo = ranksInfo[comp.bib] || { rank: "-", gapStr: "" };
-        let rankDisplay = myRankInfo.rank === "Kiesett" ? "Kiesett" : myRankInfo.rank + ".";
+        let rankDisplay = comp.isEliminated ? "Kiesett" : helyezesCimke(comp, myRankInfo.rank);
         let gapDisplay = myRankInfo.gapStr ? myRankInfo.gapStr : "-";
 
         let distName = catNames[comp.dist] || (comp.dist + " km");
@@ -2655,9 +3037,9 @@
                             <td style="width: 45%; vertical-align: top;">
                                 <table style="width: 100%; border-collapse: collapse; text-align: center; table-layout: fixed;">
                                     <tr style="background: #e0e0e0; font-size: 8pt; font-weight: bold;">
-                                        <td style="border: 1px solid #000; padding: 1mm;">ARR</td>
-                                        <td style="border: 1px solid #000; padding: 1mm;">VET</td>
-                                        <td style="border: 1px solid #000; padding: 1mm;">PULSE</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">BEÉRK.</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">ORVOSI</td>
+                                        <td style="border: 1px solid #000; padding: 1mm;">PULZUSIDŐ</td>
                                     </tr>
                                     <tr style="font-size: 11pt; font-weight: bold;">
                                         <td style="border: 1px solid #000; padding: 1mm; white-space: nowrap;">${arrStr}</td>
@@ -2759,10 +3141,11 @@
                     <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
                         <tr>
                             <td style="width: 45%; border: 2px solid #000; background: #e0e0e0; padding: 1.5mm; text-align: center;">
-                                <div style="font-size: 9pt; text-transform: uppercase;">Kimeneteli Idő / OUT</div>
+                                <div style="font-size: 9pt; text-transform: uppercase;">Kimeneteli idő</div>
                                 <div style="font-size: 24pt; font-weight: bold; letter-spacing: 1px; color: #000; line-height: 1.1;">
                                     ${outStr}
                                 </div>
+                                ${recheckSor}
                             </td>
                             <td style="width: 55%; padding-left: 2mm; vertical-align: middle;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; height: 100%;">
@@ -2793,9 +3176,10 @@
     // --- SÖTÉT TÉMÁJÚ ÁLLATORVOSI KARTON (TÖRTÉNET) MODAL ---
     function openVetHistory(bib, silent = false) {
         let comp = null;
-        
-        // 1. Először keressük az élő versenyzők között
-        if (competitors && competitors.length > 0) {
+        let forras = 'live';   // a FEI orvosi lap nyomtatásához: melyik versenyből jön a versenyző
+
+        // 1. Először keressük az élő versenyzők között (kivéve, ha épp egy múltbéli versenyt nézünk)
+        if (!viewingPastRaceData && competitors && competitors.length > 0) {
             comp = competitors.find(c => c.bib == bib);
         }
         
@@ -2806,6 +3190,7 @@
         if (!comp && viewingPastRaceData && viewingPastRaceData.competitors) {
             let pastArr = parseCompetitors(viewingPastRaceData.competitors);
             comp = pastArr.find(c => c.bib == bib);
+            if (comp) forras = viewingPastRaceData.id;
         }
 
         if(!comp) {
@@ -2882,13 +3267,23 @@
         html += renderVetRowCustom('Farizom, nyereghely', col => formatVetBadge(col.data.farizom));
         html += renderVetRowCustom('Mozgás', col => formatVetBadge(col.data.mozgas));
         html += renderVetRowCustom('Állatorvos', col => escapeHtml(col.data.vetName));
+        // Re-check: a FEI lap "Re-Inspection" oszlopa szerint (HR / REQ / COMP) + az időpont.
+        html += renderVetRowCustom('Re-check', col => {
+            const d = col.data;
+            const t = toSec(d.rch, d.rcm, d.rcs);
+            const tipus = d.rcTipus && RECHECK_TIPUSOK[d.rcTipus] ? RECHECK_TIPUSOK[d.rcTipus].rovid : '';
+            const jel = [tipus, t > 0 ? toTimeStr(t) : ''].filter(Boolean).join(' ');
+            return jel ? `<span style="color:#FF9F0A; font-weight:800;">${escapeHtml(jel)}</span>` : (d.vetDecision && /re-check/i.test(d.vetDecision) ? '<span style="color:#FF9F0A; font-weight:800;">esedékes</span>' : '-');
+        });
+        html += renderVetRowCustom('Döntés', col => escapeHtml(vetDontesSzoveg(col.data.vetDecision)));
 
         html += `
                     </table>
                 </div>
-                
-                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #1c1c1e;">
-                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#444; color:#fff; border: none; font-weight:bold; font-size: 1.1rem; cursor:pointer;" onclick="closeAdatlap()">Bezárás</button>
+
+                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #1c1c1e; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                    <button class="calc-btn admin-only" style="width:auto; padding:10px 24px; border-radius:25px; background:var(--teal); color:#fff; border: none; font-weight:bold; font-size: 1rem; cursor:pointer; margin:0;" onclick="printFeiVetCard('${escapeHtml(forras)}', '${escapeHtml(comp.bib)}')">🖨️ FEI orvosi lap</button>
+                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#444; color:#fff; border: none; font-weight:bold; font-size: 1.1rem; cursor:pointer; margin:0;" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>
         `;
@@ -2922,6 +3317,177 @@
         return `<div style="background: ${bg}; color: ${color}; border-radius: 8px; padding: 6px 14px; display: inline-block; font-weight: 900; font-size: 1.1rem; min-width: 50px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.4);">${upVal}</div>`;
     }
 
+    function vetDontesSzoveg(d) {
+        if (!d) return '-';
+        if (d === 'Továbbengedve' || d === 'Passed' || d === 'Active') return 'Továbbengedve';
+        if (d === 'RECHECK' || /re-check/i.test(d)) return 'Re-check';
+        if (d === 'FNR') return 'Teljesítette (FNR)';
+        return getElimText({ isEliminated: true, status: d });
+    }
+
+    // ============================================================================
+    // FEI ORVOSI LAP (FEI Endurance Vet Gate Card, 2023) - a rögzített orvosi adatokból,
+    // a hivatalos FEI lap szerkezetében (fekvő A4). Kérésre nyomtatható, bármelyik idei
+    // versenyre visszamenőleg (Versenyáttekintő fül > lovas keresése, vagy az orvosi kartonról).
+    // forras: 'live' (élő verseny) vagy egy múltbéli verseny azonosítója.
+    // ============================================================================
+    function versenyForras(forras) {
+        if (forras === 'live') {
+            if (!liveRaceMeta) return null;
+            return { meta: liveRaceMeta, comps: competitors, config: raceConfig };
+        }
+        const r = localRaces.mult.find(x => x.id === forras);
+        if (!r) return null;
+        return { meta: r, comps: parseCompetitors(r.competitors), config: mergeRaceConfig(r.raceConfig) };
+    }
+
+    function printFeiVetCard(forras, bib) {
+        const v = versenyForras(forras);
+        const c = v && v.comps.find(x => String(x.bib) === String(bib));
+        if (!c) { showToast('A versenyző nem található ebben a versenyben.', true); return; }
+        const rider = ridersCache[sanitizeKey(c.license || '')] || {};
+        const horse = horsesCache[sanitizeKey(c.startNum || '')] || {};
+        const baseDist = String(c.dist || '').replace('j', '');
+        const cfg = v.config[baseDist] || { laps: [] };
+        const korSzam = Math.max((cfg.laps || []).length, (c.laps || []).length, 1);
+        const e = s => (s === undefined || s === null || s === '') ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const nagy = s => e(String(s || '').trim().toUpperCase());
+        const ido = (h, m, s) => (String(h || '') === '' ? '' : `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}:${String(s || 0).padStart(2, '0')}`);
+        const percMp = sec => sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : '';
+        const monogram = nev => String(nev || '').replace(/^dr\.?\s*/i, '').split(/\s+/).filter(Boolean).map(sz => sz[0].toUpperCase() + '.').join('');
+        const megfelelt = d => {
+            if (!d) return '';
+            if (d === 'Továbbengedve' || d === 'Passed' || d === 'Active') return 'PASS';
+            if (d === 'FNR') return 'PASS (FNR)';
+            if (d === 'RECHECK' || /re-check/i.test(d)) return 'RE-INSP.';
+            return 'FAIL ' + e(String(d).replace('FTQ-', ''));
+        };
+        const reInsp = l => {
+            const t = toSec(l.rch, l.rcm, l.rcs);
+            const tip = l.rcTipus && RECHECK_TIPUSOK[l.rcTipus] ? RECHECK_TIPUSOK[l.rcTipus].rovid : ((/re-check/i.test(l.vetDecision || '')) ? 'RE-INSP.' : '');
+            return [tip, t > 0 ? toTimeStr(t) : ''].filter(Boolean).join(' ');
+        };
+        // A klinikai cellák a FEI lap oszlopsorrendjében. A "Farizom, nyereghely" nálunk egyetlen
+        // érték, ezért a FEI lap két oszlopába (nyereg/hát/mar és izomtónus) is az kerül.
+        const klinikai = l => `
+            <td>${nagy(l.nyalka)}</td><td>${nagy(l.crt)}</td><td>${nagy(l.vizhaztartas)}</td><td>${nagy(l.belhang)}</td>
+            <td>${nagy(l.farizom)}</td><td>${nagy(l.farizom)}</td><td>${nagy(l.mozgas)}</td>
+            <td class="megj">${e(l.vetNotes)}</td><td>${e(reInsp(l))}</td><td>${megfelelt(l.vetDecision)}</td><td>${e(monogram(l.vetName))}</td>`;
+        const uresKlinikai = `<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="megj"></td><td></td><td></td><td></td>`;
+
+        let sorok = '';
+        const pre = c.preVet || {};
+        sorok += `<tr class="blokk-eleje"><th class="szakasz" rowspan="1">FIRST HORSE INSPECTION<br><small>Előzetes vizsgálat</small></th>
+            <td></td><td></td><td></td><td>${e(pre.pulse)}</td>${pre.pulse || pre.vetDecision ? klinikai(pre) : uresKlinikai}</tr>`;
+        for (let i = 0; i < korSzam; i++) {
+            const l = (c.laps || [])[i] || {};
+            const vegso = i === korSzam - 1;
+            const cim = vegso ? 'FINAL INSPECTION<br><small>Záróvizsgálat</small>' : `VET GATE ${i + 1}<br><small>${i + 1}. kör utáni kapu</small>`;
+            const pulzusSec = l.pulzusSec > 0 ? l.pulzusSec : 0;
+            sorok += `<tr class="blokk-eleje"><th class="szakasz" rowspan="2">${cim}</th>
+                <td>${e(ido(l.h, l.m, l.s))}</td><td>${e(ido(l.oh, l.om, l.os))}</td><td>${e(percMp(pulzusSec))}</td>
+                <td>${e(l.pulse)}</td><td colspan="11" class="sorcimke">RECOVERY / regeneráció - pulzus a bemutatáskor</td></tr>
+                <tr><td colspan="3" class="sorcimke">INSPECTION / vizsgálat (CRI = pulzus a felvezetés után)</td><td>${e(l.hrri)}</td>${l.pulse || l.vetDecision ? klinikai(l) : uresKlinikai}</tr>`;
+        }
+
+        const st = c.status || (c.isEliminated ? 'FTQ-ME' : 'Active');
+        const kesz = (c.laps || []).filter(l => l && l.isComplete).length >= (cfg.laps || []).length && (cfg.laps || []).length > 0;
+        const jel = b => b ? '☒' : '☐';
+        const eredmenyek = [
+            ['Qualified / Teljesítette', st === 'Active' && kesz],
+            ['FTQ (ME)', st === 'FTQ-ME'],
+            ['FTQ (GA)', st === 'FTQ-GA'],
+            ['FTQ (MI)', st === 'FTQ-MI'],
+            ['FTQ (other / egyéb)', /^FTQ-(SP|OT|FTC|SIMUSCO|SIMETA|CI)$/.test(st)],
+            ['RET', st === 'RET'],
+            ['DSQ', st === 'DSQ'],
+            ['FNR', st === 'FNR'],
+            ['WD', st === 'WD' || st === 'DNS']
+        ];
+        const klinikaiKimenet = [
+            ['Sent for treatment / kezelésre küldve', false],
+            ['Released to travel without further inspection', false],
+            ['Minor injury / kisebb sérülés', st === 'FTQ-MI'],
+            ['Serious injury / súlyos sérülés', st === 'FTQ-SIMUSCO' || st === 'FTQ-SIMETA'],
+            ['Catastrophic injury / végzetes sérülés', st === 'FTQ-CI']
+        ];
+        const extra = (c.extraCodes || []).length ? ` + ${e(c.extraCodes.join(' + '))}` : '';
+
+        const html = `<!doctype html><html lang="hu"><head><meta charset="utf-8">
+        <title>FEI orvosi lap - ${e(c.name)} - ${e(v.meta.name)}</title>
+        <style>
+            @page { size: A4 landscape; margin: 7mm; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; margin: 0; font-size: 9pt; }
+            h1 { font-size: 14pt; margin: 0; letter-spacing: .5px; }
+            .fej { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 2mm; margin-bottom: 2mm; }
+            .fej small { font-size: 8pt; color: #333; }
+            .adatok { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1mm 4mm; margin-bottom: 2mm; }
+            .adat { border-bottom: 1px solid #000; padding: .6mm 0; min-height: 6mm; }
+            .adat b { display: block; font-size: 6.5pt; text-transform: uppercase; color: #333; }
+            .adat span { font-size: 10pt; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: .8mm 1mm; text-align: center; vertical-align: middle; font-size: 8.5pt; }
+            thead th { background: #e6e6e6; font-size: 6.6pt; line-height: 1.15; }
+            th.szakasz { background: #f2f2f2; font-size: 7.5pt; text-align: left; width: 26mm; }
+            th.szakasz small { font-weight: normal; font-size: 6.5pt; }
+            td.sorcimke { font-size: 6.5pt; color: #444; text-align: left; font-style: italic; }
+            td.megj { text-align: left; font-size: 7.5pt; }
+            tr.blokk-eleje th, tr.blokk-eleje td { border-top: 2px solid #000; }
+            .lab { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-top: 2.5mm; }
+            .doboz { border: 1.5px solid #000; padding: 1.5mm 2mm; }
+            .doboz b { font-size: 7.5pt; text-transform: uppercase; }
+            .doboz .opciok { display: flex; flex-wrap: wrap; gap: 1mm 4mm; margin-top: 1mm; font-size: 8.5pt; }
+            .alairas { margin-top: 3mm; border-top: 1px solid #000; width: 70mm; font-size: 7pt; padding-top: .5mm; }
+            .lab-jegy { margin-top: 2mm; font-size: 6.5pt; color: #444; }
+            @media print { .nem-nyomtat { display: none; } }
+        </style></head><body>
+        <div class="fej">
+            <div><h1>FEI ENDURANCE VET GATE CARD</h1><small>Állatorvosi lap - a FEI 2023-as vet card szerkezetében, a verseny rögzített adataiból</small></div>
+            <div style="text-align:right;"><small>Rajtszám / Bib</small><div style="font-size:18pt; font-weight:900;">#${e(c.bib)}</div></div>
+        </div>
+        <div class="adatok">
+            <div class="adat"><b>Horse name / Ló neve</b><span>${e(c.internal) || '&nbsp;'}</span></div>
+            <div class="adat"><b>Horse FEI ID / Ló FEI száma</b><span>${e(horse.feiId) || '&nbsp;'}</span></div>
+            <div class="adat"><b>Event / Verseny</b><span>${e(v.meta.name)}</span></div>
+            <div class="adat"><b>Date and venue / Dátum, helyszín</b><span>${e(v.meta.date)} ${e(v.meta.loc)}</span></div>
+            <div class="adat"><b>Athlete name / Lovas</b><span>${e(c.name)}</span></div>
+            <div class="adat"><b>Athlete FEI ID / Lovas FEI száma</b><span>${e(rider.feiId) || '&nbsp;'}</span></div>
+            <div class="adat"><b>Distance / Táv · Licence</b><span>${e(catNames[c.dist] || c.dist)}${c.license ? ' · ' + e(c.license) : ''}</span></div>
+            <div class="adat"><b>Trainer / Edző</b><span>${e(rider.coach) || '&nbsp;'}</span></div>
+        </div>
+        <table>
+            <thead><tr>
+                <th class="szakasz">Inspection<br>Vizsgálat</th>
+                <th>Arrival time<br>Beérkezés</th><th>Time into vet<br>Orvosi idő</th><th>Recovery<br>(min:mp)</th>
+                <th>Heart rate<br>bpm</th><th>Mucous membr.<br>A-D</th><th>Capillary refill<br>1-4</th><th>Skin turgor<br>1-4</th>
+                <th>Gut sounds<br>A-D</th><th>Girth / back / withers<br>A-C</th><th>Muscle tone<br>A-C</th><th>Gait<br>A-C</th>
+                <th>Remarks<br>Megjegyzés</th><th>Re-Inspection<br>HR / REQ / COMP</th><th>Pass / Fail</th><th>Vet.<br>initials</th>
+            </tr></thead>
+            <tbody>${sorok}</tbody>
+        </table>
+        <div class="lab">
+            <div class="doboz"><b>Ride result / Végeredmény</b>
+                <div class="opciok">${eredmenyek.map(([n, b]) => `<span>${jel(b)} ${n}</span>`).join('')}</div>
+                ${extra ? `<div style="margin-top:1mm; font-size:8pt;">Kombinált kódok: ${extra}</div>` : ''}
+                <div class="alairas">Vet. signature / Állatorvos aláírása</div>
+            </div>
+            <div class="doboz"><b>Clinical outcome / Klinikai kimenet</b>
+                <div class="opciok">${klinikaiKimenet.map(([n, b]) => `<span>${jel(b)} ${n}</span>`).join('')}</div>
+            </div>
+        </div>
+        <div class="lab-jegy">A "Farizom, nyereghely" értékelés a rendszerben egyetlen érték, ezért a "Girth/back/withers" és a "Muscle tone" oszlopba is az kerül.
+            Re-Inspection: HR = pulzus miatt újra bemutatva (100. §), REQ = az orvos kérte (92. § (4)), COMP = kötelező (92. § (3), 101. §).
+            Kinyomtatva: ${new Date().toLocaleString('hu-HU')}</div>
+        <script>window.onload = function () { window.print(); };<\/script>
+        </body></html>`;
+
+        const win = window.open('', '_blank');
+        if (!win) { showToast('A böngésző letiltotta a felugró ablakot - engedélyezd a nyomtatáshoz.', true); return; }
+        win.document.write(html);
+        win.document.close();
+    }
+
     function escapeHtml(unsafe) {
         if(!unsafe || unsafe === '-') return '-';
         return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -2940,37 +3506,26 @@
         }
     }
 
-    function changeLapCount(dist, count) {
-        let currentLaps = raceConfig[dist].laps || [];
-        let newCount = parseInt(count);
-        if (newCount > currentLaps.length) {
-            for(let i = currentLaps.length; i < newCount; i++) currentLaps.push('');
-        } else if (newCount < currentLaps.length) {
-            currentLaps = currentLaps.slice(0, newCount);
-        }
-        raceConfig[dist].laps = currentLaps;
-        renderKiiras();
-    }
+    function changeLapCount(dist, count) { kiirasKorszamValtas('', dist, count); }
 
     function renderKiiras() {
         const cont = document.getElementById('kiirasContainer');
         if (!cont) return;
-        cont.innerHTML = DIST_ORDER.filter(d => raceConfig[d]).map(d =>
-            kiirasTavBlokkHtml(d, raceConfig[d],
-                { lapCount: 'changeLapCount', config: 'updateRaceConfig', lap: 'updateRaceLap' }, '')
-        ).join('');
+        cont.innerHTML = DIST_ORDER.filter(d => raceConfig[d]).map(d => kiirasTavBlokkHtml(d, raceConfig[d], '')).join('');
     }
 
-    function updateRaceConfig(dist, field, val) { raceConfig[dist][field] = val; }
-    function updateRaceLap(dist, idx, val) { 
-        if(!raceConfig[dist].laps) raceConfig[dist].laps = [];
-        raceConfig[dist].laps[idx] = val; 
-    } 
+    function updateRaceConfig(dist, field, val) { kiirasMezo('', dist, field, null, val); }
+    function updateRaceLap(dist, idx, val) { kiirasMezo('', dist, 'lap', idx, val); }
 
+    // Élő kiírás mentése - verseny közben is: a pihenőidő vagy körtáv módosítása után minden
+    // versenyző kiindulási idejét újraszámoljuk (l. versenyzokUjraszamolasa).
     function saveKiiras() {
+        const hibak = kiirasHibak(raceConfig);
+        if (hibak.length) { showToast(hibak[0], true); return; }
         db.ref('raceConfig').set(raceConfig).then(() => {
             showAnimatedBtn('saveKiirasBtn');
             showToast('Kiírás sikeresen mentve!');
+            return versenyzokUjraszamolasa('competitors', competitors, raceConfig);
         }).catch(e => showToast('Hiba a mentéskor: ' + e.message, true));
     }
 
@@ -3086,48 +3641,14 @@
     }
 
     function saveCompetitor() {
-        const bib = document.getElementById('regBib').value;
-        const name = document.getElementById('regName').value;
-        const startNum = document.getElementById('regStartNum').value;
-        const license = document.getElementById('regLicense').value;
-        const club = document.getElementById('regClub').value;
-        const dist = document.getElementById('regDist').value;
-        const internal = document.getElementById('regInternal').value; 
-        if (!bib || !name) { showToast("Név és rajtszám kötelező!", true); return; }
-
-        if (editingBib && editingBib !== bib) { db.ref('competitors/' + editingBib).remove(); }
-
-        // A régi rekord MINDEN mezője megmarad (obPont, finishOrder, ...) - l. saveRmCompetitor().
-        let existingData = { startTime: { h: '', m: '', s: '' }, laps: [], isEliminated: false };
-        const targetBib = editingBib ? editingBib : bib;
-        const oldComp = competitors.find(c => c.bib == targetBib);
-        if (oldComp) existingData = Object.assign(existingData, oldComp);
-
-        // Ló/lovas törzsadat upsert (lo-lovas-integracio.md, 7. szakasz) - mezőszinten, l. torzsFrissitesek()
-        const horseRiderUpdates = torzsFrissitesek(startNum, internal, license, name, club);
-        if (Object.keys(horseRiderUpdates).length) db.ref('/').update(horseRiderUpdates);
-
-        // Tranzakció: ha a célhelyen (ez a bib) időközben már van szerver-oldali adat (laps/startTime,
-        // pl. a beérkeztető vagy az orvos épp most mentett), azt tartjuk meg felülírás helyett.
-        db.ref('competitors/' + bib).transaction(currentComp => {
-            const base = currentComp || existingData;
-            return {
-                ...base,
-                bib: bib, name: name.trim(), dist: dist, internal: internal.trim(), startNum: startNum.trim(), license: license.trim(), club: club.trim(),
-                startTime: base.startTime || { h: '', m: '', s: '' },
-                laps: base.laps || [],
-                isEliminated: base.isEliminated || false,
-                // A nevezés csak egy pillanatfelvétel - ezek nélkül a mentés törölné az orvosi
-                // döntést, ha az korábban már megvolt (idomodell-es-hibak.md, A rész).
-                // null (nem undefined!) a biztonságos alap, mert a Firebase SDK undefined mezőértékre hibát dob.
-                status: base.status || null,
-                extraCodes: base.extraCodes || [],
-                preVet: base.preVet || null
-            };
-        }).then(() => {
-            showAnimatedBtn('addCompBtn');
-            cancelEdit();
-        }).catch(e => showToast("Hiba a mentéskor: " + e.message, true));
+        const mezok = nevezesMezok('');
+        if (!mezok.bib || !mezok.name) { showToast("Név és rajtszám kötelező!", true); return; }
+        // Ütközésbiztos mentés (l. versenyzoMentes): foglalt rajtszámra nem ír - korábban az új
+        // versenyző itt még a régi köreit és eredményét is megörökölte.
+        versenyzoMentes({
+            ut: 'competitors/', comps: competitors, szerkesztettBib: editingBib,
+            mezok, gombId: 'addCompBtn', utana: cancelEdit
+        });
     }
 
     function deleteCompetitor() {
@@ -3356,8 +3877,9 @@
                 target.startTime = startTime;
             }
             target.status = statusVal;
-            // A RECHECK nem kiesés: a ló versenyben van, csak újra be kell mutatni.
-            target.isEliminated = (statusVal !== 'Active' && statusVal !== 'RECHECK');
+            // A RECHECK nem kiesés: a ló versenyben van, csak újra be kell mutatni. Az FNR sem:
+            // teljesítette, csak helyezést nem kap (II. melléklet).
+            target.isEliminated = !['Active', 'RECHECK', 'FNR'].includes(statusVal);
             lapValues.forEach((lv, i) => {
                 if (!target.laps) target.laps = [];
                 if (!target.laps[i]) target.laps[i] = {};
@@ -3690,13 +4212,20 @@
         const clockEl = document.getElementById('liveClockText');
         if(clockEl) { clockEl.innerText = timeNow; }
 
+        frissitEloKiindulasok();
+    }, 1000);
+
+    // Az Élő Kiindulások lista (és a TV mód) kirajzolása. Másodpercenként fut, de fülváltáskor
+    // azonnal is meghívjuk - korábban az első másodpercben csak a cím látszott.
+    function frissitEloKiindulasok() {
         const live = document.getElementById('liveCountdownContainer');
-        
+        if (!live) return;
+
         // ÚJ: Az óra frissül, ha az Élő fülön vagyunk VAGY ha nyitva van a TV mód!
         const isEloRajtokActive = document.getElementById('elo-rajtok').classList.contains('active');
         const isFullscreenActive = document.getElementById('fullscreenLiveOverlay')?.classList.contains('active');
         if (!isEloRajtokActive && !isFullscreenActive) return;
-        
+
         const now = new Date(); const nowS = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
 
         let liveData = [];
@@ -3762,14 +4291,17 @@
             const d = item.diff;
             let blinkClass = "";
             if ( (d <= 120 && d > 115) || (d <= 60 && d > 55) || (d <= 15 && d > 10) || d < 0 ) { blinkClass = "warning"; }
-            html += `<div class="live-item"><div><b>#${item.comp.bib} ${item.comp.name}</b><br><small>${item.label}: ${toTimeStr(item.nextStart)}</small></div><div class="live-time ${blinkClass}">${formatLiveTime(d)}</div></div>`;
+            // Re-check: a kiindulás előtti utolsó 15 percben kell újra bemutatni (92. § (3)-(4)).
+            const ri = recheckInfo(item.comp, raceConfig);
+            const rcSor = ri ? `<br><small class="live-recheck">🔁 ${escapeHtml(recheckSzoveg(ri))}</small>` : '';
+            html += `<div class="live-item${ri ? ' is-recheck' : ''}"><div><b>#${item.comp.bib} ${escapeHtml(item.comp.name)}</b><br><small>${item.label}: ${toTimeStr(item.nextStart)}</small>${rcSor}</div><div class="live-time ${blinkClass}">${formatLiveTime(d)}</div></div>`;
         });
-        live.innerHTML = html || '<div style="text-align:center; padding:20px;">Nincs várakozó.</div>';
+        live.innerHTML = html || `<div style="text-align:center; padding:20px; color:var(--text-dim);">${liveRaceMeta ? 'Most senki nem várakozik indulásra.' : 'Jelenleg nincs élő verseny.'}</div>`;
         const fullscreenContent = document.getElementById('fullscreenLiveContent');
         if (fullscreenContent && document.getElementById('fullscreenLiveOverlay')?.classList.contains('active')) {
             fullscreenContent.innerHTML = live.innerHTML;
         }
-    }, 1000);
+    }
 
     function enterLiveFullscreen() {
         const overlay = document.getElementById('fullscreenLiveOverlay');
@@ -3820,8 +4352,25 @@
         return { comps: competitors, config: raceConfig, name: liveRaceMeta ? liveRaceMeta.name : 'ÉLŐ' };
     }
 
+    // Célba ért (teljesítette): nincs kiesve, és minden kört lefutott. A "Gyors eredmény"-nyel
+    // (kör-adatok nélkül, utólag) rögzített, nem kiesett versenyző is ide tartozik - pl. a
+    // VII. Husztót Kupa minden versenyzője így szerepel, és korábban 0% teljesítést mutatott.
+    function teljesitetteE(c, config) {
+        if (!c || c.isEliminated) return false;
+        if (c.manualEntry) return true;
+        const base = String(c.dist || '').replace('j', '');
+        const vart = (config && config[base] && config[base].laps) ? config[base].laps.length : 3;
+        return (c.laps || []).filter(l => l && l.isComplete).length >= vart;
+    }
+
     function getCompLiveStatus(c, config) {
         if (c.isEliminated) return { text: getElimText(c), color: "var(--danger)", textCol: "#fff" };
+        // FNR: teljesítette, minden vizsgálaton megfelelt, csak helyezést nem kap - zöld (II. melléklet).
+        if (c.status === 'FNR') return { text: "Teljesítette (FNR)", color: "var(--success)", textCol: "#000" };
+        // Re-check: a FEI lap "Re-Inspection"-je - a nyilvános listán is látszik, mikorra esedékes.
+        if (c.status === 'RECHECK') return { text: '🔁 ' + recheckSzoveg(recheckInfo(c, config)), color: "#FF9F0A", textCol: "#000" };
+        // "Gyors eredmény": utólag rögzített, célba ért versenyző - nincs köradata, de nem "Körön van".
+        if (c.manualEntry) return { text: "Beérkezett", color: "var(--success)", textCol: "#000" };
 
         let baseDist = c.dist ? c.dist.replace('j', '') : '20';
         let expected = (config[baseDist] && config[baseDist].laps) ? config[baseDist].laps.length : 1;
@@ -3875,7 +4424,7 @@
     // ki ért be előbb - ezt jelezni kell a bíró felé, nem szabad csendben tömbindex szerint
     // dönteni (l. JAVITAS_bajnoki_pontszamitas.md, 3. pont).
     function getUnresolvedTieWarnings(comps, dist) {
-        const catComps = comps.filter(c => c.dist === dist && !c.isEliminated);
+        const catComps = comps.filter(c => c.dist === dist && !c.isEliminated && c.status !== 'FNR');
         const warnings = [];
         for (let i = 0; i < catComps.length; i++) {
             for (let j = i + 1; j < catComps.length; j++) {
@@ -3904,8 +4453,9 @@
         ALL_CATS.forEach(dist => {
             let catComps = comps.filter(c => c.dist === dist);
             catComps.sort((a, b) => {
-                if (a.isEliminated && !b.isEliminated) return 1;
-                if (!a.isEliminated && b.isEliminated) return -1;
+                // Sorrend: helyezettek, FNR (teljesítette, helyezés nélkül), kiesettek - l. eredmenyCsoport.
+                const ga = eredmenyCsoport(a), gb = eredmenyCsoport(b);
+                if (ga !== gb) return ga - gb;
 
                 // IDEIGLENES: "Gyors eredmény" (kör-/időadatok nélküli, kézzel megadott helyezés) -
                 // ha van manuálisan megadott helyezés, az dönt a lap-alapú összehasonlítás helyett.
@@ -3940,11 +4490,12 @@
                 return aTime - bTime;
             });
             
+            let helySzamlalo = 0;
             catComps.forEach((c, index) => {
                 let gapStr = "";
                 let lastLapIndex = (c.laps || []).filter(l => l.isComplete).length - 1;
-                if (lastLapIndex >= 0 && !c.isEliminated) {
-                    let sameLapComps = catComps.filter(x => x.laps && x.laps[lastLapIndex] && x.laps[lastLapIndex].isComplete);
+                if (lastLapIndex >= 0 && !c.isEliminated && c.status !== 'FNR') {
+                    let sameLapComps = catComps.filter(x => x.status !== 'FNR' && x.laps && x.laps[lastLapIndex] && x.laps[lastLapIndex].isComplete);
                     
                     if (dist === "20" || dist === "20j") {
                         // 20km-nél az orvosi idők közötti különbség a lemaradás
@@ -3960,7 +4511,11 @@
                 }
                 // IDEIGLENES: "Gyors eredmény" esetén a kézzel megadott helyezés jelenik meg rangként,
                 // nem a tömbindex - így pontosan azt mutatja, amit a felhasználó rögzített.
-                let rank = c.isEliminated ? "Kiesett" : (c.manualEntry && c.manualPlace ? c.manualPlace : (index + 1));
+                // Az FNR nem kap helyezést (és nem is foglal el egyet).
+                let rank;
+                if (c.isEliminated) rank = "Kiesett";
+                else if (c.status === 'FNR') rank = "FNR";
+                else { helySzamlalo++; rank = (c.manualEntry && c.manualPlace) ? c.manualPlace : helySzamlalo; }
                 ranksInfo[c.bib] = { rank: rank, gapStr: gapStr };
             });
         });
@@ -4019,14 +4574,7 @@
             let catComps = ctx.comps.filter(c => c.dist === currentAdatlapFilter);
             let total = catComps.length;
             let elim = catComps.filter(c => c.isEliminated).length;
-            let qual = 0;
-            catComps.forEach(c => {
-                if (c.isEliminated) return;
-                let baseDist = c.dist.replace('j', '');
-                let expectedLaps = (ctx.config[baseDist] && ctx.config[baseDist].laps) ? ctx.config[baseDist].laps.length : 3;
-                let completed = (c.laps || []).filter(l => l.isComplete).length;
-                if (completed >= expectedLaps) qual++;
-            });
+            let qual = catComps.filter(c => teljesitetteE(c, ctx.config)).length;
 
             let elimPct = total > 0 ? ((elim/total)*100).toFixed(1) : 0;
             let qualPct = total > 0 ? ((qual/total)*100).toFixed(1) : 0;
@@ -4076,12 +4624,7 @@
         let filtered = ctx.comps.filter(c => c.dist === currentAdatlapFilter);
         let ranksInfo = calculateCurrentRanks(ctx.comps, ctx.config);
 
-        filtered.sort((a,b) => {
-            if (a.isEliminated && !b.isEliminated) return 1;
-            if (!a.isEliminated && b.isEliminated) return -1;
-            if (!a.isEliminated && !b.isEliminated) { return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999); }
-            return parseInt(a.bib) - parseInt(b.bib);
-        });
+        filtered.sort(eredmenyRendezo(ranksInfo));
 
         // A TÁV legjobb átlagos pulzusideje - mindenkinek látszik.
         // Szándékosan a már kategóriára szűrt mezőnyből, nem az egész versenyből.
@@ -4089,13 +4632,13 @@
 
         filtered.forEach(c => {
             let info = ranksInfo[c.bib] || { rank: "-", gapStr: "" };
-            let rankStr = info.rank; let rankClass = c.isEliminated ? "kiesett" : "";
-            let rankDisplay = c.isEliminated ? "ELIM" : rankStr + "º";
-            let gapHtml = info.gapStr ? `<div class="adatlap-gap">Trail by ${info.gapStr}</div>` : '';
+            let rankClass = c.isEliminated ? "kiesett" : (c.status === 'FNR' ? "fnr" : "");
+            let rankDisplay = helyezesCimke(c, info.rank);
+            let gapHtml = info.gapStr ? `<div class="adatlap-gap">Lemaradás: ${info.gapStr}</div>` : '';
             let speedStr = ""; let speedFlagHtml = ""; let completedLaps = (c.laps || []).filter(l => l.isComplete);
             if (completedLaps.length > 0) {
                 let lastLap = completedLaps[completedLaps.length - 1];
-                speedStr = `Avg. ${lastLap.rideSpd.toFixed(2)} km/h`;
+                speedStr = `Átlag: ${kmh(lastLap.rideSpd)} km/h`;
                 // Admin állítja be távonként (Beállítások fül): max -> SP kockázat, min -> OT kockázat
                 speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
             }
@@ -4208,6 +4751,10 @@
             if (lastCompletedIdx >= 0) {
                 ranks[lastCompletedIdx] = `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>`;
             }
+        } else if (c.status === 'FNR') {
+            // Teljesítette, de helyezés nélkül: a záró kör helyén "FNR" (zöld), nem helyezési szám.
+            let lastCompletedIdx = phases.map(p => p.isComplete).lastIndexOf(true);
+            if (lastCompletedIdx >= 0) ranks[lastCompletedIdx] = `<span style="color:var(--success); font-weight:bold;">FNR</span>`;
         }
 
         let html = `
@@ -4242,14 +4789,16 @@
         html += renderDataRow('Rajt', l => l.startSec > 0 ? toTimeStr(l.startSec) : "-");
         html += renderDataRow('Beérkezés', l => l.arrSec > 0 ? toTimeStr(l.arrSec) : "-");
         html += renderDataRow('Kör idő', l => l.loopSec > 0 ? toTimeStr(l.loopSec) : "-");
-        html += renderDataRow('Kör átlag km/h', l => l.loopSpd > 0 ? `<span style="${l.loopSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.loopSpd.toFixed(2)}</span>` : "-");
+        // A nyilvános adatlapon nincs sebesség-színezés (a 16 km/h-s piros jelzés csak az admin
+        // Versenyáttekintő fülén van, a minősítőkhöz).
+        html += renderDataRow('Kör átlag km/h', l => l.loopSpd > 0 ? kmh(l.loopSpd) : "-");
         html += renderDataRow('Orvosi (Vet)', l => {
             if (!l.isComplete) return "-";
             if (is20km && l.vetSec > 0) return toTimeStr(l.loopSec + l.pulzusSec);
             return l.vetSec > 0 ? toTimeStr(l.vetSec) : "-";
         });
         html += renderDataRow('Pulzus idő', l => l.pulzusSec > 0 ? toTimeStr(l.pulzusSec) : "-");
-        html += renderDataRow('Orvosi átlag km/h', l => l.phaseSpd > 0 ? `<span style="${l.phaseSpd >= 16 ? 'color:var(--danger);font-weight:bold;' : 'color:#ddd;'}">${l.phaseSpd.toFixed(2)}</span>` : "-");
+        html += renderDataRow('Orvosi átlag km/h', l => l.phaseSpd > 0 ? kmh(l.phaseSpd) : "-");
         html += renderDataRow('Össz. menetidő', (l, i) => {
             if (!l.isComplete) return "-";
             let finalLap = i === phases.length - 1;
@@ -4260,11 +4809,9 @@
         });
         html += renderDataRow('Össz. átlag km/h', (l, i) => {
             if (!l.isComplete) return "-";
-            let anySpeedingSoFar = phases.slice(0, i + 1).some(p => p.loopSpd >= 16 || p.phaseSpd >= 16);
-            let isWarning = anySpeedingSoFar || l.rideSpd >= 16;
-            return l.rideSpd > 0 ? `<b style="${isWarning ? 'color:var(--danger);' : 'color:#fff;'}">${l.rideSpd.toFixed(2)}</b>` : "-";
+            return l.rideSpd > 0 ? `<b style="color:#fff;">${kmh(l.rideSpd)}</b>` : "-";
         });
-        html += renderDataRow('Helyezés', (l, i) => ranks[i] === `<span style="color:var(--danger); font-weight:bold;">Kiesett</span>` ? ranks[i] : (ranks[i] ? `<b style="color:#fff;">${ranks[i]}.</b>` : "-"));
+        html += renderDataRow('Helyezés', (l, i) => (typeof ranks[i] === 'string') ? ranks[i] : (ranks[i] ? `<b style="color:#fff;">${ranks[i]}.</b>` : "-"));
         html += renderDataRow('Lemaradás', (l, i) => gaps[i] ? `<span style="color:#ddd;">${gaps[i]}</span>` : "-");
 
         html += `
@@ -4310,70 +4857,122 @@
     }
 
     // --- ESZKÖZÖK ---
+    // Kalkulátor-segédek: egy óra/perc/mp mezőhármas akkor "kitöltött", ha legalább egy mezőben
+    // van érték - így a 00:00:00 (éjfél) is érvényes indulás (korábban a 0 = "üres" volt).
+    function idoMezok(hId, mId, sId) {
+        const ert = [hId, mId, sId].map(id => String(document.getElementById(id).value || '').trim());
+        const kitoltott = ert.some(v => v !== '');
+        const ok = kitoltott && /^\d{0,2}$/.test(ert[0]) && /^\d{0,2}$/.test(ert[1]) && /^\d{0,2}$/.test(ert[2])
+            && (parseInt(ert[0] || '0', 10) <= 23) && (parseInt(ert[1] || '0', 10) <= 59) && (parseInt(ert[2] || '0', 10) <= 59);
+        return { kitoltott, ok, sec: toSec(ert[0], ert[1], ert[2]) };
+    }
+
+    function kalkHiba(resId, szoveg) {
+        const r = document.getElementById(resId);
+        r.style.display = 'block';
+        r.innerHTML = `<span style="color:var(--danger); font-weight:700;">${szoveg}</span>`;
+    }
+
     function calcReszido() {
-        const d = parseFloat(document.getElementById('dist1').value);
-        const t1 = toSec(document.getElementById('rh1').value, document.getElementById('rm1').value, document.getElementById('rs1').value);
-        const t2 = toSec(document.getElementById('rh2').value, document.getElementById('rm2').value, document.getElementById('rs2').value);
-        if(!d || t1 === 0 || t2 === 0) return;
-        const roll = resolveRollover(t2 - t1);
+        const d = parseFloat(String(document.getElementById('dist1').value).replace(',', '.'));
+        const t1 = idoMezok('rh1', 'rm1', 'rs1');
+        const t2 = idoMezok('rh2', 'rm2', 'rs2');
+        // Hiányos adatnál a régi eredmény nem maradhat kint, mintha az lenne az új.
+        if (!(d > 0)) { kalkHiba('res1', 'Add meg a táv hosszát (km).'); return; }
+        if (!t1.kitoltott || !t2.kitoltott) { kalkHiba('res1', 'Add meg az indulási és a beérkezési időt.'); return; }
+        if (!t1.ok || !t2.ok) { kalkHiba('res1', 'Hibás időpont (óra 0-23, perc és mp 0-59).'); return; }
+        const pihenoMezo = document.getElementById('reszido-piheno');
+        const pihenoPerc = pihenoMezo && parseFloat(pihenoMezo.value) > 0 ? parseFloat(pihenoMezo.value) : ALAP_PIHENO_PERC;
+        const roll = resolveRollover(t2.sec - t1.sec);
         const diff = roll.diff;
-        const spd = d / (diff / 3600); const nextStart = (t2 + 2400) % 86400;
+        if (!(diff > 0)) { kalkHiba('res1', 'A beérkezés nem lehet azonos az indulással.'); return; }
+        const spd = d / (diff / 3600); const nextStart = (t2.sec + Math.round(pihenoPerc * 60)) % 86400;
         const warnHtml = roll.suspicious
             ? `<div class="warning-banner level-warn" style="margin-top:0; margin-bottom:12px;"><span class="wb-icon">⚠️</span><span>Ez az idő szokatlanul távolinak tűnik - ellenőrizd, nem gépeltél-e el egy számjegyet.</span></div>`
             : '';
         document.getElementById('res1').style.display = 'block';
-        document.getElementById('res1').innerHTML = `${warnHtml}Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${spd.toFixed(2)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (40p pihenő): <b style="color:var(--text);">${toTimeStr(nextStart)}</b></span>`;
+        document.getElementById('res1').innerHTML = `${warnHtml}Átlagsebesség: <b style="color:${spd>=16.0?'var(--warning)':'var(--success)'}">${kmh(spd)} km/h</b><br>Menetidő: <b>${toTimeStr(diff)}</b><br><br><span style="color:var(--text-dim)">Kimeneteli idő (${String(pihenoPerc).replace('.', ',')} perc pihenő): <b style="color:var(--text);">${toTimeStr(nextStart)}</b></span>`;
     }
 
     function calcMinosites() {
-        const d = parseFloat(document.getElementById('distJ').value);
-        const t1 = toSec(document.getElementById('jh1').value, document.getElementById('jm1').value, document.getElementById('js1').value);
-        if(!d || t1 === 0) return;
+        const d = parseFloat(String(document.getElementById('distJ').value).replace(',', '.'));
+        const t1 = idoMezok('jh1', 'jm1', 'js1');
+        if (!(d > 0)) { kalkHiba('res3', 'Add meg a kör hosszát (km).'); return; }
+        if (!t1.kitoltott) { kalkHiba('res3', 'Add meg a rajt idejét.'); return; }
+        if (!t1.ok) { kalkHiba('res3', 'Hibás időpont (óra 0-23, perc és mp 0-59).'); return; }
         document.getElementById('res3').style.display = 'block';
-        document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr(t1 + Math.ceil(d / (CALC_LIMIT / 3600)))}</strong>`;
+        document.getElementById('res3').innerHTML = `Szükséges beérkezési idő:<br><strong style="font-size:1.8rem; color:var(--success);">${toTimeStr((t1.sec + Math.ceil(d / (CALC_LIMIT / 3600))) % 86400)}</strong>`;
     }
 
     // --- TÖMEGES IMPORTÁLÁS FELUGRÓ ABLAKKAL ---
     function importCompetitorsFromPrompt(isModal) {
         // A böngésző saját beviteli ablakát dobja fel
         const jsonText = prompt("Kérlek, másold be ide (Ctrl+V vagy jobb klikk -> Beillesztés) a JSON kódot:");
-        
-        // Ha a Mégse gombra nyomott, vagy üresen hagyta
-        if (!jsonText || jsonText.trim() === "") {
-            return; 
+        if (!jsonText || jsonText.trim() === "") return;
+
+        let data;
+        try { data = JSON.parse(jsonText.trim()); }
+        catch (err) { showToast("Hibás a kód: nem érvényes JSON. Biztos, hogy az egészet kimásoltad?", true); return; }
+
+        // Tömb ([{...}, {...}]) és objektum ({"12": {...}} vagy {"competitors": ...}) is jó -
+        // korábban a tömböt "hibás kód"-nak mondta, pedig érvényes.
+        let lista = data && data.competitors ? data.competitors : data;
+        lista = Array.isArray(lista) ? lista.filter(Boolean) : (lista && typeof lista === 'object' ? Object.values(lista).filter(Boolean) : []);
+        if (!lista.length) { showToast("A kód üres vagy nem tartalmaz versenyzőket!", true); return; }
+
+        let ut, letezo;
+        if (isModal) {
+            if (!modalRaceId) { showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true); return; }
+            const type = document.getElementById('rm-type').value || 'jovo';
+            ut = 'races/' + type + '/' + modalRaceId + '/competitors/';
+            letezo = modalCompetitors;
+        } else {
+            ut = 'competitors/';
+            letezo = competitors;
         }
 
-        try {
-            const data = JSON.parse(jsonText.trim());
-            const compsToImport = data.competitors ? data.competitors : data;
-            
-            if (!compsToImport || Object.keys(compsToImport).length === 0) {
-                showToast("A kód üres vagy nem tartalmaz versenyzőket!", true);
-                return;
-            }
-
-            let dbRef;
-            if (isModal) {
-                if (!modalRaceId) {
-                    showToast("Hiba: Előbb mentsd el a verseny alapadatait!", true);
-                    return;
-                }
-                const type = document.getElementById('rm-type').value || 'jovo';
-                dbRef = db.ref('races/' + type + '/' + modalRaceId + '/competitors');
-            } else {
-                dbRef = db.ref('competitors');
-            }
-
-            dbRef.update(compsToImport).then(() => {
-                showToast(`Sikeres importálás: ${Object.keys(compsToImport).length} versenyző hozzáadva!`);
-                if (isModal) updateRmCompetitorDisplays();
-            }).catch(err => {
-                showToast("Hiba az adatbázis feltöltésekor: " + err.message, true);
+        // Soronkénti ellenőrzés: rajtszám, név, táv kötelező; foglalt rajtszámot NEM írunk felül.
+        const hibak = [], utkozesek = [], jok = [], latott = new Set();
+        const szoveg = v => String(v === undefined || v === null ? '' : v).trim().replace(/\s+/g, ' ');
+        lista.forEach((c, i) => {
+            const bib = szoveg(c.bib !== undefined ? c.bib : c.rajtszam);
+            const name = szoveg(c.name !== undefined ? c.name : c.nev);
+            const dist = szoveg(c.dist !== undefined ? c.dist : c.tav).replace(/\s*km$/i, '');
+            if (!bib || !rajtszamErvenyes(bib)) { hibak.push(`${i + 1}. tétel: hiányzó vagy hibás rajtszám`); return; }
+            if (!name) { hibak.push(`#${bib}: hiányzó név`); return; }
+            if (!ALL_CATS.includes(dist)) { hibak.push(`#${bib}: ismeretlen táv (${dist || 'üres'})`); return; }
+            if (latott.has(bib)) { hibak.push(`#${bib}: kétszer szerepel`); return; }
+            latott.add(bib);
+            const foglalo = (letezo || []).find(x => String(x.bib) === bib);
+            if (foglalo) { utkozesek.push(`#${bib} (${foglalo.name})`); return; }
+            jok.push({
+                bib, name, dist,
+                license: szoveg(c.license), club: szoveg(c.club), startNum: szoveg(c.startNum),
+                internal: szoveg(c.internal !== undefined ? c.internal : c.horse),
+                startTime: { h: '', m: '', s: '' }, laps: [], isEliminated: false
             });
+        });
 
-        } catch (err) {
-            showToast("Hibás a kód! Biztos, hogy az egészet (a { } zárójelekkel együtt) kimásoltad?", true);
+        if (!jok.length) {
+            const okok = hibak.concat(utkozesek.map(u => 'foglalt rajtszám: ' + u));
+            showToast('Nincs felvehető versenyző. ' + okok.slice(0, 3).join('; '), true);
+            return;
         }
+        const osszegzes = `${jok.length} versenyző kerül felvételre.`
+            + (utkozesek.length ? ` Kihagyva, mert a rajtszám már foglalt: ${utkozesek.join(', ')}.` : '')
+            + (hibak.length ? ` Kihagyva hibás adat miatt: ${hibak.join('; ')}.` : '');
+        showConfirm('Tömeges importálás', osszegzes, () => {
+            const updates = {};
+            jok.forEach(c => {
+                updates[ut + c.bib] = c;
+                // A lovas/ló törzs is frissül (mezőszinten), ahogy a kézi nevezésnél.
+                Object.assign(updates, torzsFrissitesek(c.startNum, c.internal, c.license, c.name, c.club));
+            });
+            db.ref('/').update(updates).then(() => {
+                showToast(`Sikeres importálás: ${jok.length} versenyző hozzáadva!`);
+                if (isModal) updateRmCompetitorDisplays();
+            }).catch(err => showToast("Hiba az adatbázis feltöltésekor: " + err.message, true));
+        });
     }
 
     // A kapott mezőny legjobb ÁTLAGOS PULZUSIDEJE: a beérkezés és az orvosi kapura
@@ -4426,6 +5025,11 @@
         // Egy versenyző nettó ideje és átlagsebessége a befejezett körökből.
         // A 20 km-es táv külön szabály: ott az idő az orvosi kapunál áll meg.
         function eredmeny(c) {
+            // "Gyors eredmény": nincs köradat, csak a kézzel megadott végidő (mint az Excel exportban).
+            if (c.manualEntry && c.totalTimeSec > 0) {
+                const km = parseInt(String(c.dist || '').replace('j', ''), 10) || 0;
+                return { ido: idoHhMmSs(c.totalTimeSec), spd: km > 0 ? kmh(km / (c.totalTimeSec / 3600)) + ' km/h' : '-' };
+            }
             const kesz = (c.laps || []).filter(l => l.isComplete);
             if (!kesz.length) return { ido: '-', spd: '-' };
             const utolso = kesz[kesz.length - 1];
@@ -4438,7 +5042,7 @@
             const tav = kesz.reduce((ossz, l) => ossz + (parseFloat(l.d) || 0), 0);
             return {
                 ido: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`,
-                spd: tav > 0 ? (tav / (sec / 3600)).toFixed(2) + ' km/h' : '-'
+                spd: tav > 0 ? kmh(tav / (sec / 3600)) + ' km/h' : '-'
             };
         }
 
@@ -4464,14 +5068,8 @@
         <div class="header-box"><h1>${raceName}</h1><h2>EREDMÉNYLISTA / RESULTS</h2></div>`;
 
         cats.forEach(cat => {
-            const catComps = comps.filter(c => c.dist === cat).sort((a, b) => {
-                if (a.isEliminated && !b.isEliminated) return 1;
-                if (!a.isEliminated && b.isEliminated) return -1;
-                if (!a.isEliminated && !b.isEliminated) {
-                    return (ranksInfo[a.bib]?.rank || 999) - (ranksInfo[b.bib]?.rank || 999);
-                }
-                return parseInt(a.bib) - parseInt(b.bib);
-            });
+            // Helyezettek, utánuk az FNR (teljesítette, helyezés nélkül), végül a kiesettek.
+            const catComps = comps.filter(c => c.dist === cat).sort(eredmenyRendezo(ranksInfo));
             if (!catComps.length) return;
 
             // A legjobb átlagos pulzusidő távonkénti díja: minden kategóriának saját
@@ -4485,7 +5083,8 @@
             catComps.forEach(c => {
                 const r = eredmeny(c);
                 const kiesett = c.isEliminated;
-                const hely = kiesett ? '-' : (ranksInfo[c.bib]?.rank ?? '-');
+                const fnr = !kiesett && c.status === 'FNR';
+                const hely = kiesett ? '-' : (fnr ? 'FNR' : (ranksInfo[c.bib]?.rank ?? '-'));
                 const pulzusJel = (pulzusBajnok && pulzusBajnok.bib === String(c.bib)) ? ' 💚' : '';
                 html += `<tr${kiesett ? ' class="out"' : ''}>
                     <td class="rank">${hely}</td>
@@ -4495,7 +5094,7 @@
                     <td>${c.club || ''}</td>
                     <td class="num">${kiesett ? '-' : r.ido}</td>
                     <td class="num">${kiesett ? '-' : r.spd}</td>
-                    <td>${kiesett ? (c.status || 'Kiesett') : ''}</td>
+                    <td>${kiesett ? (c.status || 'Kiesett') : (fnr ? 'Teljesítette, helyezés nélkül (FNR)' : '')}</td>
                 </tr>`;
             });
             html += `</table>`;
@@ -4645,7 +5244,7 @@
                 .qr-container { margin: 40px auto; padding: 20px; border: 8px solid #000; display: inline-block; border-radius: 20px; background: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, 0); }
                 img { width: 450px; height: 450px; display: block; }
                 p { font-size: 1.8rem; font-weight: bold; margin-top: 50px; color: #000000; }
-                .url-box { font-size: 3rem; font-weight: 900; margin-top: 20px; color: #000000; display: inlrgb(0, 0, 0)block; padding: 15px 40px; border-radius: 15px; letter-spacing: 2px; }
+                .url-box { font-size: 3rem; font-weight: 900; margin-top: 20px; color: #000000; display: inline-block; padding: 15px 40px; border-radius: 15px; letter-spacing: 2px; }
                 @media print { 
                     body { padding: 0; }
                     .qr-container { box-shadow: none; }
@@ -5025,7 +5624,7 @@
                 partnerNev: tipus === 'lovas' ? r.horseName : r.name,
                 partnerId: tipus === 'lovas' ? r.startNum : r.license,
                 ido: '', sebesseg: null, buntetes: null,
-                obPont: ob.points, obHely: ob.place, obOsztaly: ob.classKey, obMegj: ob.note,
+                obPont: ob.points, obHely: ob.place, obOsztaly: ob.classKey, obMegj: ob.note, obKlon: ob.klon || 0,
                 raceId: r.raceId, dist: r.dist, kmKulcs: r.km
             };
         });
@@ -5149,7 +5748,7 @@
         // A helyezésért kapott bajnoki pont (III. melléklet) - a régi "min.pont" helyén.
         let pontHtml = '';
         if (r.obPont > 0) {
-            const osztaly = r.obOsztaly ? CHAMPIONSHIP_CLASSES[r.obOsztaly].label.replace('Magyar ', '').replace(' Bajnokság', ' OB') : '';
+            const osztaly = r.obOsztaly ? CHAMPIONSHIP_CLASSES[r.obOsztaly].label.replace('Magyar ', '').replace(' Bajnokság', ' OB') + (r.obKlon ? ` · ${r.obKlon + 1}. sor` : '') : '';
             const masHely = r.obHely != null && r.hely != null && r.obHely !== r.hely ? `OB-hely: ${r.obHely}.` : '';
             const reszlet = r.obTablazat ? 'III. melléklet' : [osztaly, masHely].filter(Boolean).join(' · ');
             pontHtml = `<div class="eredmeny-pont">🏆 ${escapeHtml(r.obPont)} pont${reszlet ? ` <span class="eredmeny-pont-reszlet">(${escapeHtml(reszlet)})</span>` : ''}</div>`;
@@ -5451,8 +6050,7 @@
         const allRows = getAllPastRaceRows();
         const renumbered = renumberWithoutForeign(allRows);
         // Minden OB-NEVEZÉS ebben az osztályban - a kiesettek is. A 175. § szerint "az időben
-        // legkorábban benevezett két ló" számít, vagyis egy kiesett rajt is "elhasznál" egy lóhelyet;
-        // korábban csak a helyezést elért rajtokból választottunk lovat, így egy 3. ló is pontot hozhatott.
+        // legkorábban benevezett két ló" számít, vagyis egy kiesett rajt is "elhasznál" egy lóhelyet.
         // Az OB-pontról lemondott rajt (obPont: false) nem OB-nevezés, az nem foglal lóhelyet.
         const entries = allRows.filter(r =>
             r.isObRound && cls.distKeys.includes(r.dist) && r.obPont && isDateInWindow(r.raceDate, win) && !isForeignLicense(r.license, r.club)
@@ -5470,7 +6068,8 @@
             if (r.club) byRider[key].club = r.club;
         });
 
-        const riders = Object.values(byRider).filter(rider => rider.results.some(r => r.place != null)).map(rider => {
+        const riders = [];
+        Object.values(byRider).filter(rider => rider.results.some(r => r.place != null)).forEach(rider => {
             const byHorse = {};
             rider.results.forEach(r => {
                 const hKey = r.startNum || ('horse:' + r.horseName);
@@ -5479,31 +6078,42 @@
                 if (r.raceDate && r.raceDate < byHorse[hKey].firstDate) byHorse[hKey].firstDate = r.raceDate;
             });
             const horsesSorted = Object.values(byHorse).sort((a, b) => (a.firstDate || '').localeCompare(b.firstDate || ''));
-            const usedHorses = horsesSorted.slice(0, cls.maxHorses);
-            const excludedHorseCount = horsesSorted.slice(cls.maxHorses).filter(h => h.results.some(r => r.place != null)).length;
-
-            let totalPoints = 0, totalKm = 0, legjobbSav = 0;
-            const horseBreakdown = usedHorses.map(h => {
-                // 174. § (3): azonos verseny, azonos táv-kategória két futamánál csak a jobbik pont számít
-                const byRaceCat = {};
-                h.results.filter(r => r.place != null).forEach(r => {
-                    const rcKey = r.raceId + '|' + r.dist;
-                    const pts = getPoints(getPointBand(r.completedKm), r.place);
-                    if (!byRaceCat[rcKey] || pts > byRaceCat[rcKey].points) byRaceCat[rcKey] = Object.assign({ points: pts }, r);
-                });
-                const dedupedResults = Object.values(byRaceCat).sort((a, b) => (a.raceDate || '').localeCompare(b.raceDate || ''));
-                const horsePoints = dedupedResults.reduce((s, r) => s + r.points, 0);
-                totalPoints += horsePoints;
-                dedupedResults.forEach(r => {
-                    totalKm += r.completedKm || 0;
-                    if (r.points > 0) legjobbSav = Math.max(legjobbSav, SAV_RANG[getPointBand(r.completedKm)] || 0);
-                });
-                return { startNum: h.startNum, horseName: h.horseName, points: horsePoints, results: dedupedResults };
-            }).filter(h => h.results.length);
-
             // A hivatalos (szövetségi) név az elsődleges - a nevezésben előfordul elírás.
             const torzsNev = rider.license && (ridersCache[sanitizeKey(rider.license)] || {}).name;
-            return { license: rider.license, name: torzsNev || rider.name, club: rider.club, totalPoints, totalKm: Math.round(totalKm * 100) / 100, legjobbSav, horses: horseBreakdown, excludedHorseCount };
+            const alapNev = torzsNev || rider.name;
+
+            // "KLÓN" SOROK: aki 2-nél több lóval versenyzett, annak a lovai benevezési sorrendben
+            // párokba kerülnek - az 1-2. ló az eredeti sorba, a 3-4. ló egy második, "(2)" jelű sorba,
+            // az 5-6. ló egy harmadik, "(3)" sorba és így tovább (felhasználói kérés, 2026-10-05).
+            for (let klon = 0; klon * cls.maxHorses < horsesSorted.length; klon++) {
+                const parLovai = horsesSorted.slice(klon * cls.maxHorses, (klon + 1) * cls.maxHorses);
+                let totalPoints = 0, totalKm = 0, legjobbSav = 0;
+                const horseBreakdown = parLovai.map(h => {
+                    // 174. § (3): azonos verseny, azonos táv-kategória két futamánál csak a jobbik pont számít
+                    const byRaceCat = {};
+                    h.results.filter(r => r.place != null).forEach(r => {
+                        const rcKey = r.raceId + '|' + r.dist;
+                        const pts = getPoints(getPointBand(r.completedKm), r.place);
+                        if (!byRaceCat[rcKey] || pts > byRaceCat[rcKey].points) byRaceCat[rcKey] = Object.assign({ points: pts }, r);
+                    });
+                    const dedupedResults = Object.values(byRaceCat).sort((a, b) => (a.raceDate || '').localeCompare(b.raceDate || ''));
+                    const horsePoints = dedupedResults.reduce((s, r) => s + r.points, 0);
+                    totalPoints += horsePoints;
+                    dedupedResults.forEach(r => {
+                        totalKm += r.completedKm || 0;
+                        if (r.points > 0) legjobbSav = Math.max(legjobbSav, SAV_RANG[getPointBand(r.completedKm)] || 0);
+                    });
+                    return { startNum: h.startNum, horseName: h.horseName, points: horsePoints, results: dedupedResults };
+                }).filter(h => h.results.length);
+                if (!horseBreakdown.length) continue;   // ennek a lópárnak egyik lova sem ért el helyezést
+
+                riders.push({
+                    license: rider.license, name: klon ? `${alapNev} (${klon + 1})` : alapNev, alapNev, klon,
+                    lovakTol: klon * cls.maxHorses + 1, lovakIg: Math.min((klon + 1) * cls.maxHorses, horsesSorted.length),
+                    club: rider.club, totalPoints, totalKm: Math.round(totalKm * 100) / 100, legjobbSav,
+                    horses: horseBreakdown, excludedHorseCount: 0
+                });
+            }
         });
 
         return rangsorol(riders);
@@ -5516,8 +6126,9 @@
         const merged = {};
         Object.keys(CHAMPIONSHIP_CLASSES).forEach(classKey => {
             computeIndividualChampionship(classKey, year).forEach(r => {
-                const key = r.license || r.name;
-                if (!merged[key]) merged[key] = { license: r.license, name: r.name, club: r.club, totalPoints: 0, totalKm: 0, legjobbSav: 0, classBreakdown: [] };
+                // A klón sorok (3-4. ló stb.) külön sorként maradnak az összesítettben is.
+                const key = (r.license || r.alapNev || r.name) + '#' + (r.klon || 0);
+                if (!merged[key]) merged[key] = { license: r.license, name: r.name, klon: r.klon || 0, club: r.club, totalPoints: 0, totalKm: 0, legjobbSav: 0, classBreakdown: [] };
                 merged[key].totalPoints += r.totalPoints;
                 merged[key].totalKm += r.totalKm || 0;
                 merged[key].legjobbSav = Math.max(merged[key].legjobbSav, r.legjobbSav || 0);
@@ -5539,19 +6150,17 @@
         return (!isDateInWindow(datum, getChampionshipWindow(ev)) && isDateInWindow(datum, getChampionshipWindow(ev + 1))) ? ev + 1 : ev;
     }
 
-    // ev -> { eredmeny: Map("raceId|bib" -> {points, place, classKey}), lovak: Map("osztály|igazolás" -> Set(lókulcs)) }
+    // ev -> { eredmeny: Map("raceId|bib" -> {points, place, classKey, klon}) }
     function getBeszamitottEredmenyek(ev) {
         const eredmeny = new Map();
-        const lovak = new Map();
         Object.keys(CHAMPIONSHIP_CLASSES).forEach(classKey => {
             computeIndividualChampionship(classKey, ev).forEach(rider => {
-                lovak.set(classKey + '|' + rider.license, new Set(rider.horses.map(h => h.startNum || ('horse:' + h.horseName))));
                 rider.horses.forEach(h => h.results.forEach(r => {
-                    eredmeny.set(r.raceId + '|' + r.bib, { points: r.points, place: r.place, classKey });
+                    eredmeny.set(r.raceId + '|' + r.bib, { points: r.points, place: r.place, classKey, klon: rider.klon || 0 });
                 }));
             });
         });
-        return { eredmeny, lovak };
+        return { eredmeny };
     }
 
     // r: getAllPastRaceRows() sor. cache: { ev -> getBeszamitottEredmenyek(ev) } (hívásonként újra-
@@ -5564,7 +6173,7 @@
         if (ev != null && !cache[ev]) cache[ev] = getBeszamitottEredmenyek(ev);
         const besz = ev != null ? cache[ev] : null;
         const talalat = besz && besz.eredmeny.get(kulcs);
-        if (talalat) return { points: talalat.points, place: talalat.place, classKey: talalat.classKey, note: '' };
+        if (talalat) return { points: talalat.points, place: talalat.place, classKey: talalat.classKey, klon: talalat.klon || 0, note: '' };
 
         let note = '';
         if (!r.isObRound) note = 'nem OB-forduló';
@@ -5573,14 +6182,10 @@
         else if (!r.obPont) note = 'lemondott az OB-pontról';
         else if (r.isEliminated || r.place == null) note = 'nincs helyezés';
         else if (!getPointBand(r.completedKm)) note = 'nincs megtett km (hiányzó kör-adat)';
-        else {
-            const lovai = besz && besz.lovak.get(classKey + '|' + r.license);
-            const loKulcs = r.startNum || ('horse:' + r.horseName);
-            note = lovai && !lovai.has(loKulcs)
-                ? 'nem számít: legfeljebb 2 ló (175. §)'
-                : 'nem számít: ugyanazon a versenyen csak a jobbik (174. § (3))';
-        }
-        return { points: 0, place: obHely, classKey, note };
+        // A 3. és további lovak pontjai a lovas "klón" sorába kerülnek (l. computeIndividualChampionship),
+        // így ha egy helyezett eredmény mégsem számít, annak csak a 174. § (3) lehet az oka.
+        else note = 'nem számít: ugyanazon a versenyen csak a jobbik (174. § (3))';
+        return { points: 0, place: obHely, classKey, klon: 0, note };
     }
 
     // --- 2. LÓ-RANGLISTA (a lo-lovas-integracio.md törzsadatára épül - minden kategóriájú verseny számít) ---
@@ -5733,7 +6338,8 @@
             html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Lovas</th><th class="col-header">Pont</th><th class="col-header">Lovak</th><th class="col-header" style="text-align:left;">Egyesület</th></tr>`;
             riders.forEach((r, i) => {
                 const horseStr = r.horses.map(h => `${horseLink(h.horseName, h.startNum)} (${h.points} p)`).join(', ');
-                const excl = r.excludedHorseCount > 0 ? ` <span style="color:var(--text-dim-2); font-size:0.78rem;">(+${r.excludedHorseCount} ló nem számít)</span>` : '';
+                // A klón sor jelzi, hányadik lovairól van szó (pl. "3-4. ló").
+                const excl = r.klon ? ` <span style="color:var(--text-dim-2); font-size:0.78rem;">(${r.lovakTol}${r.lovakIg > r.lovakTol ? '-' + r.lovakIg : ''}. ló)</span>` : '';
                 html += `<tr><td>${r.rank}.</td><td style="text-align:left; font-weight:700;">${riderLink(r.name, r.license)}</td><td><b style="color:var(--primary);">${r.totalPoints}</b></td><td style="text-align:left; font-size:0.85rem; color:var(--text-dim);">${horseStr}${excl}</td><td style="text-align:left; color:var(--text-dim);">${r.club || '-'}</td></tr>`;
             });
             html += `</table></div>`;
@@ -5807,6 +6413,7 @@
         if (btn) btn.classList.add('active');
         if (tabId === 'beallitasok-pontkereso') renderAdminPontkereso();
         if (tabId === 'beallitasok-kulfoldi') renderKulfoldiKezelo();
+        if (tabId === 'beallitasok-vetek') renderVetTorzs();
     }
 
     // ============================================================================
@@ -6295,6 +6902,260 @@
                 <input type="date" value="${bajnokavatasDatumCache[y] || ''}" placeholder="${y}-12-31" style="margin-top:0; flex:1;" onchange="saveBajnokavatasDatum(${y}, this.value)">
             </div>
         `).join('');
+    }
+
+    // ============================================================================
+    // VERSENYÁTTEKINTŐ (admin) - egy verseny összes versenyzője, minden köre és ideje egy
+    // táblázatban. Itt (és csak itt) van a >= 16 km/h piros jelzés a minősítők ellenőrzéséhez
+    // (139. § (2) sebességkorlát) - a nyilvános versenyzői adatlap színezés nélküli.
+    // Innen nyomtatható a FEI orvosi lap is, és név szerint kereshető minden idei verseny.
+    // ============================================================================
+    let attekintoForras = null;
+    let attekintoTav = 'all';
+    const MINOSITO_HATAR_KMH = 16;
+
+    function attekintoVersenyek() {
+        const lista = [];
+        if (liveRaceMeta) lista.push({ id: 'live', nev: `🔴 ÉLŐ: ${liveRaceMeta.name}` });
+        localRaces.mult.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+            .forEach(r => lista.push({ id: r.id, nev: `${r.date || ''} · ${r.name}` }));
+        return lista;
+    }
+
+    function setAttekintoVerseny(id) { attekintoForras = id; attekintoTav = 'all'; renderAttekinto(); }
+    function setAttekintoTav(tav) { attekintoTav = tav; renderAttekinto(); }
+
+    function renderAttekinto() {
+        const cont = document.getElementById('attekinto-tartalom');
+        if (!cont) return;
+        const versenyek = attekintoVersenyek();
+        if (!versenyek.some(v => v.id === attekintoForras)) attekintoForras = versenyek.length ? versenyek[0].id : null;
+        const sel = document.getElementById('attekinto-verseny');
+        if (sel) sel.innerHTML = versenyek.length
+            ? versenyek.map(v => `<option value="${escapeHtml(v.id)}" ${v.id === attekintoForras ? 'selected' : ''}>${escapeHtml(v.nev)}</option>`).join('')
+            : '<option value="">Nincs verseny</option>';
+        renderAttekintoKereso();
+
+        const v = attekintoForras ? versenyForras(attekintoForras) : null;
+        if (!v) { cont.innerHTML = '<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs megjeleníthető verseny.</p>'; return; }
+
+        const cats = getActiveCategories(v.comps, v.config);
+        if (attekintoTav !== 'all' && !cats.includes(attekintoTav)) attekintoTav = 'all';
+        const tavSel = document.getElementById('attekinto-tav');
+        if (tavSel) tavSel.innerHTML = `<option value="all">Minden táv</option>` +
+            cats.map(c => `<option value="${c}" ${c === attekintoTav ? 'selected' : ''}>${escapeHtml(catNames[c] || c)}</option>`).join('');
+
+        const ranks = calculateCurrentRanks(v.comps, v.config);
+        const piros = sp => sp > 0 && sp >= MINOSITO_HATAR_KMH;
+        let html = '';
+        (attekintoTav === 'all' ? cats : [attekintoTav]).forEach(cat => {
+            const comps = v.comps.filter(c => c.dist === cat).sort(eredmenyRendezo(ranks));
+            if (!comps.length) return;
+            const cfg = v.config[cat.replace('j', '')] || { laps: [] };
+            const korSzam = Math.max((cfg.laps || []).length, ...comps.map(c => (c.laps || []).length), 1);
+            html += `<h4 class="attekinto-cim">${escapeHtml(catNames[cat] || cat)} <small>(${comps.length} versenyző)</small></h4>
+                <div class="table-responsive"><table class="ttrack-table attekinto-tabla"><tr>
+                <th class="col-header">Hely</th><th class="col-header">#</th><th class="col-header" style="text-align:left;">Versenyző / ló</th>`;
+            for (let i = 0; i < korSzam; i++) {
+                html += `<th class="col-header">${i + 1}. kör${cfg.laps && cfg.laps[i] ? `<br><small>${escapeHtml(String(cfg.laps[i]))} km</small>` : ''}</th>`;
+            }
+            html += `<th class="col-header">Össz. idő</th><th class="col-header">Össz. átlag</th><th class="col-header">Állapot</th><th class="col-header"></th></tr>`;
+
+            comps.forEach(c => {
+                const kesz = (c.laps || []).filter(l => l && l.isComplete);
+                const ut = kesz[kesz.length - 1];
+                let gyors = false;
+                let sor = `<tr><td><b>${escapeHtml(helyezesCimke(c, (ranks[c.bib] || {}).rank))}</b></td><td>${escapeHtml(String(c.bib))}</td>
+                    <td style="text-align:left;"><b>${escapeHtml(c.name)}</b><br><small style="color:var(--text-dim);">${c.internal ? escapeHtml(c.internal) : ''}</small></td>`;
+                for (let i = 0; i < korSzam; i++) {
+                    const l = (c.laps || [])[i] || {};
+                    if (!(l.arrSec > 0)) { sor += '<td style="color:var(--text-dim-2);">-</td>'; continue; }
+                    const korP = l.isComplete && piros(l.loopSpd), orvP = l.isComplete && piros(l.phaseSpd);
+                    if (korP || orvP) gyors = true;
+                    sor += `<td class="attekinto-kor">
+                        <div>Beérk.: <b>${toTimeStr(l.arrSec)}</b></div>
+                        <div>Orvosi: <b>${l.vetSec > 0 ? toTimeStr(l.vetSec) : '-'}</b></div>
+                        <div>Pulzusidő: <b>${l.pulzusSec > 0 ? toTimeStr(l.pulzusSec) : '-'}</b>${l.pulse ? ` · ${escapeHtml(String(l.pulse))}` : ''}</div>
+                        <div>Köridő: <b>${l.loopSec > 0 ? toTimeStr(l.loopSec) : '-'}</b></div>
+                        <div class="${korP ? 'gyors' : ''}">Kör: ${l.isComplete && l.loopSpd > 0 ? kmh(l.loopSpd) : '-'} km/h</div>
+                        <div class="${orvP ? 'gyors' : ''}">Orvosi: ${l.isComplete && l.phaseSpd > 0 ? kmh(l.phaseSpd) : '-'} km/h</div>
+                    </td>`;
+                }
+                const osszIdo = ut ? ((c.dist === '20' || c.dist === '20j') && ut.vetSec > 0 ? ut.loopSec + ut.pulzusSec : ut.rideTime) : (c.manualEntry ? c.totalTimeSec : 0);
+                // "Gyors eredmény" (nincs köradat): a táv és a kézzel megadott végidő hányadosa.
+                const osszAtlag = ut ? ut.rideSpd
+                    : (c.manualEntry && osszIdo > 0 ? (parseInt(String(c.dist || '').replace('j', ''), 10) || 0) / (osszIdo / 3600) : 0);
+                if (piros(osszAtlag)) gyors = true;
+                const st = getCompLiveStatus(c, v.config);
+                sor += `<td><b>${osszIdo > 0 ? toTimeStr(osszIdo) : '-'}</b></td>
+                    <td class="${piros(osszAtlag) ? 'gyors' : ''}"><b>${osszAtlag > 0 ? kmh(osszAtlag) + ' km/h' : '-'}</b></td>
+                    <td><span class="adatlap-live-status" style="background:${st.color}; color:${st.textCol || '#fff'};">${escapeHtml(st.text)}</span>${gyors ? '<br><span class="gyors-jel">⚠ 16+ km/h</span>' : ''}</td>
+                    <td><button class="edit-btn" onclick="printFeiVetCard('${escapeHtml(attekintoForras)}', '${escapeHtml(String(c.bib))}')">🩺 FEI lap</button></td></tr>`;
+                html += sor;
+            });
+            html += `</table></div>`;
+        });
+        cont.innerHTML = html || '<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Ebben a versenyben még nincs versenyző.</p>';
+    }
+
+    // Név szerinti keresés az IDEI versenyekben (élő + múltbéli) -> FEI orvosi lap nyomtatása.
+    function renderAttekintoKereso() {
+        const cont = document.getElementById('attekinto-kereso-lista');
+        if (!cont) return;
+        const q = (document.getElementById('attekinto-kereso')?.value || '').trim().toLowerCase();
+        if (q.length < 2) { cont.innerHTML = '<p class="field-hint" style="margin:6px 0 0 0;">Írj be legalább 2 karaktert (lovas vagy ló neve, rajtszám, igazolási szám).</p>'; return; }
+        const ev = String(new Date().getFullYear());
+        const forrasok = [];
+        if (liveRaceMeta) forrasok.push({ id: 'live', meta: liveRaceMeta, comps: competitors });
+        localRaces.mult.filter(r => String(r.date || '').startsWith(ev))
+            .forEach(r => forrasok.push({ id: r.id, meta: r, comps: parseCompetitors(r.competitors) }));
+        const talalatok = [];
+        forrasok.forEach(f => f.comps.forEach(c => {
+            const szoveg = [c.name, c.internal, c.license, c.bib, c.startNum].join(' ').toLowerCase();
+            if (szoveg.includes(q)) talalatok.push({ f, c });
+        }));
+        talalatok.sort((a, b) => String(b.f.meta.date || '').localeCompare(String(a.f.meta.date || '')));
+        cont.innerHTML = talalatok.length ? talalatok.map(({ f, c }) => `
+            <div class="competitor-item">
+                <div style="flex:1; min-width:180px;"><b>${escapeHtml(c.name)}</b>${c.internal ? ' · ' + escapeHtml(c.internal) : ''}<br>
+                    <small style="color:var(--text-dim);">${escapeHtml(f.meta.date || '')} · ${escapeHtml(f.meta.name)} · ${escapeHtml(catNames[c.dist] || c.dist)} · #${escapeHtml(String(c.bib))}</small></div>
+                <button class="edit-btn" onclick="printFeiVetCard('${escapeHtml(f.id)}', '${escapeHtml(String(c.bib))}')">🖨️ FEI orvosi lap</button>
+            </div>`).join('')
+            : '<p style="text-align:center; color:var(--text-dim); padding:12px 0;">Nincs találat az idei versenyeken.</p>';
+    }
+
+    // ============================================================================
+    // ÁLLATORVOS-TÖRZS SZERKESZTŐ (Beállítások > Állatorvosok): elírt nevek javítása, két írásmód
+    // összevonása. Az átnevezés MINDENHOL átvezeti a nevet: törzs, élő és versenyenkénti
+    // orvoslisták, valamint minden rögzített vizsgálat (kör / előzetes) vetName mezője.
+    // ============================================================================
+    function vetNevFrissitesek(regi, uj) {
+        const u = {};
+        const vizsgalatok = (alapUt, comps) => {
+            Object.entries(comps || {}).forEach(([kulcs, c]) => {
+                if (!c) return;
+                if (c.preVet && c.preVet.vetName === regi) u[`${alapUt}/${kulcs}/preVet/vetName`] = uj;
+                Object.entries(c.laps || {}).forEach(([i, l]) => { if (l && l.vetName === regi) u[`${alapUt}/${kulcs}/laps/${i}/vetName`] = uj; });
+            });
+        };
+        liveVets.forEach(v => { if (v && v.name === regi && v.id) u[`vets/${v.id}/name`] = uj; });
+        competitors.forEach(c => {
+            if (c.preVet && c.preVet.vetName === regi) u[`competitors/${c.bib}/preVet/vetName`] = uj;
+            (c.laps || []).forEach((l, i) => { if (l && l.vetName === regi) u[`competitors/${c.bib}/laps/${i}/vetName`] = uj; });
+        });
+        ['mult', 'jovo'].forEach(tipus => localRaces[tipus].forEach(r => {
+            Object.entries(r.vets || {}).forEach(([id, v]) => { if (v && v.name === regi) u[`races/${tipus}/${r.id}/vets/${id}/name`] = uj; });
+            vizsgalatok(`races/${tipus}/${r.id}/competitors`, r.competitors);
+        }));
+        return u;
+    }
+
+    // A lista az ÖSSZES létező állatorvos: a törzs (vetsDb), az élő és a versenyenkénti
+    // orvoslisták, valamint minden rögzített vizsgálatban szereplő név - mindegyik egy sor,
+    // mentés (javítás / összevonás) és törlés gombbal.
+    function vetMindenNev() {
+        const torzs = Object.values(vetsDbCache).filter(v => v && v.name).map(v => v.name);
+        const vizsgalat = {};
+        const szamol = n => { if (n) vizsgalat[n] = (vizsgalat[n] || 0) + 1; };
+        competitors.forEach(c => { szamol(c.preVet && c.preVet.vetName); (c.laps || []).forEach(l => szamol(l && l.vetName)); });
+        localRaces.mult.forEach(r => parseCompetitors(r.competitors).forEach(c => { szamol(c.preVet && c.preVet.vetName); (c.laps || []).forEach(l => szamol(l && l.vetName)); }));
+        const listan = {};
+        const listaba = n => { if (n) listan[n] = (listan[n] || 0) + 1; };
+        liveVets.forEach(v => listaba(v && v.name));
+        ['mult', 'jovo'].forEach(t => localRaces[t].forEach(r => Object.values(r.vets || {}).forEach(v => listaba(v && v.name))));
+        const nevek = Array.from(new Set(torzs.concat(Object.keys(vizsgalat), Object.keys(listan)))).sort((a, b) => a.localeCompare(b, 'hu'));
+        return { nevek, torzs, vizsgalat, listan };
+    }
+
+    function renderVetTorzs() {
+        const cont = document.getElementById('vet-torzs-lista');
+        if (!cont) return;
+        const { nevek, vizsgalat, listan } = vetMindenNev();
+        const uj = `<div class="competitor-item vet-torzs-sor">
+                <input type="text" id="vet-uj-felvetel" placeholder="Új állatorvos neve (pl. Dr. Kovács Anna)" autocomplete="off" onkeydown="if(event.key==='Enter') vetTorzsFelvetel()">
+                <button class="edit-btn" onclick="vetTorzsFelvetel()">➕ Hozzáadás</button>
+            </div>`;
+        if (!nevek.length) { cont.innerHTML = uj + '<p style="color:var(--text-dim);">Még nincs rögzített állatorvos.</p>'; cont.dataset.nevek = '[]'; return; }
+        cont.innerHTML = uj + `<p class="field-hint" style="margin:10px 0 6px 0;">${nevek.length} állatorvos</p>` + nevek.map((n, i) => {
+            const adat = [];
+            if (vizsgalat[n]) adat.push(`${vizsgalat[n]} rögzített vizsgálat`);
+            if (listan[n]) adat.push(`${listan[n]} verseny orvoslistáján`);
+            return `<div class="competitor-item vet-torzs-sor">
+                <input type="text" id="vet-uj-nev-${i}" value="${escapeHtml(n)}" autocomplete="off" onkeydown="if(event.key==='Enter') vetAtnevezes(${i})" aria-label="Állatorvos neve">
+                <button class="edit-btn vet-mentes" onclick="vetAtnevezes(${i})">💾 Mentés</button>
+                <button class="edit-btn is-danger" onclick="vetTorzsTorles(${i})">Törlés</button>
+                <small class="vet-torzs-info">${adat.length ? adat.join(' · ') : 'csak a keresőben szerepel'}</small>
+            </div>`;
+        }).join('');
+        cont.dataset.nevek = JSON.stringify(nevek);
+    }
+
+    function vetTorzsNev(i) {
+        try { return JSON.parse(document.getElementById('vet-torzs-lista').dataset.nevek || '[]')[i]; } catch (e) { return null; }
+    }
+
+    function vetTorzsFelvetel() {
+        const mezo = document.getElementById('vet-uj-felvetel');
+        const nev = String(mezo.value || '').trim().replace(/\s+/g, ' ');
+        if (!nev) { showToast('Add meg az állatorvos nevét!', true); return; }
+        if (vetMindenNev().nevek.some(n => n.toLowerCase() === nev.toLowerCase())) { showToast('Ez az állatorvos már szerepel a listában.', true); return; }
+        db.ref('vetsDb/' + sanitizeKey(nev)).update({ name: nev, updatedAt: Date.now() })
+            .then(() => { mezo.value = ''; showToast('Állatorvos hozzáadva.'); renderVetTorzs(); })
+            .catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    // Mentés: változatlan névnél csak a törzsbe veszi fel (ha még nem volt benne), megváltozott
+    // névnél mindenhol átírja - ha az új név már létezik, a kettő összevonódik.
+    function vetAtnevezes(i) {
+        const regi = vetTorzsNev(i);
+        const uj = String(document.getElementById('vet-uj-nev-' + i).value || '').trim().replace(/\s+/g, ' ');
+        if (!regi) return;
+        if (!uj) { showToast('Add meg a helyes nevet!', true); return; }
+        if (uj === regi) {
+            if (Object.values(vetsDbCache).some(v => v && v.name === regi)) { showToast('Nincs változás - a név már el van mentve.'); return; }
+            db.ref('vetsDb/' + sanitizeKey(regi)).update({ name: regi, updatedAt: Date.now() })
+                .then(() => { showToast('Mentve.'); renderVetTorzs(); })
+                .catch(e => showToast('Hiba: ' + e.message, true));
+            return;
+        }
+        const u = vetNevFrissitesek(regi, uj);
+        const vizsgalatDb = Object.keys(u).filter(k => k.endsWith('/vetName')).length;
+        if (sanitizeKey(regi) !== sanitizeKey(uj)) u['vetsDb/' + sanitizeKey(regi)] = null;
+        u['vetsDb/' + sanitizeKey(uj) + '/name'] = uj;
+        u['vetsDb/' + sanitizeKey(uj) + '/updatedAt'] = Date.now();
+        const osszevon = vetMindenNev().nevek.includes(uj);
+        showConfirm('Állatorvos mentése', `"${regi}" → "${uj}". ${vizsgalatDb} rögzített vizsgálatban és az orvoslistákban is átíródik.${osszevon ? ` "${uj}" már létezik - a kettő összevonódik.` : ''}`, () => {
+            db.ref('/').update(u).then(() => { showToast('Mentve.'); renderVetTorzs(); })
+                .catch(e => showToast('Hiba: ' + e.message, true));
+        });
+    }
+
+    // Teljes törlés: a törzsből, az élő és a versenyenkénti orvoslistákból, és a rögzített
+    // vizsgálatokból is (ott csak az orvos neve lesz üres, a vizsgálat adatai megmaradnak).
+    function vetNevTorlesek(nev) {
+        const u = {};
+        Object.entries(vetNevFrissitesek(nev, null)).forEach(([ut]) => {
+            // orvoslista-bejegyzés: az egész bejegyzés törlődik, nem csak a neve
+            u[ut.endsWith('/name') ? ut.slice(0, -'/name'.length) : ut] = null;
+        });
+        Object.entries(vetsDbCache).forEach(([k, v]) => { if (v && v.name === nev) u['vetsDb/' + k] = null; });
+        u['vetsDb/' + sanitizeKey(nev)] = null;
+        return u;
+    }
+
+    function vetTorzsTorles(i) {
+        const nev = vetTorzsNev(i);
+        if (!nev) return;
+        const u = vetNevTorlesek(nev);
+        const vizsgalatDb = Object.keys(u).filter(k => k.endsWith('/vetName')).length;
+        const listaDb = Object.keys(u).filter(k => /(^|\/)vets\/[^/]+$/.test(k)).length;
+        const reszletek = [];
+        if (vizsgalatDb) reszletek.push(`${vizsgalatDb} rögzített vizsgálatból az orvos neve is törlődik (a vizsgálat adatai megmaradnak)`);
+        if (listaDb) reszletek.push(`${listaDb} orvoslistáról is lekerül`);
+        showConfirm('Állatorvos törlése', `Biztosan törlöd: "${nev}"?${reszletek.length ? '\n' + reszletek.join(', ') + '.' : ''}\nEz nem vonható vissza. Ha csak elírás, inkább javítsd ki a nevet és mentsd.`, () => {
+            db.ref('/').update(u).then(() => { showToast('Törölve.'); renderVetTorzs(); })
+                .catch(e => showToast('Hiba: ' + e.message, true));
+        });
     }
 
     // --- ÉV TENYÉSZTŐJE - placeholder (l. terv 5.) ---

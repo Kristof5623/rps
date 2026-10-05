@@ -1382,3 +1382,53 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
 #fullscreenLiveOverlay .live-item b { font-size: 1.5rem; display: block; margin-bottom: 5px; }
 #fullscreenLiveOverlay .live-item small { font-size: 1.1rem; color: var(--text-dim); }
 #fullscreenLiveOverlay .live-time { font-size: 2.6rem; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+
+/* --- 2026-10 javítások --- */
+/* FNR: teljesítette, de helyezés nélkül - zöld (II. melléklet) */
+.adatlap-rank.fnr { background: var(--success); color: #000; font-size: 0.72rem; }
+/* Kiírás: körönkénti kötelező pihenőidő (53. §) */
+.piheno-sor { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.piheno-mezo { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-dim); background: var(--card-3); border-radius: var(--radius-sm); padding: 4px 8px; margin: 0; text-transform: none; letter-spacing: 0; }
+.piheno-mezo span { font-weight: 700; color: var(--text); min-width: 5.6em; }
+.piheno-mezo input { width: 64px; margin-top: 0; padding: 6px; text-align: center; }
+/* Re-check a nyilvános nézetekben (FEI: Re-Inspection) */
+.live-item.is-recheck { border-color: #FF9F0A; }
+.live-recheck { color: #FF9F0A; font-weight: 800; }
+#fullscreenLiveOverlay .live-item small.live-recheck { color: #FF9F0A; }
+/* Versenyáttekintő (admin) - a 16 km/h-s jelzés csak itt piros */
+.attekinto-cim { margin: 18px 0 6px 0; color: var(--text); }
+.attekinto-cim small { color: var(--text-dim); font-weight: 600; }
+.attekinto-tabla td { vertical-align: top; font-size: 0.8rem; }
+.attekinto-kor { text-align: left; white-space: nowrap; line-height: 1.45; }
+.attekinto-tabla .gyors { color: var(--danger); font-weight: 800; }
+/* Vízszintes görgetésnél a név oszlop a helyén marad, hogy látszódjon, kié a kör */
+.attekinto-tabla.ttrack-table tr > :nth-child(3) { position: sticky; left: 0; z-index: 3; will-change: transform; box-shadow: 1px 0 0 var(--border); }
+.attekinto-tabla.ttrack-table tr > td:nth-child(3) { background: var(--card); }
+.attekinto-tabla.ttrack-table tr:nth-child(2n) > td:nth-child(3) { background: linear-gradient(rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02)), var(--card); }
+.attekinto-tabla.ttrack-table tr > th:nth-child(3) { background: var(--card-3); }
+.gyors-jel { display: inline-block; margin-top: 4px; color: var(--danger); font-weight: 800; font-size: 0.72rem; white-space: nowrap; }
+@media (max-width: 800px) {
+    /* A ragadós mobil fejléc (z-index 1000) eltakarta a nyitott menü tetejét. */
+    .sidebar.open { padding-top: 76px; }
+}
+
+/* Állatorvosok (Beállítások): név mező + Mentés + Törlés egy sorban, alatta a használat */
+.vet-torzs-sor { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vet-torzs-sor input { flex: 1 1 220px; min-width: 0; margin: 0; }
+.vet-torzs-sor .edit-btn { flex: 0 0 auto; margin: 0; }
+.vet-torzs-info { flex-basis: 100%; color: var(--text-dim); font-size: 0.75rem; }
+.vet-torzs-sor .vet-mentes { background: var(--primary); color: var(--on-primary, #fff); border-color: var(--primary); }
+
+/* Fülsorok: alapból 4 fül fér egy sorba (21%), így 5-6 fülnél egy-két gomb egyedül csúszott át
+   a következő sorba. Gépen 5-6 fül egy sorban, telefonon kiegyensúlyozott 3+2 / 3+3. */
+@media (min-width: 801px) {
+    .tabs > .tab-btn:first-child:nth-last-child(5), .tabs > .tab-btn:first-child:nth-last-child(5) ~ .tab-btn { flex-basis: 17%; }
+    .tabs > .tab-btn:first-child:nth-last-child(6), .tabs > .tab-btn:first-child:nth-last-child(6) ~ .tab-btn { flex-basis: 14%; }
+}
+@media (max-width: 800px) {
+    .tabs > .tab-btn:first-child:nth-last-child(5), .tabs > .tab-btn:first-child:nth-last-child(5) ~ .tab-btn,
+    .tabs > .tab-btn:first-child:nth-last-child(6), .tabs > .tab-btn:first-child:nth-last-child(6) ~ .tab-btn { flex-basis: 30%; }
+}
+
+/* Kétsoros menüfelirat ("ÉLŐ Verseny Kezelés"): a második sor a szöveg alá kerüljön, ne az ikon alá */
+.sidebar-btn { padding-left: calc(12px + 1.55em); text-indent: -1.55em; }

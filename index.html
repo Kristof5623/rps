@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v113</title>
+    <title>Verseny Kalkulátor v114</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,6 +51,7 @@
     <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Fő funkciók</div>
         <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">📝 ÉLŐ Verseny Kezelés</button>
+        <button id="btn-menu-attekinto" class="sidebar-btn admin-only" onclick="switchMainTab('attekinto-mod', this)">📋 Versenyáttekintő</button>
         <button id="btn-menu-beallitasok" class="sidebar-btn admin-only" onclick="switchMainTab('beallitasok-mod', this)">⚙️ Beállítások</button>
         <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
         <button class="sidebar-btn admin-only" onclick="printVersenyLista('nevezes')">🖨️ Nevezési Lista (A4)</button>
@@ -193,6 +194,12 @@
 
                 <div id="orv-recheck-box" style="display:none; background:var(--card-2); border-radius:10px; padding:10px 12px; margin:10px 0; border-left:3px solid var(--warning);">
                     <div style="font-size:0.85rem; font-weight:bold;" id="orv-recheck-info">Re-check: --</div>
+                    <select id="orv-rc-tipus" style="margin-top:8px;">
+                        <option value="">Re-check oka (FEI: Re-Inspection)...</option>
+                        <option value="HR">HR - pulzus miatt újra bemutatva (100. §)</option>
+                        <option value="REQ">REQ - az orvos kérte (92. § (4))</option>
+                        <option value="COMP">COMP - kötelező ismételt vizsgálat (92. § (3), 101. §)</option>
+                    </select>
                     <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
                         <input type="number" id="orv-rch" placeholder="óó" style="width:64px; margin-top:0; text-align:center;">
                         <input type="number" id="orv-rcm" placeholder="pp" style="width:64px; margin-top:0; text-align:center;">
@@ -225,7 +232,7 @@
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                    <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
+                    <option value="FNR" style="color:var(--success);">Teljesítette, helyezés nélkül (FNR)</option>
                     <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                     <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                     <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
@@ -460,6 +467,7 @@
                 <button id="btn-beallitasok-tema" class="tab-btn active" onclick="switchBeallitasokTab('beallitasok-tema', this)">Design téma</button>
                 <button id="btn-beallitasok-pontkereso" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-pontkereso', this)">Versenyző pontkereső</button>
                 <button id="btn-beallitasok-kulfoldi" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-kulfoldi', this)">Nemzetközi versenyek</button>
+                <button id="btn-beallitasok-vetek" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-vetek', this)">Állatorvosok</button>
             </div>
 
             <div id="beallitasok-tema" class="sub-mode-content" style="display:block;">
@@ -468,7 +476,7 @@
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🎨 Design téma</h4>
                     <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Kattints a kívánt témára - csak ezen az eszközön vált át.</p>
                     <div class="theme-swatch-row" id="themeSwatchRow"></div>
-                    <button class="calc-btn" style="background:var(--card-3); margin-top:15px; width:auto; padding:8px 18px;" onclick="resetUiTheme()">Vissza a közös témához</button>
+                    <button class="calc-btn" style="background:var(--card-3); color:var(--text); border:1px solid var(--border); margin-top:15px; width:auto; padding:8px 18px;" onclick="resetUiTheme()">Vissza a közös témához</button>
                 </div>
 
                 <div class="kiiras-card admin-only" style="border-left-color: var(--warning);">
@@ -482,6 +490,16 @@
                 <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Keress rá egy versenyzőre, és nézd meg versenyenkénti bontásban, hányadik helyen végzett, milyen távon, és mennyi bajnoki pontot ért ez.</p>
                 <input type="text" id="admin-pontkereso-search" placeholder="Keresés név, igazolási szám vagy egyesület alapján..." autocomplete="off" oninput="renderAdminPontkereso()">
                 <div id="admin-pontkereso-list" style="margin-top:15px;"></div>
+            </div>
+
+            <div id="beallitasok-vetek" class="sub-mode-content" style="display:none;">
+                <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
+                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🩺 Állatorvosok</h4>
+                    <p class="field-hint" style="margin-bottom:0;">Az összes létező állatorvos. Elírt nevet itt javíts ki, majd <b>Mentés</b> - a név mindenhol átíródik
+                        (kereső, orvoslisták, korábbi vizsgálatok). Ha a javított név már létezik (pl. "Pallos" → "Pallós"), a kettő összevonódik.
+                        A <b>Törlés</b> mindenhonnan eltávolítja a nevet.</p>
+                </div>
+                <div id="vet-torzs-lista" style="margin-top:15px;"></div>
             </div>
 
             <div id="beallitasok-kulfoldi" class="sub-mode-content" style="display:none;">
@@ -570,7 +588,7 @@
                 <h4 style="margin-bottom: 15px; color: var(--text);">ÉLŐ: Állatorvosok felvitele</h4>
                 <label>Állatorvos neve (pl. Dr. Szabó János):</label>
                 <input type="text" id="regVetName" placeholder="Kezdd el gépelni a nevet..." autocomplete="off">
-                <div style="font-size:0.75rem; color:var(--text-dim); margin:-6px 0 10px 2px;">
+                <div style="font-size:0.75rem; color:var(--text-dim); margin:6px 0 10px 2px;">
                     A korábbi versenyeken szerepelt orvosok gépelés közben felajánlódnak.
                 </div>
                 <button class="calc-btn add-btn admin-only" onclick="saveVet()">Orvos Hozzáadása</button>
@@ -598,7 +616,7 @@
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                    <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
+                    <option value="FNR" style="color:var(--success);">Teljesítette, helyezés nélkül (FNR)</option>
                     <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                     <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                     <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
@@ -638,6 +656,21 @@
             </div>
         </div>
 
+        <div id="attekinto-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 10px;">📋 Versenyáttekintő</h3>
+            <p class="field-hint" style="margin-top:0;">Egy verseny összes versenyzője, minden köre és ideje. A <b style="color:var(--danger);">piros</b> érték 16 km/h vagy afölötti átlagsebesség (minősítők, 139. § (2)) - ez csak itt látszik, a nyilvános adatlapon nincs színezés.</p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                <select id="attekinto-verseny" onchange="setAttekintoVerseny(this.value)" style="flex:2; min-width:200px; margin-top:0;"></select>
+                <select id="attekinto-tav" onchange="setAttekintoTav(this.value)" style="flex:1; min-width:130px; margin-top:0;"></select>
+            </div>
+            <div class="kiiras-card" style="border-left-color: var(--teal);">
+                <h4 style="margin:0 0 6px 0; color:var(--text);">🖨️ FEI orvosi lap kérésre - keresés az idei versenyekben</h4>
+                <input type="text" id="attekinto-kereso" placeholder="Lovas vagy ló neve, rajtszám, igazolási szám..." autocomplete="off" oninput="renderAttekintoKereso()" style="margin-top:0;">
+                <div id="attekinto-kereso-lista" style="margin-top:8px;"></div>
+            </div>
+            <div id="attekinto-tartalom"></div>
+        </div>
+
         <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
         <div id="fullscreenLiveOverlay">
             <div class="fullscreen-panel">
@@ -658,6 +691,7 @@
             <label>Táv (km):</label><input type="number" id="dist1" placeholder="20">
             <label>Indulás:</label><div class="time-group"><input type="number" id="rh1" oninput="jump(this, 'rm1')" placeholder="00">:<input type="number" id="rm1" oninput="jump(this, 'rs1')" placeholder="00">:<input type="number" id="rs1" oninput="jump(this, 'rh2')" placeholder="00"></div>
             <label>Beérkezés:</label><div class="time-group"><input type="number" id="rh2" oninput="jump(this, 'rm2')" placeholder="00">:<input type="number" id="rm2" oninput="jump(this, 'rs2')" placeholder="00">:<input type="number" id="rs2" placeholder="00"></div>
+            <label>Kötelező pihenő (perc):</label><input type="number" id="reszido-piheno" placeholder="40" min="1" max="120">
             <button class="calc-btn" onclick="calcReszido()">Számolás</button>
             <div id="res1" class="result-box" style="display:none"></div>
         </div>
@@ -721,7 +755,7 @@
             <h4 style="margin-bottom: 15px; color: var(--text);">Állatorvosok ehhez a versenyhez</h4>
             <label>Állatorvos neve:</label>
             <input type="text" id="rm-regVetName" placeholder="pl. Dr. Kovács János">
-            <button id="rm-saveVetBtn" class="calc-btn add-btn admin-only" style="margin-top:0;" onclick="saveRmVet()">Orvos hozzáadása</button>
+            <button id="rm-saveVetBtn" class="calc-btn add-btn admin-only" style="margin-top:10px;" onclick="saveRmVet()">Orvos hozzáadása</button>
             <div id="rm-vetListContainer" style="margin-top:20px;"></div>
         </div>
 
@@ -778,7 +812,7 @@
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                    <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
+                    <option value="FNR" style="color:var(--success);">Teljesítette, helyezés nélkül (FNR)</option>
                     <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                     <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                     <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
@@ -855,7 +889,7 @@
                 <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                 <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                 <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
-                <option value="FNR" style="color:var(--text-dim);">Helyezés nélkül (FNR)</option>
+                <option value="FNR" style="color:var(--success);">Teljesítette, helyezés nélkül (FNR)</option>
                 <option value="FTQ-SP" style="color:var(--danger);">Kiesés: Sebesség (SP)</option>
                 <option value="FTQ-GA" style="color:var(--danger);">Kiesés: Sántaság (GA)</option>
                 <option value="FTQ-ME" style="color:var(--danger);">Kiesés: Metabolikus (ME)</option>
