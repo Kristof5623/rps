@@ -946,10 +946,10 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 
 /* ============================================================================
    LOVAS / LÓ PROFIL ABLAK
-   A fejléc és a törzsadat fix, csak az eredménylista görget - ezért a gyökér egy
-   flex oszlop, és az eredményblokk kapja a flex:1 + overflow-y:auto párost.
+   Fejléc + gyors jelzések + fülek (Eredmények / Adatlap / FEI újonc) fixen, alattuk a fül
+   tartalma görget (flex:1 + overflow-y:auto). A fix magasság miatt fülváltáskor nem ugrál az ablak.
    ============================================================================ */
-.profil { display: flex; flex-direction: column; max-height: calc(90vh - 50px); }
+.profil { display: flex; flex-direction: column; height: min(720px, calc(90vh - 50px)); }
 
 .profil-fejlec { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 /* Az eredeti oldalon itt lófej-rajz áll; nekünk nincs képünk, ezért nagy halvány monogram. */
@@ -983,18 +983,61 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 .profil-licenc.lejart { background: var(--danger-dim); color: var(--danger); }
 .profil-megjegyzes { font-size: 0.78rem; color: var(--text-dim-2); margin-top: 8px; line-height: 1.5; }
 
-/* Eredmény-sáv: forrásváltó + évszűrő */
-.profil-sav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
-.profil-sav-cim { font-weight: 800; color: var(--text); margin-right: auto; }
+/* Gyors jelzések a név alatt (licenc, minősítés, ló pihenője) */
+.profil-jelek { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.profil-jel {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px;
+    font-size: 0.78rem; font-weight: 700; line-height: 1.35; font-family: inherit;
+    background: var(--card-3); color: var(--text-dim); border: 1px solid var(--border);
+}
+.profil-jel.jo { background: var(--success-dim); color: var(--success); border-color: transparent; }
+.profil-jel.rossz { background: var(--danger-dim); color: var(--danger); border-color: transparent; }
+.profil-jel.figyel { background: rgba(255, 159, 10, .15); color: var(--warning); border-color: transparent; cursor: pointer; }
+.profil-jel .minosites-jel { font-size: 0.72rem; }
+
+/* Fülek */
+.profil-fulek { display: flex; gap: 2px; margin-top: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.profil-ful {
+    background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    padding: 10px 14px; min-height: 44px; color: var(--text-dim); font-weight: 800; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+    white-space: nowrap;
+}
+.profil-ful:hover { color: var(--text); }
+.profil-ful.aktiv { color: var(--text); border-bottom-color: var(--primary); }
+.profil-ful small { color: var(--text-dim-2); font-weight: 700; margin-left: 2px; }
+.profil-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 4px 4px 0; }
+.profil-panel > .profil-piheno:first-child, .profil-panel > .profil-adatok:first-child { margin-top: 12px; }
+
+/* Eredmények fül: forrásváltó + évgombok fixen a lista tetején */
+.profil-szuro { position: sticky; top: 0; z-index: 2; background: var(--card); padding: 12px 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.profil-szuro:empty { display: none; }
+.profil-forrasok { display: flex; gap: 6px; }
+.profil-evek { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.profil-evek::-webkit-scrollbar { display: none; }
+.profil-evgomb {
+    flex-shrink: 0; background: var(--card-3); border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 999px; padding: 6px 13px; min-height: 36px; font-weight: 800; font-size: 0.82rem; cursor: pointer; font-family: inherit;
+}
+.profil-evgomb:hover { color: var(--text); }
+.profil-evgomb.aktiv { background: var(--text); border-color: var(--text); color: var(--card); }
+.profil-evgomb small, .profil-forras small { opacity: .7; font-weight: 700; margin-left: 2px; }
+
+/* Összesítő: rajt / teljesített / győzelem / dobogó / km */
+.profil-statok { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; margin: 2px 0 12px; }
+.profil-stat { background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
+.profil-stat b { display: block; font-size: 1.15rem; font-weight: 900; color: var(--text); line-height: 1.2; }
+.profil-stat b small { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; }
+.profil-stat span { font-size: 0.7rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.profil-evfej { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 8px; font-weight: 900; font-size: 0.98rem; color: var(--text); }
+.profil-evfej:first-child { margin-top: 0; }
+.profil-evfej small { color: var(--text-dim); font-weight: 700; font-size: 0.75rem; }
+
 .profil-forras {
     background: var(--card-3); color: var(--text-dim); border: 1px solid var(--border);
     border-radius: 999px; padding: 8px 14px; min-height: 44px; cursor: pointer; font-size: 0.82rem; font-weight: 700;
 }
 .profil-forras.aktiv { background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff); }
 .profil-forras:disabled { opacity: .45; cursor: default; }
-.profil-ev { width: auto; margin: 0; padding: 8px 12px; min-height: 44px; background: var(--card-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); }
-
-.profil-eredmenyek { flex: 1 1 auto; overflow-y: auto; min-height: 130px; padding-right: 4px; }
 .profil-ures { text-align: center; color: var(--text-dim); padding: 26px 10px; }
 
 /* Versenyenkénti kártya: a fejléc a verseny, a törzs a saját eredmény. */
@@ -1048,15 +1091,17 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 @media (max-width: 700px) {
     /* A profil töltse ki a képernyőt, és az eredménylista kapja a maradék helyet. */
     .modal-content { padding: 14px; max-height: 94vh; }
-    .profil { max-height: calc(94vh - 34px); }
-    .profil-eredmenyek { min-height: 40vh; }
+    .profil { height: calc(94vh - 34px); }
     .profil-fejlec { padding-bottom: 10px; }
-
-    /* Forrásváltó: két egyenlő gomb egy sorban, alatta teljes szélességű évválasztó. */
-    .profil-sav { margin: 10px 0 8px; padding-top: 10px; gap: 6px; }
-    .profil-sav-cim { width: 100%; margin-right: 0; font-size: 0.82rem; }
+    .profil-jelek { margin-top: 10px; }
+    .profil-ful { flex: 1 1 auto; padding: 10px 4px; font-size: 0.84rem; }
+    /* Forrásváltó: két egyenlő gomb egy sorban */
     .profil-forras { flex: 1 1 0; min-width: 0; padding: 9px 6px; font-size: 0.8rem; }
-    .profil-ev { flex: 1 1 100%; width: 100%; }
+    .profil-statok { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .profil-stat { padding: 6px 4px; text-align: center; }
+    .profil-stat b { font-size: 1rem; }
+    .profil-stat b small { display: block; font-size: 0.65rem; }
+    .profil-stat span { font-size: 0.6rem; letter-spacing: 0; }
 }
 
 @media (max-width: 560px) {

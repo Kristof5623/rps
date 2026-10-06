@@ -196,18 +196,25 @@ html.uj-dizajn .uj-hero-kep.aktiv .uj-hero-elo { transform: scale(1); }
 @media (min-width: 901px) {
     html.uj-dizajn .uj-hero-kep.alak-allo .uj-hero-elo,
     html.uj-dizajn .uj-hero-kep.alak-negyzet .uj-hero-elo { background-size: contain; background-position: 80% center; }
-    html.uj-dizajn .uj-hero-kep.alak-fekvo .uj-hero-hatter { display: none; }
+    html.uj-dizajn .uj-hero-kep.alak-fekvo .uj-hero-hatter,
+    html.uj-dizajn .uj-hero-kep.alak-csoport .uj-hero-hatter { display: none; }
     html.uj-dizajn .uj-hero-szoveg { max-width: 560px; }
 }
 /* Telefonon (álló keret): az álló kép kitölti, a négyzetes egészben látszik, a fekvő kitölti a lovasra igazítva */
 @media (max-width: 900px) {
     html.uj-dizajn .uj-hero-kep.alak-negyzet .uj-hero-elo { background-size: contain; background-position: center 30%; }
+    /* a széles csoportkép egészben, a keret felső részén (alul a felirat) */
+    html.uj-dizajn .uj-hero-kep.alak-csoport .uj-hero-elo { background-size: contain; background-position: center 22%; }
     html.uj-dizajn .uj-hero-kep.alak-allo .uj-hero-hatter,
     html.uj-dizajn .uj-hero-kep.alak-fekvo .uj-hero-hatter { display: none; }
 }
 html.uj-dizajn .uj-hero-arnyek {
     position: absolute; inset: 0;
     background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.78) 100%), linear-gradient(90deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 60%);
+}
+/* Csoportképnél az emberek a kép felső részén vannak: csak az alsó sáv sötétedik (a felirat alatt) */
+html.uj-dizajn .uj-hero.csoport-aktiv .uj-hero-arnyek {
+    background: linear-gradient(180deg, rgba(0,0,0,0) 58%, rgba(0,0,0,.8) 100%);
 }
 html.uj-dizajn .uj-hero-szoveg { position: absolute; left: 0; right: 0; bottom: 0; padding: 32px 36px 38px; max-width: 720px; color: #fff; }
 html.uj-dizajn .uj-hero-felirat { font-size: 0.75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--primary); }
@@ -272,6 +279,30 @@ html.uj-dizajn .uj-nev { flex: 1; min-width: 0; }
 html.uj-dizajn .uj-nev small { display: block; color: var(--text-dim); font-size: 0.78rem; }
 html.uj-dizajn .uj-dobogo b, html.uj-dizajn .uj-lista b { font-variant-numeric: tabular-nums; color: var(--primary); }
 html.uj-dizajn .uj-dobogo li:first-child .uj-hely { color: var(--arany); }
+
+/* --- Élő verseny a kezdőlapon ------------------------------------------------- */
+html.uj-dizajn .uj-hero.elo { height: clamp(220px, 34vh, 330px); }
+html.uj-dizajn .uj-elo-blokk { margin-top: -14px; }
+html.uj-dizajn .uj-elo-szamok { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+html.uj-dizajn .uj-elo-szam { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+html.uj-dizajn .uj-elo-szam b { display: block; font-size: 1.7rem; font-weight: 900; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
+html.uj-dizajn .uj-elo-szam span { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+html.uj-dizajn .uj-elo-szam.palyan b { color: var(--primary); }
+html.uj-dizajn .uj-elo-szam.cel b { color: var(--success); }
+html.uj-dizajn .uj-elo-szam.ki b { color: var(--danger); }
+html.uj-dizajn .uj-visszaszam { font-size: 1.15rem; font-weight: 900; min-width: 64px; text-align: right; }
+html.uj-dizajn .uj-lista b.uj-visszaszam.kozel { color: var(--warning); }
+html.uj-dizajn .uj-esemenyek li.rossz .uj-nev small { color: var(--danger); }
+html.uj-dizajn .uj-esemeny-ido { flex: 0 0 46px; font-weight: 800; color: var(--text-dim); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+html.uj-dizajn .uj-dobogo .uj-nev small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) {
+    html.uj-dizajn .uj-elo-blokk { margin-top: -10px; }
+    html.uj-dizajn .uj-hero.elo { height: 32vh; min-height: 230px; }
+    html.uj-dizajn .uj-elo-szamok { gap: 6px; }
+    html.uj-dizajn .uj-elo-szam { padding: 8px 6px; text-align: center; }
+    html.uj-dizajn .uj-elo-szam b { font-size: 1.3rem; }
+    html.uj-dizajn .uj-elo-szam span { font-size: 0.6rem; letter-spacing: 0; }
+}
 
 /* --- Alsó fülsáv (telefon) --------------------------------------------------- */
 html.uj-dizajn #uj-also-sav { display: none; }
