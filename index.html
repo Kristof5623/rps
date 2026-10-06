@@ -7,10 +7,21 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Verseny Kalkulátor v117</title>
+    <title>End-Ride – távlovas versenyek</title>
+    <meta name="description" content="Élő időmérés, eredmények, bajnokság és lovas-profilok a magyar távlovas versenyekhez.">
+    <meta name="application-name" content="End-Ride">
+    <meta name="apple-mobile-web-app-title" content="End-Ride">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="End-Ride – távlovas versenyek">
+    <meta property="og:description" content="Élő időmérés, eredmények és bajnokság a magyar távlovas versenyekhez.">
+    <meta property="og:image" content="https://endurancehunracingfk.com/kepek/tavlovas-1.jpg">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="kepek/logo.svg" type="image/svg+xml">
+    <link rel="icon" href="kepek/ikon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
-         oldalak ebből veszik észre, hogy új verzió van fent, és maguktól frissülnek. -->
-    <meta name="app-verzio" content="117">
+         oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
+    <meta name="app-verzio" content="118">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,16 +31,16 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <!-- Új dizájn (próba): eszközönként kapcsolható, a régi felülethez nem nyúl -->
-    <!-- Megosztható link a megbeszéléshez: ...?dizajn=uj bekapcsolja, ...?dizajn=regi visszaállítja (azon az eszközön) -->
+    <!-- Az új dizájn a végleges, mindenkinek (2026-10-06). Vészkijárat, ha valami nagyon elromlana:
+         ...?dizajn=regi visszahozza a régit azon az eszközön, ...?dizajn=uj visszaállít. -->
     <script>try {
         var dz = new URLSearchParams(location.search).get('dizajn');
-        if (dz === 'uj') localStorage.setItem('rps-uj-dizajn', '1');
-        else if (dz === 'regi') localStorage.setItem('rps-uj-dizajn', '0');
-        if (localStorage.getItem('rps-uj-dizajn') === '1') document.documentElement.classList.add('uj-dizajn');
-    } catch (e) {}</script>
-    <link rel="stylesheet" href="rps.css?v=117">
-    <link rel="stylesheet" href="rps-uj.css?v=117">
+        if (dz === 'regi') localStorage.setItem('rps-dizajn', 'regi');
+        else if (dz === 'uj') localStorage.removeItem('rps-dizajn');
+        if (localStorage.getItem('rps-dizajn') !== 'regi') document.documentElement.classList.add('uj-dizajn');
+    } catch (e) { document.documentElement.classList.add('uj-dizajn'); }</script>
+    <link rel="stylesheet" href="rps.css?v=118">
+    <link rel="stylesheet" href="rps-uj.css?v=118">
 </head>
 <body>
 
@@ -55,7 +66,7 @@
 </div>
 
 <header id="uj-fejlec">
-    <button class="uj-marka" onclick="ujNavValaszt('kezdolap')"><span class="uj-logo">TL</span><span><b>Távlovas</b><small>versenyek · élő eredmények</small></span></button>
+    <button class="uj-marka" onclick="ujNavValaszt('kezdolap')" aria-label="End-Ride kezdőlap"><svg class="brand-logo uj-logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" class="bl-alap"/><path class="bl-lo" d="M29.93 72.29A30 30 0 1 1 70.07 72.29L61.38 62.63A17 17 0 1 0 38.62 62.63Z"/><rect class="bl-lyuk" x="27.38" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-26.0 28.88 60.30)"/><rect class="bl-lyuk" x="25.01" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(2.0 26.51 49.18)"/><rect class="bl-lyuk" x="28.15" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(30.0 29.65 38.25)"/><rect class="bl-lyuk" x="68.85" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(-210.0 70.35 38.25)"/><rect class="bl-lyuk" x="71.99" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(-182.0 73.49 49.18)"/><rect class="bl-lyuk" x="69.62" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-154.0 71.12 60.30)"/><path class="bl-vonal" d="M35 55H42L45.5 46L50.5 64L54.5 51L57 55H65"/></svg><span><b class="brand-szo">End<svg class="kotojel-puls" viewBox="0 0 40 24" aria-hidden="true"><path d="M1 12H11L15 4L20 20L25 8L28 12H39"/></svg>Ride</b><small>távlovas versenyek · élő eredmények</small></span></button>
     <nav id="uj-nav"></nav>
     <div id="uj-nav-jobb"></div>
 </header>
@@ -64,7 +75,7 @@
 <div class="overlay" onclick="toggleMenu()"></div>
 
 <div class="sidebar" id="sidebar">
-    <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; color: var(--text);">⏱️ Verseny Kalkulátor</div>
+    <div class="sidebar-marka"><svg class="brand-logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" class="bl-alap"/><path class="bl-lo" d="M29.93 72.29A30 30 0 1 1 70.07 72.29L61.38 62.63A17 17 0 1 0 38.62 62.63Z"/><rect class="bl-lyuk" x="27.38" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-26.0 28.88 60.30)"/><rect class="bl-lyuk" x="25.01" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(2.0 26.51 49.18)"/><rect class="bl-lyuk" x="28.15" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(30.0 29.65 38.25)"/><rect class="bl-lyuk" x="68.85" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(-210.0 70.35 38.25)"/><rect class="bl-lyuk" x="71.99" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(-182.0 73.49 49.18)"/><rect class="bl-lyuk" x="69.62" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-154.0 71.12 60.30)"/><path class="bl-vonal" d="M35 55H42L45.5 46L50.5 64L54.5 51L57 55H65"/></svg><b class="brand-szo">End<svg class="kotojel-puls" viewBox="0 0 40 24" aria-hidden="true"><path d="M1 12H11L15 4L20 20L25 8L28 12H39"/></svg>Ride</b></div>
     
     <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Fő funkciók</div>
@@ -73,6 +84,7 @@
         <button id="btn-menu-rfid" class="sidebar-btn admin-only" onclick="switchMainTab('rfid-mod', this)">📡 RFID kapuk</button>
         <button id="btn-menu-beallitasok" class="sidebar-btn admin-only" onclick="switchMainTab('beallitasok-mod', this)">⚙️ Beállítások</button>
         <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">📥 Verseny Exportálás</button>
+        <button id="btn-menu-felhasznalok" class="sidebar-btn admin-only" onclick="switchMainTab('felhasznalok-mod', this)">👥 Felhasználók</button>
     </div>
 
     <div id="szerepkor-menu" style="display: none; flex-direction: column;">
@@ -111,20 +123,10 @@
 
     <div style="margin-top: 40px;"></div>
     
-    <div id="login-section">
-        <form onsubmit="doLogin(); return false;">
-            <div class="menu-title">Bejelentkezés</div>
-            <input type="text" id="loginUser" name="username" class="sidebar-input" placeholder="Felhasználónév" autocomplete="username" required>
-            <input type="password" id="loginPass" name="password" class="sidebar-input" placeholder="Jelszó" autocomplete="current-password" required>
-            <button type="submit" class="sidebar-submit">Bejelentkezés</button>
-            <div id="loginError" style="color:var(--danger); display:none; font-size:0.85rem; margin-top:10px; text-align:center; font-weight:bold;">Helytelen felhasználónév vagy jelszó!</div>
-        </form>
-    </div>
-
-    <div id="logout-section" style="display: none; flex-direction: column;">
+    <div id="fiok-szekcio">
         <div class="menu-title">Fiók</div>
-        <div id="logged-in-role-text" style="color:var(--success); font-size:0.85rem; margin-bottom:10px; font-weight:bold;">✅ Szerepkör</div>
-        <button class="sidebar-submit" style="background:var(--danger-dim); border-color:#550000;" onclick="doLogout()">Kijelentkezés</button>
+        <div id="fiok-sav"><button class="sidebar-submit" onclick="fiokMegnyit('belepes')">Belépés / Regisztráció</button></div>
+        <div class="app-verzio-jel">End-Ride · <span id="app-verzio-szam"></span></div>
     </div>
 </div>
 
@@ -503,15 +505,6 @@
                     <button class="calc-btn" style="background:var(--card-3); color:var(--text); border:1px solid var(--border); margin-top:15px; width:auto; padding:8px 18px;" onclick="resetUiTheme()">Vissza a közös témához</button>
                 </div>
 
-                <div class="kiiras-card admin-only" style="border-left-color: var(--success);">
-                    <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">✨ Új dizájn (próba)</h4>
-                    <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:10px;">Teljesen újragondolt felület: felső menü, kezdőlap képváltóval és összefoglalóval,
-                        szélesebb elrendezés, telefonon alsó fülsáv. Csak ezen az eszközön kapcsol - a látogatók továbbra is a megszokottat látják.
-                        Bármikor vissza lehet állni a régire.</p>
-                    <p id="uj-dizajn-allapot" style="font-size:0.85rem; font-weight:700; color:var(--text); margin:0 0 8px;"></p>
-                    <button id="uj-dizajn-gomb" class="calc-btn add-btn" style="width:auto; padding:10px 18px; margin-top:0;" onclick="ujDizajnKapcsol(!ujDizajnAktiv())">Új dizájn bekapcsolása</button>
-                </div>
-
                 <div class="kiiras-card admin-only" style="border-left-color: var(--warning);">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">👑 Közös (alapértelmezett) téma</h4>
                     <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Ezt kapja mindenki, aki még nem választott magának sajátot.</p>
@@ -576,7 +569,7 @@
                 <h4 style="color:var(--warning); margin-bottom:5px;">ÉLŐ: Hivatalos adatok beállítása</h4>
                 <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt add meg a távok rajtidejét és a köröket a futó versenyhez.</p>
                 <div id="kiirasContainer"></div>
-                <button id="saveKiirasBtn" class="calc-btn admin-only" style="background:var(--primary); color:white;" onclick="saveKiiras()">Beállítások Mentése</button>
+                <button id="saveKiirasBtn" class="calc-btn admin-only csak-fomod-kiiras" style="background:var(--primary); color:white;" onclick="saveKiiras()">Beállítások Mentése</button>
             </div>
 
             <div id="versenyzok" class="sub-mode-content" style="display:none;">
@@ -602,7 +595,7 @@
                     <option value="160">160 km</option>
                 </select>
                 
-                <button id="addCompBtn" class="calc-btn add-btn admin-only" onclick="saveCompetitor()">Hozzáadás</button>
+                <button id="addCompBtn" class="calc-btn add-btn admin-only csak-fomod-kiiras" onclick="saveCompetitor()">Hozzáadás</button>
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
                 <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
@@ -728,6 +721,39 @@
                 Ha egy ló beérkezett, de sokáig nincs orvosi ideje, figyelmeztet (lehet, hogy a kapu nem olvasta a tag-et).</p>
             <select id="rfid-tav" onchange="setRfidTav(this.value)" style="max-width:220px; margin-top:0;"></select>
             <div id="rfid-tartalom"></div>
+        </div>
+
+        <div id="felhasznalok-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 10px;">👥 Felhasználók</h3>
+            <p class="field-hint" style="margin-top:0;">Mindenki, aki belépett vagy regisztrált (Google-lel vagy e-maillel). Itt adhatsz <b>szerepkört</b> (bíró, állatorvos,
+                beérkeztető, nyomtató, admin) és menünként <b>jogot</b>. Szerepkör nélkül mindenki néző: követhet és szurkolhat, de az adatbázisba nem írhat.</p>
+            <div class="tabs" id="felh-szurok"></div>
+            <input type="text" id="felh-kereso" placeholder="Keresés név vagy e-mail alapján..." autocomplete="off" oninput="renderFelhasznalok()">
+            <div id="felh-lista" style="margin-top:12px;"><p class="field-hint">Betöltés...</p></div>
+
+            <details class="kiiras-card felh-beall" style="border-left-color: var(--teal); margin-top:22px;">
+                <summary><b>Adatvédelmi tájékoztató – adatkezelő</b></summary>
+                <p class="field-hint">Ez jelenik meg a regisztrációnál és a fiókban az adatvédelmi tájékoztatóban (kötelező feltüntetni, ki kezeli az adatokat).</p>
+                <label>Adatkezelő neve (pl. egyesület vagy magánszemély)</label>
+                <input type="text" id="adatkezelo-nev" maxlength="120">
+                <label>Kapcsolat e-mail</label>
+                <input type="email" id="adatkezelo-email" maxlength="120">
+                <button class="calc-btn add-btn" style="margin-top:12px;" onclick="adatkezeloMentes()">Mentés</button>
+            </details>
+
+            <details class="kiiras-card felh-beall" style="border-left-color: var(--warning);">
+                <summary><b>Firebase beállítás (egyszer kell)</b></summary>
+                <ol class="felh-lepesek">
+                    <li><b>Google-belépés:</b> Firebase konzol → Authentication → Sign-in method → <b>Google</b> → Enable (support e-mailnek a saját címed) → Save.</li>
+                    <li><b>E-mail regisztráció:</b> ugyanott az <b>Email/Password</b> legyen Enable; Authentication → Settings → User actions → „Enable create (sign-up)” bekapcsolva.</li>
+                    <li><b>Engedélyezett címek:</b> Authentication → Settings → Authorized domains → <b>endurancehunracingfk.com</b> (és ha használod, end-ride.com) legyen a listán.</li>
+                    <li><b>Adatbázis-szabályok:</b> Realtime Database → Rules → a teljes szöveget cseréld erre, majd Publish:
+                        <button class="calc-btn" style="width:auto; padding:8px 14px; margin:8px 0 0;" onclick="szabalyokMasolas()">Szabályok másolása</button>
+                        <textarea id="felh-szabalyok" readonly rows="14" style="display:none; margin-top:8px; font-family:monospace; font-size:0.75rem;"></textarea></li>
+                </ol>
+                <p class="field-hint">Mi változik a szabályokban? A belépett felhasználó a <b>saját</b> profilját és követéseit mentheti, és szurkolhat; minden más
+                    írás továbbra is csak szerepkörrel megy. Szerepkört és jogot csak az admin adhat.</p>
+            </details>
         </div>
 
         <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
@@ -983,6 +1009,10 @@
     <div class="modal-content"><span class="close-btn" onclick="closeAdatlap()">&times;</span><div id="modalBody"></div></div>
 </div>
 
+<div id="fiokModal" class="modal" onclick="if(event.target==this) fiokBezar()">
+    <div class="modal-content fiok-ablak"><span class="close-btn" onclick="fiokBezar()">&times;</span><div id="fiokTartalom"></div></div>
+</div>
+
 <div id="catSwapModal" class="modal" onclick="if(event.target==this) closeCatSwapModal()">
     <div class="modal-content" style="max-width: 350px; padding: 30px 20px;">
         <h3 style="text-align:center; color:var(--text); margin-top:0; margin-bottom:20px;">Kategória váltás</h3>
@@ -990,7 +1020,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=117"></script>
+<script src="rps.js?v=118"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

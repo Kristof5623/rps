@@ -1,0 +1,21 @@
+{
+  "name": "End-Ride – távlovas versenyek",
+  "short_name": "End-Ride",
+  "description": "Élő időmérés, eredmények és bajnokság a magyar távlovas versenyekhez.",
+  "lang": "hu",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0e11",
+  "theme_color": "#0c0e11",
+  "categories": ["sports", "utilities"],
+  "icons": [
+    { "src": "kepek/ikon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "kepek/ikon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "kepek/ikon-maszk-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "kepek/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,15 +1,16 @@
 /* ============================================================================
-   ÚJ DIZÁJN (próba) - csak akkor él, ha a <html> megkapta az "uj-dizajn" osztályt
-   (Beállítások > Design téma > Új dizájn, eszközönként). A régi felület (rps.css)
-   ebből semmit nem lát, bármikor vissza lehet kapcsolni.
+   ÚJ DIZÁJN - 2026-10-06 óta mindenkinek ez az alap (a <html> "uj-dizajn" osztálya).
+   Vészkijárat: ...?dizajn=regi az adott eszközön visszahozza a régi felületet.
 
    Irány: sötét, nyugodt "sport-időmérő" felület. Kevesebb díszítés (nincs ragyogás,
    színátmenet, csupa nagybetű, emoji a címekben), felül vízszintes menü, széles
    tartalom, telefonon alsó fülsáv, kezdőlap képváltóval.
    ============================================================================ */
 
-html.uj-dizajn,
-html.uj-dizajn[data-theme] {
+/* Az "Alap" téma (End-Ride): sötét, zöld kiemeléssel. A többi téma a saját színeit hozza
+   (rps.css), az új dizájnban csak a formai jegyek egységesek (l. a következő blokk). */
+html.uj-dizajn:not([data-theme]),
+html.uj-dizajn[data-theme="default"] {
     --bg: #0c0e11;
     --bg-glow: #0c0e11;
     --card: #14171c;
@@ -32,14 +33,20 @@ html.uj-dizajn[data-theme] {
     --danger-dim: rgba(242, 96, 92, .15);
     --teal: #4ab3c6;
     --sidebar-bg: #111419;
+    color-scheme: dark;
+}
+/* Minden témában: lapos felületek, egységes lekerekítés, ragyogás nélkül */
+html.uj-dizajn,
+html.uj-dizajn[data-theme] {
+    --bg-glow: var(--bg);
+    --primary-glow: transparent;
     --radius: 10px;
     --radius-sm: 8px;
     --radius-lg: 14px;
     --shadow: none;
     --shadow-sm: none;
-    --shadow-lg: 0 24px 60px rgba(0, 0, 0, .55);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, .35);
     --card-blur: 0px;
-    color-scheme: dark;
 }
 
 /* --- Alap elrendezés: fejléc felül, alatta görgethető tartalom ------------------ */
@@ -49,15 +56,13 @@ html.uj-dizajn .mobile-header { display: none !important; }
 html.uj-dizajn #uj-fejlec {
     display: flex; align-items: center; gap: 18px; flex: 0 0 auto;
     height: 62px; padding: 0 22px; padding-top: env(safe-area-inset-top);
-    background: rgba(12, 14, 17, .94); border-bottom: 1px solid var(--border-soft);
+    background: var(--bg); background: color-mix(in srgb, var(--bg) 94%, transparent); border-bottom: 1px solid var(--border-soft);
     position: relative; z-index: 900;
 }
 html.uj-dizajn .uj-marka { display: flex; align-items: center; gap: 10px; background: none; border: none; color: var(--text); cursor: pointer; padding: 0; text-align: left; }
-html.uj-dizajn .uj-logo {
-    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
-    background: var(--primary); color: var(--on-primary); font-weight: 900; font-size: 0.85rem; letter-spacing: -0.03em;
-}
+html.uj-dizajn .uj-logo { width: 36px; height: 36px; }
 html.uj-dizajn .uj-marka b { display: block; font-size: 0.98rem; font-weight: 800; line-height: 1.1; }
+html.uj-dizajn .uj-marka b.brand-szo { display: flex; font-size: 1.08rem; font-weight: 900; }
 html.uj-dizajn .uj-marka small { display: block; font-size: 0.7rem; color: var(--text-dim-2); font-weight: 600; }
 
 html.uj-dizajn #uj-nav { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
@@ -88,6 +93,9 @@ html.uj-dizajn .uj-fiok {
     background: var(--card-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
     padding: 8px 14px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
 }
+html.uj-dizajn .uj-fiok.belepve { display: flex; align-items: center; gap: 8px; padding: 3px 12px 3px 3px; border-radius: 999px; max-width: 170px; }
+html.uj-dizajn .uj-fiok.belepve .fiok-avatar { width: 28px; height: 28px; font-size: 0.72rem; }
+html.uj-dizajn .uj-fiok.belepve span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Az oldalsó menü az új dizájnban fiók (Menü / Belépés gomb nyitja), minden szélességen */
 html.uj-dizajn .sidebar {
@@ -227,7 +235,7 @@ html.uj-dizajn .uj-gomb {
     border-radius: 8px; padding: 10px 18px; font-size: 0.92rem; font-weight: 700; cursor: pointer;
 }
 html.uj-dizajn .uj-gomb:hover { background: rgba(255,255,255,.18); }
-html.uj-dizajn .uj-gomb.fo { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+html.uj-dizajn .uj-gomb.fo { background: var(--primary); color: var(--on-primary, #fff); border-color: var(--primary); }
 html.uj-dizajn .uj-kartya .uj-gomb { background: var(--card-2); color: var(--text); border-color: var(--border); width: 100%; margin-top: 12px; }
 html.uj-dizajn .uj-kartya .uj-gomb:hover { border-color: var(--primary); color: var(--primary); }
 html.uj-dizajn .uj-hero-nyil {
@@ -304,6 +312,19 @@ html.uj-dizajn .uj-dobogo .uj-nev small { white-space: nowrap; overflow: hidden;
     html.uj-dizajn .uj-elo-szam span { font-size: 0.6rem; letter-spacing: 0; }
 }
 
+/* --- Fejléc közepes szélességen: ne csússzon egymásra a menü és a jobb oldali gombok --- */
+@media (max-width: 1240px) and (min-width: 901px) {
+    html.uj-dizajn .uj-marka small { display: none; }
+    html.uj-dizajn #uj-fejlec { gap: 12px; padding-left: 16px; padding-right: 16px; }
+    html.uj-dizajn .uj-nav-fo { padding: 8px 9px; font-size: 0.86rem; }
+    html.uj-dizajn .uj-fiok.belepve { padding: 3px; }
+    html.uj-dizajn .uj-fiok.belepve span:last-child { display: none; }
+}
+@media (max-width: 1060px) and (min-width: 901px) {
+    html.uj-dizajn .uj-marka b.brand-szo { display: none; }
+    html.uj-dizajn .uj-nav-fo { padding: 8px 7px; font-size: 0.84rem; }
+}
+
 /* --- Alsó fülsáv (telefon) --------------------------------------------------- */
 html.uj-dizajn #uj-also-sav { display: none; }
 @media (max-width: 900px) {
@@ -313,7 +334,7 @@ html.uj-dizajn #uj-also-sav { display: none; }
     html.uj-dizajn .main-wrapper { padding: 18px 14px calc(92px + env(safe-area-inset-bottom)); }
     html.uj-dizajn #uj-also-sav {
         display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 950;
-        background: rgba(12, 14, 17, .96); border-top: 1px solid var(--border);
+        background: var(--bg); background: color-mix(in srgb, var(--bg) 96%, transparent); border-top: 1px solid var(--border);
         padding-bottom: env(safe-area-inset-bottom);
     }
     html.uj-dizajn #uj-also-sav button {

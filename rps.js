@@ -42,7 +42,8 @@
     // settings/uiTheme-ben tárolt régi érték ne törjön el - két téma jelentése viszont
     // megváltozott: 'terminal' már Éjkék (Tokyo Night), 'wheat' már Pergamen (meleg papír).
     const THEME_LIST = [
-        { key: 'default',  label: '☀️ Alap',          colors: ['#0A84FF', '#000000', '#1c1c1e'] },
+        { key: 'default',  label: '🐎 End-Ride (alap)', colors: ['#3cc68c', '#0c0e11', '#14171c'] },
+        { key: 'nyereg',   label: '🟤 Nyereg',        colors: ['#D69A5C', '#14100C', '#1D1712'] },
         { key: 'graphite', label: '⚙️ Acél',          colors: ['#2F81F7', '#0D1117', '#161B22'] },
         { key: 'violet',   label: '🔮 Ametiszt',      colors: ['#7C7FF5', '#0B0C11', '#14161C'] },
         { key: 'terminal', label: '🌃 Éjkék',         colors: ['#7AA2F7', '#1A1B26', '#24283B'] },
@@ -54,6 +55,7 @@
         { key: 'player',   label: '🎧 Player',        colors: ['#1DB954', '#0B0B0B', '#181818'] },
         { key: 'gold',     label: '✨ Éjarany',       colors: ['#D9A93C', '#0C0A07', '#17140E'] },
         { key: 'neon',     label: '🌆 Neon',          colors: ['#F04FB0', '#07060E', '#110E1E'] },
+        { key: 'napfeny',  label: '🌞 Napfény (kint, erős fényben)', colors: ['#0B7A4B', '#FFFFFF', '#F2F5F3'] },
         { key: 'daylight', label: '🌤️ Verőfény',     colors: ['#0570DE', '#F6F9FC', '#FFFFFF'] },
         { key: 'nordic',   label: '🧊 Északi Fény',   colors: ['#5E81AC', '#ECEFF4', '#FFFFFF'] },
         { key: 'mint',     label: '🌿 Menta',         colors: ['#0E9F6E', '#F2F8F5', '#FFFFFF'] },
@@ -685,6 +687,7 @@
         db.ref('liveRaceMeta').on('value', snap => {
             liveRaceMeta = snap.val();
             betoltesAllapot.live = true;
+            szurkolasFigyeles();
             renderLocalRaces();
         });
 
@@ -724,6 +727,7 @@
         db.ref('competitors').on('value', (snapshot) => {
             competitors = szamolatlanIdokPotlasa(parseCompetitors(snapshot.val()), raceConfig);
             rfidKapuFrissites();
+            kovetesEsemenyek();
             updateCompetitorDisplays();
             if (attekintoForras === 'live' && document.getElementById('attekinto-mod')?.classList.contains('active')) renderAttekinto();
             if (document.getElementById('kezdolap')?.classList.contains('active')) renderKezdolap();
@@ -826,118 +830,912 @@
 
     startDatabaseListeners();
 
-    // --- AUTENTIKÁCIÓ ÉS JOGOSULTSÁGOK ---
-    // Csak bejelentkezve (és a megfelelő szerepkörrel) elérhető nézetek - kijelentkezve
-    // ezekről a Versenyek oldalra visszük a látogatót (l. applyAuthUI).
-    const BELSO_NEZETEK = ['fo-mod', 'beallitasok-mod', 'export-mod', 'beerkeztetes-mod', 'orvosi-ido-mod', 'orvosi-mod', 'nyomtatas-mod', 'attekinto-mod', 'bajnoksag-teny', 'rfid-mod', 'nyomtatvanyok-mod'];
+    // ============================================================================
+    // FIÓK, BEJELENTKEZÉS, JOGOSULTSÁGOK
+    // Belépés: Google-fiókkal, e-maillel (regisztrációval) vagy a régi stábfiókok felhasználónevével
+    // (felhasznalonev@verseny.hu). Minden fiók a users/{uid} alatt: a profil (név, e-mail, kép,
+    // utolsó belépés) és a követések a felhasználóé, a szerepkör (role) és a menünkénti jogok
+    // (jogok) csak az adminé - a Firebase szabályai is így engedik (tests/firebase-szabalyok.json).
+    // Íráshoz a szabályok a szerepkör meglétét kérik: aki csak regisztrált, az néző marad.
+    // ============================================================================
 
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            db.ref('users/' + user.uid + '/role').once('value').then((snapshot) => {
-                const role = snapshot.val() || 'guest';
-                applyAuthUI(true, role);
-                if(role === 'admin') runAutoMigration();
-            }).catch(e => {
-                applyAuthUI(true, 'guest');
-            });
-        } else {
-            applyAuthUI(false, null);
-        }
-    });
+    // A menük / belső nézetek jogai. A szerepkör adja az alapot (SZEREP_JOGOK), az admin a
+    // Felhasználók oldalon pipánként felülírhatja. Az admin szerepkör mindent lát.
+    const JOG_LISTA = [
+        { kulcs: 'fomod-verseny', csoport: 'Élő verseny', cimke: 'Eredmények bevitele (Teljes verseny fül)' },
+        { kulcs: 'fomod-kiiras', csoport: 'Élő verseny', cimke: 'Kiírás, versenyzők, sebességhatár' },
+        { kulcs: 'beerkeztetes', csoport: 'Feladatkörök', cimke: 'Beérkeztetés' },
+        { kulcs: 'orvosi-ido', csoport: 'Feladatkörök', cimke: 'Orvosi idő' },
+        { kulcs: 'orvosi', csoport: 'Feladatkörök', cimke: 'Állatorvosi vizsgálat' },
+        { kulcs: 'nyomtatas', csoport: 'Feladatkörök', cimke: 'Nyomtatás (orvosi lap)' },
+        { kulcs: 'nyomtatvanyok', csoport: 'Admin eszközök', cimke: 'A4 nyomtatványok' },
+        { kulcs: 'attekinto', csoport: 'Admin eszközök', cimke: 'Versenyáttekintő' },
+        { kulcs: 'rfid', csoport: 'Admin eszközök', cimke: 'RFID kapuk' },
+        { kulcs: 'export', csoport: 'Admin eszközök', cimke: 'Verseny exportálás' },
+        { kulcs: 'beallitasok', csoport: 'Admin eszközök', cimke: 'Beállítások' },
+        { kulcs: 'tenyeszto', csoport: 'Admin eszközök', cimke: 'Év Tenyésztője' }
+    ];
+    const SZEREPKOROK = [
+        { kulcs: '', cimke: 'Nincs – csak néző' },
+        { kulcs: 'judge', cimke: 'Bíró' },
+        { kulcs: 'doctor', cimke: 'Állatorvos' },
+        { kulcs: 'checkin', cimke: 'Beérkeztető' },
+        { kulcs: 'printer', cimke: 'Nyomtató' },
+        { kulcs: 'admin', cimke: 'Admin – mindent lát és kezel' }
+    ];
+    const SZEREP_JOGOK = {
+        judge: ['fomod-verseny'],
+        doctor: ['beerkeztetes', 'orvosi-ido', 'orvosi', 'nyomtatas'],
+        checkin: ['beerkeztetes', 'orvosi-ido'],
+        printer: ['nyomtatas']
+    };
+    // Menügomb -> melyik jog kell hozzá ('__admin': csak az admin szerepkör)
+    const JOG_MENU = {
+        'btn-menu-fomod': ['fomod-verseny', 'fomod-kiiras'],
+        'btn-menu-attekinto': ['attekinto'],
+        'btn-menu-rfid': ['rfid'],
+        'btn-menu-beallitasok': ['beallitasok'],
+        'btn-menu-export': ['export'],
+        'btn-menu-felhasznalok': ['__admin'],
+        'btn-menu-beerkeztetes': ['beerkeztetes'],
+        'btn-menu-orvosi-ido': ['orvosi-ido'],
+        'btn-menu-orvosi': ['orvosi'],
+        'btn-menu-nyomtatas': ['nyomtatas'],
+        'btn-menu-nyomtatvanyok': ['nyomtatvanyok'],
+        'btn-menu-bajnoksag-teny': ['tenyeszto']
+    };
+    // Belső nézet -> jog. Ami nincs itt, az nyilvános.
+    const NEZET_JOG = {
+        'fo-mod': ['fomod-verseny', 'fomod-kiiras'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'],
+        'beallitasok-mod': ['beallitasok'], 'export-mod': ['export'], 'felhasznalok-mod': ['__admin'],
+        'beerkeztetes-mod': ['beerkeztetes'], 'orvosi-ido-mod': ['orvosi-ido'], 'orvosi-mod': ['orvosi'],
+        'nyomtatas-mod': ['nyomtatas'], 'nyomtatvanyok-mod': ['nyomtatvanyok'], 'bajnoksag-teny': ['tenyeszto']
+    };
+    // Belépéskor ide visz a szerepkör (ha szabad oda), hogy a stáb rögtön a saját munkájánál legyen
+    const SZEREP_NYITO = {
+        doctor: { nezet: 'orvosi-mod', gomb: 'btn-menu-orvosi' },
+        checkin: { nezet: 'beerkeztetes-mod', gomb: 'btn-menu-beerkeztetes' },
+        printer: { nezet: 'nyomtatas-mod', gomb: 'btn-menu-nyomtatas' },
+        judge: { nezet: 'fo-mod', gomb: 'btn-menu-fomod' }
+    };
 
-    function applyAuthUI(isLoggedIn, role) {
-        document.body.classList.remove('role-admin', 'role-doctor', 'role-checkin', 'role-judge', 'role-printer');
-        
-        if (isLoggedIn) {
-            document.body.classList.add('role-' + role);
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('logout-section').style.display = 'flex';
-            
-            let roleNameHu = role;
-            if(role === 'judge') roleNameHu = "Bíró";
-            if(role === 'checkin') roleNameHu = "Beérkeztető";
-            if(role === 'doctor') roleNameHu = "Állatorvos";
-            if(role === 'printer') roleNameHu = "Nyomtató";
-            document.getElementById('logged-in-role-text').innerText = "✅ " + roleNameHu.toUpperCase() + " mód";
-            
-            // --- GOMBOK LÁTHATÓSÁGÁNAK KÉZI FELÜLÍRÁSA A SZEREPKÖRÖK SZERINT ---
-            let btnBk = document.getElementById('btn-menu-beerkeztetes');
-            let btnOrvIdo = document.getElementById('btn-menu-orvosi-ido');
-            let btnOrv = document.getElementById('btn-menu-orvosi');
-            let btnNyom = document.getElementById('btn-menu-nyomtatas');
+    let aktivSzerep = null;        // null = nincs belépve, 'guest' = belépett, de nincs szerepköre
+    let aktivJogok = new Set();
+    let authAllapotIsmert = false;  // amíg a Firebase nem szólt, nem terelünk el semmilyen nézetről
+    let authUiKulcs = null;
+    let fiokAdat = null;            // a users/{uid} tartalma (profil, kovetes, beallitas, role, jogok)
+    let fiokRef = null, fiokFigyelo = null, migracioFutott = false;
 
-            // Alaphelyzet: Hagyjuk a CSS-t dolgozni (Pl. az Admin mindent lát)
-            if(btnBk) btnBk.style.display = '';
-            if(btnOrvIdo) btnOrvIdo.style.display = '';
-            if(btnOrv) btnOrv.style.display = '';
-            if(btnNyom) btnNyom.style.display = '';
-
-            // 1. BEÉRKEZTETŐ JOGOSULTSÁG
-            if (role === 'checkin') {
-                if(btnBk) btnBk.style.setProperty('display', 'flex', 'important');
-                if(btnOrvIdo) btnOrvIdo.style.setProperty('display', 'flex', 'important');
-                if(btnOrv) btnOrv.style.setProperty('display', 'none', 'important');
-                if(btnNyom) btnNyom.style.setProperty('display', 'none', 'important');
-                switchSidebarMode('beerkeztetes-mod', btnBk);
-            } 
-            // 2. ÁLLATORVOS JOGOSULTSÁG
-            else if (role === 'doctor') {
-                if(btnBk) btnBk.style.setProperty('display', 'flex', 'important');
-                if(btnOrvIdo) btnOrvIdo.style.setProperty('display', 'flex', 'important');
-                if(btnOrv) btnOrv.style.setProperty('display', 'flex', 'important');
-                if(btnNyom) btnNyom.style.setProperty('display', 'flex', 'important');
-                switchSidebarMode('orvosi-mod', btnOrv);
-            }
-            // 3. NYOMTATÓ JOGOSULTSÁG
-            else if (role === 'printer') {
-                if(btnBk) btnBk.style.setProperty('display', 'none', 'important');
-                if(btnOrvIdo) btnOrvIdo.style.setProperty('display', 'none', 'important');
-                if(btnOrv) btnOrv.style.setProperty('display', 'none', 'important');
-                if(btnNyom) btnNyom.style.setProperty('display', 'flex', 'important');
-                switchSidebarMode('nyomtatas-mod', btnNyom);
-            }
-
-            if(role === 'judge') { switchSubMode('verseny', document.getElementById('btn-verseny')); }
-            
-        } else {
-            document.getElementById('login-section').style.display = 'block';
-            document.getElementById('logout-section').style.display = 'none';
-            // Kijelentkezett látogató ne maradjon (vagy újratöltéskor ne kerüljön vissza) egy belső
-            // nézetre, pl. az állatorvosi űrlapra - a currentMode a localStorage-ból jön vissza.
-            const aktiv = document.querySelector('.mode-content.active');
-            if (aktiv && BELSO_NEZETEK.includes(aktiv.id)) {
-                switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
-            }
-        }
-        ujNavFrissit();
+    function adminE() { return aktivSzerep === 'admin'; }
+    function jogVan(kulcs) { return adminE() || aktivJogok.has(kulcs); }
+    function nezetEngedelyezett(id) {
+        const kell = NEZET_JOG[id];
+        if (!kell) return true;
+        if (!aktivSzerep) return false;
+        return kell.includes('__admin') ? adminE() : kell.some(jogVan);
+    }
+    function nyitoNezet() {
+        const id = ujDizajnAktiv() ? 'kezdolap' : 'versenyek';
+        switchSidebarMode(id, document.getElementById('btn-menu-' + id));
     }
 
-    function doLogin() {
+    // A szerepkör + a pipák -> a ténylegesen érvényes jogok halmaza
+    function jogokSzamit(role, jogok) {
+        if (role === 'admin') return new Set(JOG_LISTA.map(j => j.kulcs));
+        if (jogok && typeof jogok === 'object') return new Set(Object.keys(jogok).filter(k => jogok[k]));
+        return new Set(SZEREP_JOGOK[role] || []);
+    }
+
+    auth.onAuthStateChanged(user => {
+        if (fiokRef && fiokFigyelo) fiokRef.off('value', fiokFigyelo);
+        fiokRef = null; fiokFigyelo = null; fiokAdat = null;
+        if (!user) {
+            applyAuthUI(false, null);
+            kovetesBetoltes(null);
+            return;
+        }
+        profilMentes(user);
+        fiokRef = db.ref('users/' + user.uid);
+        fiokFigyelo = fiokRef.on('value', snap => {
+            fiokAdat = snap.val() || {};
+            const role = fiokAdat.role || 'guest';
+            applyAuthUI(true, role, jogokSzamit(role, fiokAdat.jogok));
+            kovetesBetoltes(fiokAdat.kovetes || {});
+            if (role === 'admin' && !migracioFutott) { migracioFutott = true; runAutoMigration(); }
+            if (document.getElementById('fiokModal')?.style.display === 'flex') renderFiok();
+        }, () => {
+            fiokAdat = {};
+            applyAuthUI(true, 'guest', new Set());
+            kovetesBetoltes({});
+        });
+    });
+
+    // Minden belépéskor frissül a saját profil (név, e-mail, kép, utolsó belépés) - ebből látja az
+    // admin a Felhasználók oldalon, ki regisztrált. Ha a szabályok még a régiek, csendben kimarad.
+    function profilMentes(user) {
+        const szolg = (user.providerData && user.providerData[0] && user.providerData[0].providerId) || 'password';
+        const email = String(user.email || '');
+        const profil = {
+            email: email,
+            nev: String(user.displayName || (email.endsWith('@verseny.hu') ? email.split('@')[0] : '') || '').slice(0, 80),
+            szolgaltato: szolg,
+            utolsoBelepes: Date.now()
+        };
+        if (user.photoURL) profil.foto = String(user.photoURL).slice(0, 300);
+        const ref = db.ref('users/' + user.uid + '/profil');
+        ref.update(profil).then(() => ref.child('letrehozva').once('value')).then(s => {
+            if (s && !s.exists()) return ref.update({ letrehozva: Date.now() });
+        }).catch(() => {});
+    }
+
+    function applyAuthUI(isLoggedIn, role, jogok) {
+        aktivSzerep = isLoggedIn ? (role || 'guest') : null;
+        aktivJogok = isLoggedIn ? new Set(jogok || []) : new Set();
+        authAllapotIsmert = true;
+
+        const b = document.body;
+        [...b.classList].filter(c => /^(role-|jog-)/.test(c) || c === 'jogos' || c === 'belepve').forEach(c => b.classList.remove(c));
+        if (isLoggedIn) {
+            b.classList.add('belepve', 'role-' + aktivSzerep);
+            if (!adminE()) b.classList.add('jogos');
+            JOG_LISTA.forEach(j => { if (jogVan(j.kulcs)) b.classList.add('jog-' + j.kulcs); });
+        }
+        menukJogSzerint();
+        fiokSavFrissit();
+
+        // Terelés csak akkor, ha a jogok tényleg változtak (különben pl. egy követés mentése is
+        // átvinné az orvost a vizsgálati lapra).
+        const kulcs = isLoggedIn ? aktivSzerep + '|' + [...aktivJogok].sort().join(',') : '-';
+        if (kulcs !== authUiKulcs) {
+            authUiKulcs = kulcs;
+            szerepNavigacio(isLoggedIn);
+        }
+        ujNavFrissit();
+        if (document.getElementById('kezdolap')?.classList.contains('active')) renderKezdolap();
+    }
+
+    // A menügombok a jogok szerint (inline !important, mert a régi szerepkör-osztályok is !important-ok)
+    function menukJogSzerint() {
+        Object.entries(JOG_MENU).forEach(([id, kell]) => {
+            const gomb = document.getElementById(id);
+            if (!gomb) return;
+            const lathato = !!aktivSzerep && (kell.includes('__admin') ? adminE() : kell.some(jogVan));
+            gomb.style.setProperty('display', lathato ? 'flex' : 'none', 'important');
+        });
+        ['admin-menu', 'szerepkor-menu', 'nyomtatvany-menu'].forEach(id => {
+            const cs = document.getElementById(id);
+            if (!cs) return;
+            const van = [...cs.querySelectorAll('.sidebar-btn')].some(g => g.style.display !== 'none');
+            cs.style.setProperty('display', van ? 'flex' : 'none', 'important');
+        });
+    }
+
+    function szerepNavigacio(isLoggedIn) {
+        const aktiv = (document.querySelector('.mode-content.active') || {}).id;
+        if (aktiv && !nezetEngedelyezett(aktiv)) { nyitoNezet(); }
+        if (!isLoggedIn) return;
+        const most = (document.querySelector('.mode-content.active') || {}).id;
+        const nyito = SZEREP_NYITO[aktivSzerep];
+        // A stáb a nyilvános nézetről a saját munkájához kerül; ha épp egy szabad belső nézeten van, ott marad.
+        if (nyito && nezetEngedelyezett(nyito.nezet) && (!most || !NEZET_JOG[most])) {
+            switchMainTab(nyito.nezet, document.getElementById(nyito.gomb));
+        }
+        if ((document.querySelector('.mode-content.active') || {}).id === 'fo-mod') foModFulJogSzerint();
+    }
+
+    // Az ÉLŐ Verseny Kezelés fülei: kiírás jog nélkül csak a "Teljes verseny" (eredmény) fül marad
+    function foModFulJogSzerint() {
+        if (!aktivSzerep || adminE()) return;
+        const aktivFul = document.querySelector('#fo-mod .tabs .tab-btn.active');
+        const kiirasFulek = ['btn-sebesseg', 'btn-kiiras', 'btn-versenyzok', 'btn-orvosok'];
+        if (!jogVan('fomod-kiiras') && jogVan('fomod-verseny') && (!aktivFul || kiirasFulek.includes(aktivFul.id))) {
+            switchSubMode('verseny', document.getElementById('btn-verseny'));
+        } else if (!jogVan('fomod-verseny') && aktivFul && aktivFul.id === 'btn-verseny') {
+            switchSubMode('kiiras', document.getElementById('btn-kiiras'));
+        }
+    }
+
+    function szerepNev(role) {
+        const sz = SZEREPKOROK.find(s => s.kulcs === role);
+        return role === 'guest' || !role ? 'Néző' : (sz ? sz.cimke.split(' – ')[0] : role);
+    }
+
+    // --- Az oldalsó menü alján: belépés gomb vagy a fiók rövid adatai ---
+    function fiokSavFrissit() {
+        const sav = document.getElementById('fiok-sav');
+        if (!sav) return;
+        const u = auth.currentUser;
+        if (!u) {
+            sav.innerHTML = `<button class="sidebar-submit" onclick="fiokMegnyit('belepes')">Belépés / Regisztráció</button>
+                <p class="fiok-sav-megj">Kövesd a kedvenc versenyzőidet, szurkolj nekik. A stáb itt lép be.</p>`;
+            return;
+        }
+        const p = (fiokAdat && fiokAdat.profil) || {};
+        sav.innerHTML = `<button class="fiok-sav-kartya" onclick="fiokMegnyit()">
+                ${fiokAvatarHtml(u, p)}
+                <span><b>${escapeHtml(p.nev || u.displayName || u.email || 'Fiókom')}</b><small>${escapeHtml(szerepNev(aktivSzerep))}</small></span>
+            </button>
+            <button class="sidebar-submit kijelentkezes" onclick="doLogout()">Kijelentkezés</button>`;
+    }
+
+    function fiokAvatarHtml(u, p) {
+        const kep = (p && p.foto) || (u && u.photoURL);
+        const nev = (p && p.nev) || (u && (u.displayName || u.email)) || '?';
+        if (kep) return `<img class="fiok-avatar" src="${escapeHtml(kep)}" alt="" referrerpolicy="no-referrer">`;
+        const betuk = String(nev).replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase() || '?';
+        return `<span class="fiok-avatar betu">${escapeHtml(betuk)}</span>`;
+    }
+
+    // --- Belépés / regisztráció / fiók ablak ---
+    let fiokNezet = 'belepes';
+    let fiokUzenet = null;  // { szoveg, hiba }
+
+    function fiokMegnyit(nezet, uzenet) {
+        fiokNezet = nezet || (auth.currentUser ? 'fiok' : 'belepes');
+        fiokUzenet = uzenet ? { szoveg: uzenet, hiba: false } : null;
+        document.getElementById('fiokModal').style.display = 'flex';
+        renderFiok();
+        if (document.getElementById('sidebar').classList.contains('open')) toggleMenu();
+    }
+    function fiokBezar() { document.getElementById('fiokModal').style.display = 'none'; }
+    function fiokNezetValt(n) { fiokNezet = n; fiokUzenet = null; renderFiok(); }
+
+    const GOOGLE_IKON = `<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
+
+    function renderFiok() {
+        const cont = document.getElementById('fiokTartalom');
+        if (!cont) return;
+        const u = auth.currentUser;
+        if (u && !['fiok'].includes(fiokNezet)) fiokNezet = 'fiok';
+        if (!u && fiokNezet === 'fiok') fiokNezet = 'belepes';
+        const uzenet = fiokUzenet ? `<div class="fiok-uzenet ${fiokUzenet.hiba ? 'hiba' : ''}">${escapeHtml(fiokUzenet.szoveg)}</div>` : '';
+
+        if (fiokNezet === 'fiok') { cont.innerHTML = fiokOldalHtml(u) ; return; }
+
+        const fulek = `<div class="fiok-fulek">
+            <button class="${fiokNezet === 'belepes' ? 'aktiv' : ''}" onclick="fiokNezetValt('belepes')">Belépés</button>
+            <button class="${fiokNezet === 'regisztracio' ? 'aktiv' : ''}" onclick="fiokNezetValt('regisztracio')">Regisztráció</button>
+        </div>`;
+        const google = `<button class="fiok-google" onclick="googleBelepes()">${GOOGLE_IKON}<span>${fiokNezet === 'regisztracio' ? 'Regisztráció' : 'Belépés'} Google-fiókkal</span></button>
+            <div class="fiok-vagy"><span>vagy</span></div>`;
+
+        let urlap = '';
+        if (fiokNezet === 'belepes') {
+            urlap = `<form onsubmit="emailBelepes(); return false;" class="fiok-urlap">
+                    <label for="loginUser">E-mail vagy felhasználónév</label>
+                    <input type="text" id="loginUser" autocomplete="username" required>
+                    <label for="loginPass">Jelszó</label>
+                    <input type="password" id="loginPass" autocomplete="current-password" required>
+                    <button type="submit" class="calc-btn">Belépés</button>
+                </form>
+                <button class="fiok-link" onclick="fiokNezetValt('jelszo')">Elfelejtett jelszó?</button>`;
+        } else if (fiokNezet === 'regisztracio') {
+            urlap = `<form onsubmit="regisztracio(); return false;" class="fiok-urlap">
+                    <label for="regNev">Név</label>
+                    <input type="text" id="regNevFiok" autocomplete="name" maxlength="80" required>
+                    <label for="regEmail">E-mail</label>
+                    <input type="email" id="regEmail" autocomplete="email" required>
+                    <label for="regJelszo">Jelszó (legalább 6 karakter)</label>
+                    <input type="password" id="regJelszo" autocomplete="new-password" minlength="6" required>
+                    <label for="regJelszo2">Jelszó még egyszer</label>
+                    <input type="password" id="regJelszo2" autocomplete="new-password" minlength="6" required>
+                    <label class="fiok-pipa"><input type="checkbox" id="regAdatvedelem" required> Elolvastam és elfogadom az <a href="#" onclick="adatvedelemMegnyit(); return false;">adatvédelmi tájékoztatót</a>.</label>
+                    <button type="submit" class="calc-btn">Regisztráció</button>
+                </form>`;
+        } else if (fiokNezet === 'jelszo') {
+            urlap = `<form onsubmit="jelszoEmlekezteto(); return false;" class="fiok-urlap">
+                    <p class="fiok-megj">Add meg a regisztrációkor használt e-mail címet, és küldünk egy linket az új jelszó beállításához.
+                        (A régi, felhasználónévvel belépő stábfiókoknál az admin tud segíteni.)</p>
+                    <label for="jelszoEmail">E-mail</label>
+                    <input type="email" id="jelszoEmail" autocomplete="email" required>
+                    <button type="submit" class="calc-btn">Link küldése</button>
+                </form>
+                <button class="fiok-link" onclick="fiokNezetValt('belepes')">← Vissza a belépéshez</button>`;
+        }
+        cont.innerHTML = `<div class="fiok">
+            <div class="fiok-fej">${brandLogoSvg('fiok-logo')}<div><h3>End-Ride fiók</h3><p>Kövesd a kedvenc versenyzőidet, kapj értesítést róluk, és szurkolj nekik élőben.</p></div></div>
+            ${fiokNezet === 'jelszo' ? '' : fulek}
+            <div id="fiok-uzenet-hely">${uzenet}</div>
+            ${fiokNezet === 'jelszo' ? '' : google}
+            ${urlap}
+            <p class="fiok-megj kicsi">A stáb (bíró, állatorvos, beérkeztető) a regisztráció után az admintól kap jogot. <a href="#" onclick="adatvedelemMegnyit(); return false;">Adatvédelem</a></p>
+        </div>`;
+    }
+
+    function fiokHibaSzoveg(e) {
+        const kod = (e && (e.code || e.message)) || '';
+        const t = {
+            'auth/invalid-credential': 'Hibás e-mail / felhasználónév vagy jelszó.',
+            'auth/wrong-password': 'Hibás jelszó.',
+            'auth/user-not-found': 'Nincs ilyen fiók.',
+            'auth/invalid-email': 'Az e-mail cím formátuma nem jó.',
+            'auth/email-already-in-use': 'Ezzel az e-mail címmel már van fiók - lépj be, vagy kérj új jelszót.',
+            'auth/weak-password': 'A jelszó túl gyenge (legalább 6 karakter).',
+            'auth/too-many-requests': 'Túl sok próbálkozás - várj egy kicsit, és próbáld újra.',
+            'auth/network-request-failed': 'Nincs internetkapcsolat.',
+            'auth/popup-blocked': 'A böngésző letiltotta a felugró ablakot - engedélyezd, vagy próbáld újra.',
+            'auth/operation-not-allowed': 'Ez a belépési mód még nincs bekapcsolva (admin: Firebase konzol → Authentication → Sign-in method).',
+            'auth/unauthorized-domain': 'Ez a webcím nincs engedélyezve a belépéshez (admin: Firebase konzol → Authentication → Settings → Authorized domains).',
+            'auth/requires-recent-login': 'Biztonsági okból lépj ki és be újra, majd próbáld meg még egyszer.',
+            'auth/account-exists-with-different-credential': 'Ezzel az e-mail címmel már van fiók más belépési móddal - lépj be azzal.'
+        };
+        const talalt = Object.keys(t).find(k => kod.includes(k));
+        if (talalt) return t[talalt];
+        // A saját (űrlap-ellenőrzési) üzeneteinknek nincs kódjuk - azok úgy jók, ahogy vannak
+        return e && !e.code && e.message ? e.message : 'Nem sikerült: ' + (e && e.message ? e.message : kod);
+    }
+    function fiokHiba(e) {
+        const kod = (e && (e.code || e.message)) || '';
+        if (/popup-closed-by-user|cancelled-popup-request/.test(kod)) return; // a felhasználó bezárta - nem hiba
+        fiokUzenet = { szoveg: fiokHibaSzoveg(e), hiba: true };
+        // Csak az üzenetsor frissül - az újrarajzolás kitörölné, amit a felhasználó beírt
+        const hely = document.getElementById('fiok-uzenet-hely');
+        if (hely) hely.innerHTML = `<div class="fiok-uzenet hiba" role="alert">${escapeHtml(fiokUzenet.szoveg)}</div>`;
+        else renderFiok();
+    }
+    function fiokSiker(szoveg) {
+        showToast(szoveg);
+        fiokBezar();
+    }
+
+    function googleBelepes() {
+        if (!firebase.auth.GoogleAuthProvider) { fiokHiba({ message: 'A Google-belépés itt nem érhető el.' }); return; }
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try { auth.useDeviceLanguage(); } catch (e) {}
+        auth.signInWithPopup(provider)
+            .then(() => fiokSiker('Sikeres belépés.'))
+            .catch(e => {
+                // Telefonon / beépített böngészőben a felugró ablak tiltott lehet - átirányítással próbáljuk
+                if (e && /popup-blocked|operation-not-supported-in-this-environment/.test(e.code || '')) {
+                    auth.signInWithRedirect(provider).catch(fiokHiba);
+                    return;
+                }
+                fiokHiba(e);
+            });
+    }
+
+    function emailBelepes() {
         const u = document.getElementById('loginUser').value.trim();
         const p = document.getElementById('loginPass').value;
-        const err = document.getElementById('loginError');
-        const fullEmail = u + "@verseny.hu";
+        // A régi stábfiókok felhasználónévvel lépnek be (nev@verseny.hu)
+        const email = u.includes('@') ? u : u + '@verseny.hu';
+        auth.signInWithEmailAndPassword(email, p)
+            .then(() => fiokSiker('Sikeres belépés.'))
+            .catch(e => { document.getElementById('loginPass').value = ''; fiokHiba(e); });
+    }
+    // Régi név, ha valahol még hívnák
+    function doLogin() { emailBelepes(); }
 
-        auth.signInWithEmailAndPassword(fullEmail, p)
-            .then(() => {
-                err.style.display = 'none';
-                document.getElementById('loginPass').value = '';
-                switchMainTab('versenyek', document.getElementById('btn-menu-versenyek'));
-            })
-            .catch(() => {
-                err.style.display = 'block';
-                // Telefonon a menü alján, a látható részen kívülre esett az üzenet.
-                if (err.scrollIntoView) err.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                setTimeout(() => { err.style.display = 'none'; }, 4000);
-                document.getElementById('loginPass').value = '';
-            });
+    function regisztracio() {
+        const nev = document.getElementById('regNevFiok').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const j1 = document.getElementById('regJelszo').value;
+        const j2 = document.getElementById('regJelszo2').value;
+        if (!document.getElementById('regAdatvedelem').checked) { fiokHiba({ message: 'Az adatvédelmi tájékoztató elfogadása kötelező.' }); return; }
+        if (j1 !== j2) { fiokHiba({ message: 'A két jelszó nem egyezik.' }); return; }
+        if (/@verseny\.hu$/i.test(email)) { fiokHiba({ message: 'Ez a cím a stábfiókoké - adj meg saját e-mail címet.' }); return; }
+        auth.createUserWithEmailAndPassword(email, j1)
+            .then(cred => cred.user.updateProfile({ displayName: nev }).then(() => profilMentes({
+                uid: cred.user.uid, email: cred.user.email, displayName: nev, photoURL: null, providerData: [{ providerId: 'password' }]
+            })))
+            .then(() => fiokSiker('Sikeres regisztráció - üdv az End-Ride-on!'))
+            .catch(fiokHiba);
+    }
+
+    function jelszoEmlekezteto() {
+        const email = document.getElementById('jelszoEmail').value.trim();
+        auth.sendPasswordResetEmail(email)
+            .then(() => { fiokUzenet = { szoveg: 'Ha van ilyen fiók, elküldtük a linket - nézd meg a postafiókodat (a spam mappát is).', hiba: false }; fiokNezet = 'belepes'; renderFiok(); })
+            .catch(fiokHiba);
     }
 
     function doLogout() {
         auth.signOut().then(() => {
-            document.getElementById('loginUser').value = '';
-            switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
+            fiokBezar();
+            nyitoNezet();
+            showToast('Kijelentkeztél.');
         });
+    }
+
+    // Fiók törlése (Google Play / GDPR: a felhasználó maga törölhesse): a saját adatai és a belépési fiók
+    function fiokTorles() {
+        const u = auth.currentUser;
+        if (!u) return;
+        showConfirm('Fiók végleges törlése', 'Törlődik a profilod, a követéseid és a szurkolásaid, és a fiókkal többet nem tudsz belépni. Ez nem vonható vissza.', () => {
+            const uid = u.uid;
+            const torlesek = [
+                db.ref('users/' + uid + '/profil').remove(),
+                db.ref('users/' + uid + '/kovetes').remove(),
+                db.ref('users/' + uid + '/beallitas').remove()
+            ];
+            if (liveRaceMeta && liveRaceMeta.id) Object.keys(szurkolasAdat || {}).forEach(bib => {
+                if (szurkolasAdat[bib] && szurkolasAdat[bib][uid]) torlesek.push(db.ref('szurkolas/' + liveRaceMeta.id + '/' + bib + '/' + uid).remove());
+            });
+            Promise.all(torlesek.map(p => p.catch(() => null)))
+                .then(() => u.delete())
+                .then(() => { fiokBezar(); nyitoNezet(); showToast('A fiókodat töröltük.'); })
+                .catch(e => { fiokUzenet = { szoveg: fiokHibaSzoveg(e), hiba: true }; renderFiok(); });
+        });
+    }
+
+    // End-Ride logó (patkó, benne pulzusvonal - l. kepek/logo.svg). A háttér a téma kiemelő színe,
+    // így minden témában illik a felülethez; a telefonos ikon (kepek/ikon-*.png) mindig zöld.
+    function brandLogoSvg(osztaly = '') {
+        return `<svg class="brand-logo ${osztaly}" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" class="bl-alap"/><path class="bl-lo" d="M29.93 72.29A30 30 0 1 1 70.07 72.29L61.38 62.63A17 17 0 1 0 38.62 62.63Z"/><rect class="bl-lyuk" x="27.38" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-26.0 28.88 60.30)"/><rect class="bl-lyuk" x="25.01" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(2.0 26.51 49.18)"/><rect class="bl-lyuk" x="28.15" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(30.0 29.65 38.25)"/><rect class="bl-lyuk" x="68.85" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(-210.0 70.35 38.25)"/><rect class="bl-lyuk" x="71.99" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(-182.0 73.49 49.18)"/><rect class="bl-lyuk" x="69.62" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-154.0 71.12 60.30)"/><path class="bl-vonal" d="M35 55H42L45.5 46L50.5 64L54.5 51L57 55H65"/></svg>`;
+    }
+
+    // --- A saját fiók oldala (belépve) ---
+    function fiokOldalHtml(u) {
+        const p = (fiokAdat && fiokAdat.profil) || {};
+        const szolg = p.szolgaltato || ((u.providerData && u.providerData[0]) || {}).providerId || 'password';
+        const email = p.email || u.email || '';
+        const regiFiok = /@verseny\.hu$/i.test(email);
+        const nev = p.nev || u.displayName || (regiFiok ? email.split('@')[0] : email) || 'Fiókom';
+        const jogok = adminE() ? ['Minden menü (admin)'] : JOG_LISTA.filter(j => aktivJogok.has(j.kulcs)).map(j => j.cimke);
+        const kov = kovetettLista();
+        const ertesitesTamogatott = typeof Notification !== 'undefined';
+        const ertesitesBe = ertesitesBekapcsolva();
+        const tiltva = ertesitesTamogatott && Notification.permission === 'denied';
+
+        return `<div class="fiok">
+            <div class="fiok-profil">
+                ${fiokAvatarHtml(u, p)}
+                <div style="min-width:0;">
+                    <h3>${escapeHtml(nev)}</h3>
+                    <p>${regiFiok ? 'Stábfiók (felhasználónév: ' + escapeHtml(email.split('@')[0]) + ')' : escapeHtml(email)} · ${szolg === 'google.com' ? 'Google-fiók' : 'E-mail + jelszó'}</p>
+                    <span class="fiok-szerep ${aktivSzerep && aktivSzerep !== 'guest' ? 'stab' : ''}">${escapeHtml(szerepNev(aktivSzerep))}</span>
+                </div>
+            </div>
+            ${jogok.length ? `<div class="fiok-blokk"><h4>Jogosultságaid</h4><p class="fiok-megj">${jogok.map(escapeHtml).join(' · ')}</p></div>`
+                : `<div class="fiok-blokk"><p class="fiok-megj">Nézőként követheted a versenyzőket és szurkolhatsz. Ha a stáb tagja vagy (bíró, állatorvos, beérkeztető), szólj az adminnak, és ő megadja a jogaidat.</p></div>`}
+
+            <div class="fiok-blokk">
+                <h4>⭐ Követett versenyzők és lovak</h4>
+                ${kov.length ? `<div class="fiok-kovetettek">${kov.map(k => `<div class="fiok-kovetett">
+                        <button class="name-link" onclick="fiokBezar(); ${k.tipus === 'lovas' ? 'openRiderProfile' : 'openHorseProfile'}('${escapeHtml(k.id)}')">${k.tipus === 'lovas' ? '👤' : '🐴'} ${escapeHtml(k.nev)}</button>
+                        <button class="fiok-x" title="Követés vége" onclick="kovetesValt('${k.tipus}', '${escapeHtml(k.id)}')">✕</button>
+                    </div>`).join('')}</div>`
+                    : `<p class="fiok-megj">Még senkit nem követsz. Egy lovas vagy ló adatlapján a <b>☆ Követés</b> gombbal veheted fel - élő versenyen jelezzük, ha beér, átmegy a vizsgálaton vagy célba ér.</p>`}
+            </div>
+
+            <div class="fiok-blokk">
+                <h4>🔔 Értesítések</h4>
+                ${!ertesitesTamogatott ? `<p class="fiok-megj">Ez a böngésző nem tud értesítést küldeni. iPhone-on: Megosztás → „Főképernyőhöz adás”, és onnan megnyitva már igen.</p>`
+                    : `<label class="fiok-kapcsolo"><input type="checkbox" ${ertesitesBe ? 'checked' : ''} ${tiltva ? 'disabled' : ''} onchange="ertesitesValt(this.checked)"> Értesítés a követettekről ezen az eszközön</label>
+                       <p class="fiok-megj">${tiltva ? 'Az értesítések le vannak tiltva ennek az oldalnak a böngésző beállításaiban - ott tudod engedélyezni.'
+                            : 'Akkor jön, amíg az End-Ride nyitva van (háttérben is). Ha az oldal előtérben van, a képernyő tetején jelenik meg.'}</p>`}
+            </div>
+
+            <div class="fiok-blokk">
+                <h4>🎨 Megjelenés</h4>
+                <p class="fiok-megj">A téma csak ezen az eszközön változik.</p>
+                <div class="theme-swatch-row fiok-temak">${THEME_LIST.map(t => temaSwatchHtml(t, uiTheme === t.key, 'fiokTemaValt')).join('')}</div>
+            </div>
+
+            ${appTelepithetoHtml()}
+
+            <div class="fiok-gombok">
+                <button class="calc-btn" onclick="doLogout()">Kijelentkezés</button>
+                <button class="fiok-link veszely" onclick="fiokTorles()">Fiók törlése</button>
+            </div>
+            <p class="fiok-megj kicsi"><a href="#" onclick="adatvedelemMegnyit(); return false;">Adatvédelmi tájékoztató</a></p>
+        </div>`;
+    }
+
+    function fiokTemaValt(kulcs) { setUiTheme(kulcs); renderFiok(); }
+
+    // --- Adatvédelmi tájékoztató (az adatkezelő nevét és címét az admin adja meg: Felhasználók oldal) ---
+    function adatvedelemMegnyit() {
+        const kiir = (adatkezelo) => {
+            const nev = (adatkezelo && adatkezelo.nev) || 'az End-Ride üzemeltetője';
+            const email = adatkezelo && adatkezelo.email;
+            document.getElementById('infoModalTitle').textContent = 'Adatvédelmi tájékoztató';
+            document.getElementById('infoModalBody').innerHTML = `
+                <p><b>Adatkezelő:</b> ${escapeHtml(nev)}${email ? ` (${escapeHtml(email)})` : ''}.</p>
+                <p><b>Milyen adatot tárolunk, ha fiókot hozol létre?</b> A neved, az e-mail címed, Google-belépésnél a profilképed címét,
+                    a regisztráció és az utolsó belépés idejét, a követett versenyzőidet és lovaidat, valamint a szurkolásaidat (melyik versenyzőnek, mikor).</p>
+                <p><b>Mire használjuk?</b> A belépéshez, a követéshez és az értesítésekhez, a szurkolások számlálásához, valamint ahhoz, hogy az admin
+                    a stáb tagjainak (bíró, állatorvos, beérkeztető) jogot adhasson. Másnak nem adjuk tovább, hirdetésre nem használjuk.</p>
+                <p><b>Hol tároljuk?</b> A Google Firebase szolgáltatásában (adatbázis és belépés). A versenyeredmények (lovas, ló, idők) a
+                    versenyszabályzat szerint nyilvánosak - ezek nem a fiókodhoz tartoznak.</p>
+                <p><b>Látogatottság:</b> a Cloudflare Web Analytics sütik nélkül, személyes azonosítás nélkül számolja a látogatásokat.</p>
+                <p><b>Meddig?</b> Amíg a fiókod megvan. A <b>Fiók → Fiók törlése</b> gombbal bármikor törölheted - ekkor a profilod, a követéseid és
+                    a szurkolásaid is törlődnek. Kérdés esetén ${email ? `írj a ${escapeHtml(email)} címre` : 'keresd az adatkezelőt'}.</p>
+                <p><b>Jogaid:</b> hozzáférés, helyesbítés, törlés, tiltakozás; panasszal a Nemzeti Adatvédelmi és Információszabadság Hatósághoz (NAIH) fordulhatsz.</p>`;
+            document.getElementById('infoModal').style.display = 'flex';
+        };
+        db.ref('settings/adatkezelo').once('value').then(s => kiir(s.val())).catch(() => kiir(null));
+    }
+
+    // ============================================================================
+    // KÖVETÉS, ÉRTESÍTÉS, SZURKOLÁS
+    // Követni lovast (igazolási szám) és lovat (start szám) lehet. Belépve a fiókban tároljuk
+    // (users/{uid}/kovetes/{lovas|lo}/{id}), kijelentkezve ezen az eszközön - belépéskor átkerül.
+    // Élő versenyen a követettek eseményeiről (beérkezés, vizsgálat, kiesés, cél) értesítést kap.
+    // ============================================================================
+    const KOVETES_HELYI = 'rps-kovetes';
+    let kovetesek = { lovas: {}, lo: {} };
+
+    function kovetesHelyiOlvas() {
+        try { const k = JSON.parse(localStorage.getItem(KOVETES_HELYI)) || {}; return { lovas: k.lovas || {}, lo: k.lo || {} }; }
+        catch (e) { return { lovas: {}, lo: {} }; }
+    }
+    function kovetesHelyiIr(k) { try { localStorage.setItem(KOVETES_HELYI, JSON.stringify(k)); } catch (e) {} }
+
+    function kovetesBetoltes(fiokbol) {
+        if (fiokbol === null) {
+            kovetesek = kovetesHelyiOlvas();
+        } else {
+            kovetesek = { lovas: Object.assign({}, fiokbol.lovas), lo: Object.assign({}, fiokbol.lo) };
+            // A kijelentkezve követetteket átvisszük a fiókba
+            const helyi = kovetesHelyiOlvas();
+            const atvinni = {};
+            ['lovas', 'lo'].forEach(t => Object.keys(helyi[t]).forEach(id => {
+                if (!kovetesek[t][id]) { atvinni[t + '/' + id] = Number(helyi[t][id]) || Date.now(); kovetesek[t][id] = atvinni[t + '/' + id]; }
+            }));
+            if (Object.keys(atvinni).length && auth.currentUser) {
+                db.ref('users/' + auth.currentUser.uid + '/kovetes').update(atvinni)
+                    .then(() => kovetesHelyiIr({ lovas: {}, lo: {} })).catch(() => {});
+            }
+        }
+        kovetesUIFrissit();
+    }
+
+    function kovetettE(tipus, id) { return !!(id && kovetesek[tipus] && kovetesek[tipus][sanitizeKey(String(id))]); }
+
+    function kovetesValt(tipus, id) {
+        const kulcs = sanitizeKey(String(id || ''));
+        if (!kulcs) return;
+        const most = !kovetettE(tipus, id);
+        const nev = tipus === 'lovas' ? ((ridersCache[kulcs] || {}).name || id) : ((horsesCache[kulcs] || {}).name || id);
+        if (most) kovetesek[tipus][kulcs] = Date.now(); else delete kovetesek[tipus][kulcs];
+        const u = auth.currentUser;
+        const kesz = () => {
+            showToast(most ? `⭐ Követed: ${nev}` : `Követés vége: ${nev}`);
+            kovetesUIFrissit();
+        };
+        if (u) {
+            db.ref('users/' + u.uid + '/kovetes/' + tipus + '/' + kulcs).set(most ? Date.now() : null).then(kesz)
+                .catch(e => { showToast('Nem sikerült menteni: ' + e.message, true); });
+        } else {
+            kovetesHelyiIr(kovetesek);
+            kesz();
+            if (most && !localStorage.getItem('rps-kovetes-tipp')) {
+                try { localStorage.setItem('rps-kovetes-tipp', '1'); } catch (e) {}
+                setTimeout(() => showToast('Tipp: lépj be, és a követéseid minden eszközödön megmaradnak.'), 2600);
+            }
+        }
+    }
+
+    function kovetettLista() {
+        const lista = [];
+        Object.keys(kovetesek.lovas).forEach(id => lista.push({ tipus: 'lovas', id, nev: (ridersCache[id] || {}).name || id }));
+        Object.keys(kovetesek.lo).forEach(id => lista.push({ tipus: 'lo', id, nev: (horsesCache[id] || {}).name || id }));
+        return lista.sort((a, b) => a.nev.localeCompare(b.nev, 'hu'));
+    }
+
+    function kovetesGombHtml(tipus, id) {
+        if (!id) return '';
+        const be = kovetettE(tipus, id);
+        return `<button type="button" class="kovetes-gomb ${be ? 'aktiv' : ''}" onclick="event.stopPropagation(); kovetesValt('${tipus}', '${escapeHtml(String(id))}')">${be ? '★ Követed' : '☆ Követés'}</button>`;
+    }
+
+    // A követett versenyző az élő versenyen (a lovasa vagy a lova követett)
+    function kovetettVersenyzoE(c) { return kovetettE('lovas', c.license) || kovetettE('lo', c.startNum); }
+
+    function kovetesUIFrissit() {
+        // A frissen követett versenyző mostani állapota legyen a kiindulás - különben az első
+        // eseménye (pl. a következő beérkezése) kimaradna az értesítésből.
+        kovetesEsemenyek(true);
+        if (document.getElementById('adatlapModal')?.style.display === 'flex') {
+            if (document.querySelector('#modalBody .profil')) renderProfil();
+            else if (typeof refreshOpenModalIfNeeded === 'function') refreshOpenModalIfNeeded();
+        }
+        if (document.getElementById('fiokModal')?.style.display === 'flex') renderFiok();
+        if (document.getElementById('kezdolap')?.classList.contains('active')) renderKezdolap();
+        if (document.getElementById('adatlapok')?.classList.contains('active') && !viewingPastRaceData) renderAdatlapList();
+    }
+
+    // --- Értesítések a követettekről (amíg az oldal nyitva van) ---
+    const ERTESITES_KULCS = 'rps-ertesites';
+    function ertesitesBekapcsolva() {
+        try { return localStorage.getItem(ERTESITES_KULCS) === '1' && typeof Notification !== 'undefined' && Notification.permission === 'granted'; }
+        catch (e) { return false; }
+    }
+    function ertesitesValt(be) {
+        if (!be) { try { localStorage.removeItem(ERTESITES_KULCS); } catch (e) {} renderFiok(); return; }
+        if (typeof Notification === 'undefined') return;
+        Notification.requestPermission().then(eng => {
+            if (eng === 'granted') {
+                try { localStorage.setItem(ERTESITES_KULCS, '1'); } catch (e) {}
+                rendszerErtesites('🔔 Értesítések bekapcsolva', 'Szólunk, ha egy követett versenyződ beér, vizsgálaton megy át vagy célba ér.', 'proba');
+            } else {
+                showToast('Az értesítést a böngészőben engedélyezni kell.', true);
+            }
+            renderFiok();
+        });
+    }
+    function rendszerErtesites(cim, szoveg, tag) {
+        if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+        const opts = { body: szoveg, tag: tag || undefined, icon: 'kepek/ikon-192.png', badge: 'kepek/ikon-96.png', data: { url: location.href.split('#')[0] } };
+        const sima = () => { try { new Notification(cim, opts); } catch (e) {} };
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistration().then(reg => (reg ? reg.showNotification(cim, opts) : sima())).catch(sima);
+        } else sima();
+    }
+
+    // Az élő verseny követett versenyzőinek eseményei: az előző állapothoz képest mi változott.
+    let kovetesAllapot = null, kovetesVersenyId = null;
+    // csakAlap: csak az állapotot jegyzi meg (követés be/ki), értesítés nélkül
+    function kovetesEsemenyek(csakAlap = false) {
+        if (!liveRaceMeta) { kovetesAllapot = null; kovetesVersenyId = null; return; }
+        const versenyId = liveRaceMeta.id || liveRaceMeta.name || 'elo';
+        const uj = {};
+        competitors.forEach(c => {
+            if (!kovetettVersenyzoE(c)) return;
+            const korok = c.laps || [];
+            uj[c.bib] = {
+                erk: korok.filter(l => l && l.arrSec > 0).length,
+                vet: korok.filter(l => l && l.vetSec > 0).length,
+                kiesett: !!c.isEliminated,
+                cel: teljesitetteE(c, raceConfig)
+            };
+        });
+        if (!csakAlap && kovetesAllapot && kovetesVersenyId === versenyId) {
+            let rangok = null;
+            competitors.forEach(c => {
+                const most = uj[c.bib], elozo = kovetesAllapot[c.bib];
+                if (!most || !elozo) return;
+                const nev = c.name + (c.internal ? ' · ' + c.internal : '');
+                const tav = catNames[c.dist] || c.dist;
+                if (most.kiesett && !elozo.kiesett) {
+                    kovetesErtesit('❌ ' + nev, getElimText(c) + ' · ' + tav, c);
+                } else if (most.cel && !elozo.cel) {
+                    rangok = rangok || calculateCurrentRanks(competitors, raceConfig);
+                    const r = rangok[c.bib];
+                    kovetesErtesit('🏁 ' + nev + ' célba ért', (r && typeof r.rank === 'number' ? r.rank + '. hely · ' : '') + tav, c);
+                } else if (most.vet > elozo.vet) {
+                    kovetesErtesit('🩺 ' + nev, most.vet + '. vizsgálat: megfelelt · ' + tav, c);
+                } else if (most.erk > elozo.erk) {
+                    const l = (c.laps || [])[most.erk - 1];
+                    kovetesErtesit('⏱️ ' + nev, `Beérkezett a(z) ${most.erk}. körből${l && l.loopSpd ? ' · ' + kmh(l.loopSpd) + ' km/h' : ''} · ${tav}`, c);
+                }
+            });
+        }
+        kovetesAllapot = uj;
+        kovetesVersenyId = versenyId;
+    }
+    function kovetesErtesit(cim, szoveg, c) {
+        showToast(cim + ' – ' + szoveg);
+        if (document.hidden && ertesitesBekapcsolva()) rendszerErtesites(cim, szoveg, 'kovetes-' + c.bib);
+    }
+
+    // --- Szurkolás: élő versenyen egy versenyzőnek fiókonként egy taps (szurkolas/{verseny}/{rajtszám}/{uid}) ---
+    let szurkolasAdat = {}, szurkolasRef = null, szurkolasVersenyId = null;
+    function szurkolasFigyeles() {
+        const id = liveRaceMeta && liveRaceMeta.id ? sanitizeKey(String(liveRaceMeta.id)) : null;
+        if (id === szurkolasVersenyId) return;
+        if (szurkolasRef) szurkolasRef.off();
+        szurkolasRef = null; szurkolasVersenyId = id; szurkolasAdat = {};
+        if (!id) return;
+        szurkolasRef = db.ref('szurkolas/' + id);
+        szurkolasRef.on('value', s => { szurkolasAdat = s.val() || {}; szurkolasUIFrissit(); }, () => {});
+    }
+    function szurkolasSzam(bib) { const x = szurkolasAdat[sanitizeKey(String(bib))]; return x ? Object.keys(x).length : 0; }
+    function szurkoltamE(bib) {
+        const u = auth.currentUser;
+        const x = szurkolasAdat[sanitizeKey(String(bib))];
+        return !!(u && x && x[u.uid]);
+    }
+    function szurkolas(bib) {
+        const u = auth.currentUser;
+        if (!u) { fiokMegnyit('belepes', 'A szurkoláshoz lépj be - Google-fiókkal egy kattintás.'); return; }
+        if (!szurkolasVersenyId) return;
+        const ref = db.ref('szurkolas/' + szurkolasVersenyId + '/' + sanitizeKey(String(bib)) + '/' + u.uid);
+        const most = !szurkoltamE(bib);
+        (most ? ref.set(Date.now()) : ref.remove())
+            .then(() => { if (most) showToast('👏 Szurkolsz neki!'); })
+            .catch(e => showToast('Nem sikerült: ' + (e.code === 'PERMISSION_DENIED' ? 'a szurkolás még nincs engedélyezve az adatbázisban (admin: szabályok frissítése)' : e.message), true));
+    }
+    function szurkolasGombHtml(bib, kicsi) {
+        if (!szurkolasVersenyId) return '';
+        const en = szurkoltamE(bib);
+        return `<button type="button" class="szurkolas-gomb ${en ? 'aktiv' : ''} ${kicsi ? 'kicsi' : ''}" data-szurk-bib="${escapeHtml(String(bib))}" title="${en ? 'Szurkolsz neki - kattints a visszavonáshoz' : 'Szurkolok!'}" onclick="event.stopPropagation(); szurkolas('${escapeHtml(String(bib))}')">👏 <span>${szurkolasSzam(bib)}</span></button>`;
+    }
+    // Új taps esetén nem rajzolunk újra mindent, csak a számlálók frissülnek
+    function szurkolasUIFrissit() {
+        document.querySelectorAll('.szurkolas-gomb[data-szurk-bib]').forEach(g => {
+            const bib = g.dataset.szurkBib;
+            const en = szurkoltamE(bib);
+            g.classList.toggle('aktiv', en);
+            g.title = en ? 'Szurkolsz neki - kattints a visszavonáshoz' : 'Szurkolok!';
+            const s = g.querySelector('span');
+            if (s) s.textContent = szurkolasSzam(bib);
+        });
+    }
+
+    // ============================================================================
+    // FELHASZNÁLÓK (csak admin): ki regisztrált, szerepkör és menünkénti jogok
+    // ============================================================================
+    let felhasznalokAdat = {}, felhasznalokRef = null, felhSzuro = 'mind';
+    function felhasznalokFigyeles(be) {
+        if (be && !felhasznalokRef && adminE()) {
+            felhasznalokRef = db.ref('users');
+            felhasznalokRef.on('value', s => { felhasznalokAdat = s.val() || {}; renderFelhasznalok(); },
+                e => { document.getElementById('felh-lista').innerHTML = `<p class="field-hint">Nem olvasható: ${escapeHtml(e.message)}</p>`; });
+        } else if (!be && felhasznalokRef) {
+            felhasznalokRef.off(); felhasznalokRef = null;
+        }
+    }
+    function felhSzuroValt(sz) { felhSzuro = sz; renderFelhasznalok(); }
+
+    function datumIdo(ms) {
+        if (!ms) return '–';
+        const d = new Date(ms);
+        return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}. ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function renderFelhasznalok() {
+        const cont = document.getElementById('felh-lista');
+        if (!cont) return;
+        const keres = (document.getElementById('felh-kereso')?.value || '').trim().toLowerCase();
+        const sajat = auth.currentUser && auth.currentUser.uid;
+        const lista = Object.entries(felhasznalokAdat).map(([uid, a]) => ({ uid, a: a || {}, p: (a && a.profil) || {} }));
+        const stab = lista.filter(x => x.a.role);
+        const db_ = { mind: lista.length, stab: stab.length, nezo: lista.length - stab.length };
+        document.getElementById('felh-szurok').innerHTML = [['mind', 'Mind'], ['stab', 'Stáb'], ['nezo', 'Nézők']]
+            .map(([k, c]) => `<button class="tab-btn ${felhSzuro === k ? 'active' : ''}" onclick="felhSzuroValt('${k}')">${c} <small>${db_[k]}</small></button>`).join('');
+
+        const szurt = lista.filter(x => felhSzuro === 'mind' || (felhSzuro === 'stab' ? x.a.role : !x.a.role))
+            .filter(x => !keres || [x.p.nev, x.p.email, x.uid].some(s => String(s || '').toLowerCase().includes(keres)))
+            .sort((x, y) => (!!y.a.role - !!x.a.role) || ((y.p.utolsoBelepes || 0) - (x.p.utolsoBelepes || 0)));
+        if (!szurt.length) { cont.innerHTML = '<p class="field-hint" style="text-align:center; padding:20px 0;">Nincs találat.</p>'; return; }
+
+        cont.innerHTML = szurt.map(({ uid, a, p }) => {
+            const role = a.role || '';
+            const jogok = jogokSzamit(role, a.jogok);
+            const regi = /@verseny\.hu$/i.test(p.email || '');
+            const nev = p.nev || (p.email ? p.email.split('@')[0] : '') || 'Névtelen fiók';
+            const en = uid === sajat;
+            const csoportok = [...new Set(JOG_LISTA.map(j => j.csoport))];
+            const jogHtml = csoportok.map(cs => `<div class="felh-jogcsoport"><b>${escapeHtml(cs)}</b>${JOG_LISTA.filter(j => j.csoport === cs).map(j =>
+                `<label><input type="checkbox" data-jog="${j.kulcs}" ${jogok.has(j.kulcs) ? 'checked' : ''} ${!role || role === 'admin' ? 'disabled' : ''} onchange="felhValtozott('${uid}')"> ${escapeHtml(j.cimke)}</label>`).join('')}</div>`).join('');
+            return `<details class="felh-kartya ${role ? 'stab' : ''}" data-uid="${escapeHtml(uid)}">
+                <summary>
+                    ${fiokAvatarHtml(null, p.foto ? p : { nev })}
+                    <span class="felh-nev"><b>${escapeHtml(nev)}${en ? ' (te)' : ''}</b>
+                        <small>${p.email ? escapeHtml(regi ? 'stábfiók: ' + p.email.split('@')[0] : p.email) : 'régi fiók – a neve a következő belépésekor jelenik meg'}${p.szolgaltato === 'google.com' ? ' · Google' : ''}</small></span>
+                    <span class="felh-szerep ${role ? 'stab' : ''}">${escapeHtml(szerepNev(role || 'guest'))}</span>
+                </summary>
+                <div class="felh-reszlet">
+                    <p class="field-hint" style="margin-top:0;">Regisztrált: ${datumIdo(p.letrehozva)} · utoljára belépett: ${datumIdo(p.utolsoBelepes)}</p>
+                    <label>Szerepkör</label>
+                    <select class="felh-szerepkor" ${en ? 'disabled' : ''} onchange="felhSzerepValt('${uid}', this.value)">
+                        ${SZEREPKOROK.map(s => `<option value="${s.kulcs}" ${s.kulcs === role ? 'selected' : ''}>${escapeHtml(s.cimke)}</option>`).join('')}
+                    </select>
+                    ${en ? '<p class="field-hint">A saját szerepkörödet nem módosíthatod (nehogy kizárd magad).</p>' : ''}
+                    <div class="felh-jogok ${!role || role === 'admin' ? 'tiltott' : ''}">${jogHtml}</div>
+                    <p class="field-hint">${role === 'admin' ? 'Az admin mindent lát és kezel.' : !role ? 'Szerepkör nélkül néző: semmit nem írhat az adatbázisba.' : 'A szerepkör adja az alapot, a pipákkal menünként szűkítheted vagy bővítheted.'}</p>
+                    <div class="felh-gombok"><button class="calc-btn add-btn felh-mentes" disabled onclick="felhMentes('${uid}')">Mentés</button></div>
+                </div>
+            </details>`;
+        }).join('');
+    }
+
+    function felhKartya(uid) { return document.querySelector(`.felh-kartya[data-uid="${CSS.escape(uid)}"]`); }
+    function felhValtozott(uid) { const k = felhKartya(uid); if (k) k.querySelector('.felh-mentes').disabled = false; }
+    function felhSzerepValt(uid, role) {
+        const k = felhKartya(uid);
+        if (!k) return;
+        const alap = jogokSzamit(role, null);
+        k.querySelectorAll('input[data-jog]').forEach(i => { i.checked = alap.has(i.dataset.jog); i.disabled = !role || role === 'admin'; });
+        k.querySelector('.felh-jogok').classList.toggle('tiltott', !role || role === 'admin');
+        felhValtozott(uid);
+    }
+    function felhMentes(uid) {
+        const k = felhKartya(uid);
+        if (!k) return;
+        if (auth.currentUser && uid === auth.currentUser.uid) return;
+        const role = k.querySelector('.felh-szerepkor').value;
+        const jelolt = [...k.querySelectorAll('input[data-jog]')].filter(i => i.checked).map(i => i.dataset.jog);
+        const alap = [...jogokSzamit(role, null)].sort().join(',');
+        // Ha a pipák a szerepkör alapjával egyeznek, nem tároljuk külön (így egy későbbi alapváltozás is érvényes lesz)
+        const jogok = (!role || role === 'admin' || jelolt.slice().sort().join(',') === alap) ? null : Object.fromEntries(jelolt.map(j => [j, true]));
+        // Szerepkör nélkül a role kulcsnak NEM szabad léteznie (a szabályok a meglétét nézik az íráshoz)
+        db.ref('users/' + uid).update({ role: role || null, jogok })
+            .then(() => showToast('Mentve: ' + (felhasznalokAdat[uid]?.profil?.nev || uid) + ' – ' + szerepNev(role || 'guest')))
+            .catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    function adatkezeloBetolt() {
+        db.ref('settings/adatkezelo').once('value').then(s => {
+            const a = s.val() || {};
+            const n = document.getElementById('adatkezelo-nev'), e = document.getElementById('adatkezelo-email');
+            if (n) n.value = a.nev || '';
+            if (e) e.value = a.email || '';
+        }).catch(() => {});
+    }
+    function adatkezeloMentes() {
+        const nev = document.getElementById('adatkezelo-nev').value.trim();
+        const email = document.getElementById('adatkezelo-email').value.trim();
+        db.ref('settings/adatkezelo').set({ nev: nev || null, email: email || null })
+            .then(() => showToast('Az adatvédelmi tájékoztató adatai mentve.'))
+            .catch(e => showToast('Hiba: ' + e.message, true));
+    }
+
+    // Az admin oldalon megjeleníthető, a Firebase konzolba másolandó szabályok (tests/firebase-szabalyok.json)
+    const FIREBASE_SZABALYOK = {
+        rules: {
+            users: {
+                '.read': "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+                '.write': "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+                $uid: {
+                    '.read': 'auth != null && auth.uid === $uid',
+                    profil: {
+                        '.write': 'auth != null && auth.uid === $uid',
+                        $mezo: { '.validate': '(newData.isString() && newData.val().length <= 300) || newData.isNumber() || newData.isBoolean()' }
+                    },
+                    kovetes: {
+                        '.write': 'auth != null && auth.uid === $uid',
+                        $tipus: { $id: { '.validate': "($tipus === 'lovas' || $tipus === 'lo') && (newData.isNumber() || newData.isBoolean())" } }
+                    },
+                    beallitas: {
+                        '.write': 'auth != null && auth.uid === $uid',
+                        $mezo: { '.validate': '(newData.isString() && newData.val().length <= 100) || newData.isNumber() || newData.isBoolean()' }
+                    }
+                }
+            },
+            szurkolas: {
+                '.read': 'true',
+                '.write': "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+                $verseny: { $bib: { $uid: { '.write': 'auth != null && auth.uid === $uid', '.validate': 'newData.isNumber()' } } }
+            },
+            $other: {
+                '.read': 'true',
+                '.write': "auth != null && root.child('users').child(auth.uid).child('role').exists()"
+            }
+        }
+    };
+    function szabalyokMasolas() {
+        const szoveg = JSON.stringify(FIREBASE_SZABALYOK, null, 2);
+        (navigator.clipboard ? navigator.clipboard.writeText(szoveg) : Promise.reject())
+            .then(() => showToast('A szabályok a vágólapon - illeszd be a Firebase konzolba.'))
+            .catch(() => { const t = document.getElementById('felh-szabalyok'); if (t) { t.style.display = 'block'; t.select(); } });
+    }
+
+    function renderFelhasznalokOldal() {
+        const t = document.getElementById('felh-szabalyok');
+        if (t) t.value = JSON.stringify(FIREBASE_SZABALYOK, null, 2);
+        adatkezeloBetolt();
+        felhasznalokFigyeles(true);
+        renderFelhasznalok();
+    }
+
+    // ============================================================================
+    // TELEPÍTHETŐ ALKALMAZÁS (PWA): a telefon kezdőképernyőjére tehető, saját ikonnal
+    // ============================================================================
+    let telepitesKeres = null;
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); telepitesKeres = e; });
+        window.addEventListener('appinstalled', () => { telepitesKeres = null; showToast('Az End-Ride felkerült a kezdőképernyőre.'); });
+    }
+    function appTelepitve() { return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
+    function appTelepithetoHtml() {
+        if (appTelepitve()) return '';
+        const ios = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+        return `<div class="fiok-blokk">
+            <h4>📲 End-Ride a telefonodon</h4>
+            ${telepitesKeres ? `<button class="calc-btn" onclick="appTelepites()">Hozzáadás a kezdőképernyőhöz</button>`
+                : `<p class="fiok-megj">${ios ? 'iPhone-on: Safari → Megosztás gomb → „Főképernyőhöz adás”.' : 'A böngésző menüjében: „Hozzáadás a kezdőképernyőhöz” vagy „Alkalmazás telepítése”.'} Így saját ikonnal, teljes képernyőn nyílik, mint egy app.</p>`}
+        </div>`;
+    }
+    function appTelepites() {
+        if (!telepitesKeres) return;
+        telepitesKeres.prompt();
+        telepitesKeres.userChoice.finally(() => { telepitesKeres = null; renderFiok(); });
+    }
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && typeof window.addEventListener === 'function') {
+        window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
     }
 
     function toggleMenu() {
@@ -951,6 +1749,13 @@
     const SZELES_NEZETEK = ['bajnoksag-egyeni', 'bajnoksag-lo', 'bajnoksag-csapat', 'attekinto-mod', 'bajnoksag-teny'];
 
     function switchSidebarMode(targetId, btn) {
+        // Jog nélkül (vagy kijelentkezve) belső nézetre nem lehet menni - pl. egy régi könyvjelzőből
+        // vagy a localStorage-ban megjegyzett nézetből. Amíg a belépés állapota nem ismert, nem terelünk.
+        if (authAllapotIsmert && !nezetEngedelyezett(targetId)) {
+            targetId = ujDizajnAktiv() ? 'kezdolap' : 'versenyek';
+            btn = document.getElementById('btn-menu-' + targetId);
+        }
+        if (targetId !== 'felhasznalok-mod') felhasznalokFigyeles(false);
         if(btn && btn.id === 'btn-menu-adatlapok') { viewingPastRaceData = null; }
         document.querySelectorAll('.mode-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
@@ -972,6 +1777,8 @@
         if (targetId === 'bajnoksag-teny') renderEvTenyesztoje();
         if (targetId === 'kezdolap') renderKezdolap();
         if (targetId === 'nyomtatvanyok-mod') renderNyomtatvanyok();
+        if (targetId === 'felhasznalok-mod') renderFelhasznalokOldal();
+        if (targetId === 'fo-mod') foModFulJogSzerint();
         if (targetId === 'bajnoksag-csapat') switchCsapatTab('csapat-rang', document.querySelector('#bajnoksag-csapat .tabs .tab-btn'));
         ujNavFrissit();
     }
@@ -1624,7 +2431,7 @@
                 <div class="adatlap-card" onclick="openAdatlap('${c.bib}', true)">
                     <div class="adatlap-rank ${rankClass}">${rankDisplay}</div>
                     <div class="adatlap-info">
-                        <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
+                        <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span>${kovetettVersenyzoE(c) ? ' <span class="kovetett-jel" title="Követed">★</span>' : ''} ${liveStatusHtml}</div>
                         <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                     </div>
                     <div class="adatlap-right" style="display:flex; align-items:center; gap:10px;">
@@ -3350,29 +4157,26 @@
         }
 
         let html = `
-            <div data-live-view="vethistory" data-live-bib="${comp.bib}" style="background:#1c1c1e; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 850px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
-                
-                <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
-                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${comp.bib} | ${comp.name}</div>
-                    <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${comp.internal || "Ló neve hiányzik"}</div>
+            <div data-live-view="vethistory" data-live-bib="${comp.bib}" class="vk-kartya" style="max-width: 850px;">
+                <div class="vk-fej">
+                    <div class="vk-nev">${comp.bib} | ${escapeHtml(comp.name)}</div>
+                    <div class="vk-lo">${escapeHtml(comp.internal || "Ló neve hiányzik")}</div>
                 </div>
-                
-                <div data-live-scroll style="padding: 20px; overflow-x: auto;">
-                    <table style="width:100%; border-collapse: collapse; text-align:center; font-size:1rem; font-family: sans-serif;">
-                        <tr style="background:#137A7F; color:#fff;">
-                            <th style="padding:12px; border-bottom:2px solid #1c1c1e; text-align:left; width:30%;">Szakasz</th>
+                <div data-live-scroll class="vk-gorgeto">
+                    <table class="vk-tabla" style="font-size:1rem;">
+                        <tr>
+                            <th style="width:30%;">Szakasz</th>
         `;
 
         columns.forEach(col => {
-            html += `<th style="padding:12px; border-bottom:2px solid #1c1c1e;">${col.title}</th>`;
+            html += `<th>${col.title}</th>`;
         });
         html += `</tr>`;
 
         const renderVetRowCustom = (label, valFn) => {
-            let rowHtml = `<tr style="border-bottom: 3px solid #1c1c1e; background: #2c2c2e;">
-                <td style="padding:10px; text-align:left; font-weight:bold; color:#fff; background:#3a3a3c;">${label}</td>`;
+            let rowHtml = `<tr><td>${label}</td>`;
             columns.forEach(col => {
-                rowHtml += `<td style="padding:10px; color:#fff;">${valFn(col)}</td>`;
+                rowHtml += `<td>${valFn(col)}</td>`;
             });
             rowHtml += `</tr>`;
             return rowHtml;
@@ -3407,7 +4211,7 @@
             const t = toSec(d.rch, d.rcm, d.rcs);
             const tipus = d.rcTipus && RECHECK_TIPUSOK[d.rcTipus] ? RECHECK_TIPUSOK[d.rcTipus].rovid : '';
             const jel = [tipus, t > 0 ? toTimeStr(t) : ''].filter(Boolean).join(' ');
-            return jel ? `<span style="color:#FF9F0A; font-weight:800;">${escapeHtml(jel)}</span>` : (d.vetDecision && /re-check/i.test(d.vetDecision) ? '<span style="color:#FF9F0A; font-weight:800;">esedékes</span>' : '-');
+            return jel ? `<span style="color:var(--warning); font-weight:800;">${escapeHtml(jel)}</span>` : (d.vetDecision && /re-check/i.test(d.vetDecision) ? '<span style="color:var(--warning); font-weight:800;">esedékes</span>' : '-');
         });
         html += renderVetRowCustom('Döntés', col => escapeHtml(vetDontesSzoveg(col.data.vetDecision)));
 
@@ -3415,9 +4219,9 @@
                     </table>
                 </div>
 
-                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #1c1c1e; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                    <button class="calc-btn admin-only" style="width:auto; padding:10px 24px; border-radius:25px; background:var(--teal); color:#fff; border: none; font-weight:bold; font-size: 1rem; cursor:pointer; margin:0;" onclick="printFeiVetCard('${escapeHtml(forras)}', '${escapeHtml(comp.bib)}')">🖨️ FEI orvosi lap</button>
-                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#444; color:#fff; border: none; font-weight:bold; font-size: 1.1rem; cursor:pointer; margin:0;" onclick="closeAdatlap()">Bezárás</button>
+                <div class="vk-lab sor">
+                    <button class="calc-btn admin-only vk-fei" onclick="printFeiVetCard('${escapeHtml(forras)}', '${escapeHtml(comp.bib)}')">🖨️ FEI orvosi lap</button>
+                    <button class="calc-btn vk-bezar" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>
         `;
@@ -4812,10 +5616,11 @@
             <div class="adatlap-card" onclick="openAdatlap('${c.bib}')">
                 <div class="adatlap-rank ${rankClass}">${rankDisplay}</div>
                 <div class="adatlap-info">
-                    <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span> ${liveStatusHtml}</div>
+                    <div class="adatlap-name-row"><span class="adatlap-bib">${c.bib}</span> <span class="adatlap-name">${c.name}</span>${kovetettVersenyzoE(c) ? ' <span class="kovetett-jel" title="Követed">★</span>' : ''} ${liveStatusHtml}</div>
                     <div class="adatlap-horse">${c.internal || "Ismeretlen ló"}</div>
                 </div>
                 <div class="adatlap-right" style="display:flex; align-items:center; gap:10px;">
+                    ${viewingPastRaceData ? '' : szurkolasGombHtml(c.bib, true)}
                     <button class="calc-btn" onclick="event.stopPropagation(); openVetHistory('${c.bib}')" style="background:var(--success); color:black; padding:6px 12px; margin:0; font-size:0.85rem; width:auto; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🩺 Karton</button>
                     <div class="adatlap-arrow">❯</div>
                 </div>
@@ -4833,23 +5638,22 @@
         if (c.manualEntry) {
             const placeStr = c.isEliminated ? getElimText(c) : (c.manualPlace ? c.manualPlace + '. hely' : 'nincs rögzített helyezés');
             document.getElementById('modalBody').innerHTML = `
-                <div data-live-view="adatlap" data-live-bib="${c.bib}" style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
-                    <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center;">
-                        <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
-                        <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${c.internal || "Ló neve hiányzik"}</div>
-                        <div style="margin-top: 15px; display: inline-block; background: rgba(0,0,0,0.25); padding: 6px 18px; border-radius: 8px; font-size: 1rem; color: #fff;">
-                            🏁 <b>Táv:</b> ${catNames[c.dist] || (c.dist + ' km')}
-                        </div>
+                <div data-live-view="adatlap" data-live-bib="${c.bib}" class="vk-kartya" style="max-width: 500px;">
+                    <div class="vk-fej">
+                        <div class="vk-nev">${c.bib} | ${escapeHtml(c.name)}</div>
+                        <div class="vk-lo">${escapeHtml(c.internal || "Ló neve hiányzik")}</div>
+                        <div class="vk-info"><span>🏁 <b>Táv:</b> ${catNames[c.dist] || (c.dist + ' km')}</span></div>
                     </div>
+                    ${adatlapTamogatasHtml(c)}
                     <div style="padding: 24px; text-align:center;">
-                        <p style="color:#aaa; font-size:0.82rem; margin-bottom:18px;">⚡ Gyorsan rögzített eredmény - nincsenek részletes kör-/időadatok.</p>
-                        <div style="font-size:2rem; font-weight:900; color:#fff; margin-bottom:8px;">${placeStr}</div>
-                        ${c.totalTimeSec ? `<div style="color:#ddd; font-size:1.1rem;">Teljes menetidő: <b>${toTimeStr(c.totalTimeSec)}</b></div>` : ''}
-                        ${c.club ? `<div style="color:#888; font-size:0.9rem; margin-top:10px;">${c.club}</div>` : ''}
+                        <p class="vk-halvany" style="font-size:0.82rem; margin-bottom:18px;">⚡ Gyorsan rögzített eredmény - nincsenek részletes kör-/időadatok.</p>
+                        <div class="vk-gyors-hely">${placeStr}</div>
+                        ${c.totalTimeSec ? `<div style="font-size:1.1rem;">Teljes menetidő: <b>${toTimeStr(c.totalTimeSec)}</b></div>` : ''}
+                        ${c.club ? `<div class="vk-halvany" style="font-size:0.9rem; margin-top:10px;">${escapeHtml(c.club)}</div>` : ''}
                     </div>
-                    <div style="text-align:center; padding: 15px 20px 20px 20px; background: #111; display:flex; flex-direction:column; align-items:center; gap:10px;">
-                        <button class="admin-only" style="width:auto; padding:8px 22px; border-radius:20px; border:none; cursor:pointer; font-weight:800; font-size:0.85rem; background:${c.obPont !== false ? 'var(--success)' : 'var(--card-3)'}; color:${c.obPont !== false ? 'black' : '#ddd'};" onclick="toggleObPont('${c.bib}')">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
-                        <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#1c1c1e; color:#fff; border: 1px solid #333; font-weight:bold; font-size: 1.1rem; cursor:pointer; margin-top:0;" onclick="closeAdatlap()">Bezárás</button>
+                    <div class="vk-lab">
+                        <button class="admin-only vk-obpont ${c.obPont !== false ? 'igen' : ''}" onclick="toggleObPont('${c.bib}')">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
+                        <button class="calc-btn vk-bezar" onclick="closeAdatlap()">Bezárás</button>
                     </div>
                 </div>`;
             document.getElementById('adatlapModal').style.display = 'flex';
@@ -4916,34 +5720,29 @@
         }
 
         let html = `
-            <div data-live-view="adatlap" data-live-bib="${c.bib}" style="background:#111; padding:0; border-radius:12px; color:#fff; width: 100%; max-width: 900px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow:hidden;">
-                
-                <div style="background: var(--teal); color: #fff; padding: 20px; text-align: center; position: relative;">
-                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${c.bib} | ${c.name}</div>
-                    <div style="font-size: 1.5rem; font-weight: 900; text-transform: uppercase;">${c.internal || "Ló neve hiányzik"}</div>
-                    
-                    <div style="margin-top: 15px; display: inline-block; background: rgba(0,0,0,0.25); padding: 6px 18px; border-radius: 8px; font-size: 1rem; color: #fff;">
-                        <span style="margin-right:20px;">🏁 <b>Táv:</b> ${distName}</span>
-                        <span>⏱ <b>Rajtidő:</b> ${rajTidoStr}</span>
-                    </div>
+            <div data-live-view="adatlap" data-live-bib="${c.bib}" class="vk-kartya" style="max-width: 900px;">
+                <div class="vk-fej">
+                    <div class="vk-nev">${c.bib} | ${escapeHtml(c.name)}</div>
+                    <div class="vk-lo">${escapeHtml(c.internal || "Ló neve hiányzik")}</div>
+                    <div class="vk-info"><span>🏁 <b>Táv:</b> ${distName}</span><span>⏱ <b>Rajtidő:</b> ${rajTidoStr}</span></div>
                 </div>
-                
-                <div data-live-scroll style="padding: 20px; overflow-x: auto;">
-                    <table style="width:100%; border-collapse: collapse; text-align:center; font-size:0.95rem; font-family: sans-serif;">
-                        <tr style="background:var(--teal); color:#fff;">
-                            <th style="padding:12px; border-bottom:2px solid #fff; text-align:left; width:25%;">Szakasz</th>
+                ${adatlapTamogatasHtml(c)}
+                <div data-live-scroll class="vk-gorgeto">
+                    <table class="vk-tabla">
+                        <tr>
+                            <th style="width:25%;">Szakasz</th>
         `;
-        
-        phases.forEach((_,i) => html += `<th style="padding:12px; border-bottom:2px solid #fff;">${i+1}. KÖR</th>`);
+
+        phases.forEach((_,i) => html += `<th>${i+1}. KÖR</th>`);
         html += `</tr>`;
 
         const renderDataRow = (label, valueFn) => {
-            let row = `<tr style="border-bottom: 3px solid #272729; background: #18181a;"><td style="padding:10px; text-align:left; font-weight:bold; color:#fff; background:#111;">${label}</td>`;
-            phases.forEach((l, i) => { row += `<td style="padding:10px; color:#ddd;">${valueFn(l, i)}</td>`; });
+            let row = `<tr><td>${label}</td>`;
+            phases.forEach((l, i) => { row += `<td>${valueFn(l, i)}</td>`; });
             row += `</tr>`; return row;
         };
 
-        html += renderDataRow('Táv (km)', l => `<b style="background:#242426; color:#fff; padding:2px 6px; border:1px solid #3a3a3c; border-radius:4px;">${l.d || '-'}</b>`);
+        html += renderDataRow('Táv (km)', l => `<b class="vk-tav">${l.d || '-'}</b>`);
         html += renderDataRow('Rajt', l => l.startSec > 0 ? toTimeStr(l.startSec) : "-");
         html += renderDataRow('Beérkezés', l => l.arrSec > 0 ? toTimeStr(l.arrSec) : "-");
         html += renderDataRow('Kör idő', l => l.loopSec > 0 ? toTimeStr(l.loopSec) : "-");
@@ -4961,23 +5760,23 @@
             if (!l.isComplete) return "-";
             let finalLap = i === phases.length - 1;
             if (is20km && finalLap && l.vetSec > 0) {
-                return `<b style="color:#fff;">${toTimeStr(l.loopSec + l.pulzusSec)}</b>`;
+                return `<b>${toTimeStr(l.loopSec + l.pulzusSec)}</b>`;
             }
-            return l.rideTime > 0 ? `<b style="color:#fff;">${toTimeStr(l.rideTime)}</b>` : "-";
+            return l.rideTime > 0 ? `<b>${toTimeStr(l.rideTime)}</b>` : "-";
         });
         html += renderDataRow('Össz. átlag km/h', (l, i) => {
             if (!l.isComplete) return "-";
-            return l.rideSpd > 0 ? `<b style="color:#fff;">${kmh(l.rideSpd)}</b>` : "-";
+            return l.rideSpd > 0 ? `<b>${kmh(l.rideSpd)}</b>` : "-";
         });
-        html += renderDataRow('Helyezés', (l, i) => (typeof ranks[i] === 'string') ? ranks[i] : (ranks[i] ? `<b style="color:#fff;">${ranks[i]}.</b>` : "-"));
-        html += renderDataRow('Lemaradás', (l, i) => gaps[i] ? `<span style="color:#ddd;">${gaps[i]}</span>` : "-");
+        html += renderDataRow('Helyezés', (l, i) => (typeof ranks[i] === 'string') ? ranks[i] : (ranks[i] ? `<b>${ranks[i]}.</b>` : "-"));
+        html += renderDataRow('Lemaradás', (l, i) => gaps[i] ? `<span>${gaps[i]}</span>` : "-");
 
         html += `
                     </table>
                 </div>
-                <div style="text-align:center; padding: 15px 20px 20px 20px; background: #111; display:flex; flex-direction:column; align-items:center; gap:10px;">
-                    <button class="admin-only" style="width:auto; padding:8px 22px; border-radius:20px; border:none; cursor:pointer; font-weight:800; font-size:0.85rem; background:${c.obPont !== false ? 'var(--success)' : 'var(--card-3)'}; color:${c.obPont !== false ? 'black' : '#ddd'};" onclick="toggleObPont('${c.bib}')" title="Bajnoki (OB) pontszerzésre jogosult-e ez a versenyző - ha lemond, ennek a versenynek az eredménye nem számít bele az egyéni bajnokságba">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
-                    <button class="calc-btn" style="width:auto; padding:10px 40px; border-radius:25px; background:#1c1c1e; color:#fff; border: 1px solid #333; font-weight:bold; font-size: 1.1rem; cursor:pointer; margin-top:0;" onclick="closeAdatlap()">Bezárás</button>
+                <div class="vk-lab">
+                    <button class="admin-only vk-obpont ${c.obPont !== false ? 'igen' : ''}" onclick="toggleObPont('${c.bib}')" title="Bajnoki (OB) pontszerzésre jogosult-e ez a versenyző - ha lemond, ennek a versenynek az eredménye nem számít bele az egyéni bajnokságba">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
+                    <button class="calc-btn vk-bezar" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>`;
         
@@ -4986,6 +5785,15 @@
     }
 
     function closeAdatlap() { document.getElementById('adatlapModal').style.display = 'none'; }
+
+    // A versenyzői adatlap tetején: a lovas és a ló követése, élő versenyen szurkolás
+    function adatlapTamogatasHtml(c) {
+        const gombok = [];
+        if (c.license) gombok.push(kovetesGombHtml('lovas', c.license).replace(/(☆ Követés|★ Követed)/, m => m + ' – lovas'));
+        if (c.startNum) gombok.push(kovetesGombHtml('lo', c.startNum).replace(/(☆ Követés|★ Követed)/, m => m + ' – ló'));
+        if (!viewingPastRaceData) gombok.push(szurkolasGombHtml(c.bib));
+        return gombok.filter(Boolean).length ? `<div class="adatlap-tamogatas">${gombok.join('')}</div>` : '';
+    }
 
     // A nyitott adatlap / állatorvosi karton egyszeri renderés volt: ha közben bárki
     // rögzítette az időket (beérkeztetés, orvosi idő, orvosi döntés - akár másik
@@ -6033,7 +6841,7 @@
                 ? `<button type="button" class="profil-jel figyel" onclick="profilFulValt('adatlap')">⏸️ Pihen – ${escapeHtml(v.mervado.szabad)}-tól indulhat</button>`
                 : `<span class="profil-jel jo">✅ Szabadon indulhat</span>`);
         }
-        return jelek.length ? `<div class="profil-jelek">${jelek.join('')}</div>` : '';
+        return `<div class="profil-jelek">${kovetesGombHtml(tipus, id)}${jelek.join('')}</div>`;
     }
 
     // Összesítő a kiválasztott forrás + év eredményeiről
@@ -7938,11 +8746,11 @@
     // menüvel (a meglévő oldalsó menü gombjaira épül, így a jogosultságok ugyanazok), alsó fülsávval
     // telefonon, és egy Kezdőlappal (képváltó + összefoglaló). Visszakapcsolás: Beállítások > Design téma.
     // ============================================================================
-    const UJ_DIZAJN_KULCS = 'rps-uj-dizajn';
     function ujDizajnAktiv() { return document.documentElement.classList.contains('uj-dizajn'); }
 
     function ujDizajnKapcsol(be) {
-        try { localStorage.setItem(UJ_DIZAJN_KULCS, be ? '1' : '0'); } catch (e) {}
+        // A régi felület csak vészkijárat (?dizajn=regi) - az új a végleges, mindenkinek.
+        try { if (be) localStorage.removeItem('rps-dizajn'); else localStorage.setItem('rps-dizajn', 'regi'); } catch (e) {}
         if (be) localStorage.setItem('currentMode', 'kezdolap');
         else if (localStorage.getItem('currentMode') === 'kezdolap') localStorage.setItem('currentMode', 'versenyek');
         location.reload();
@@ -8034,10 +8842,12 @@
             const kezeles = ujNavKezelesElemek();
             // A nyomtatós (onclick-es, id nélküli) gombokat is el kell érni: indexszel hivatkozunk rájuk
             window.__ujKezelesGombok = kezeles;
-            const belepve = document.getElementById('logout-section') && getComputedStyle(document.getElementById('logout-section')).display !== 'none';
+            const fu = auth.currentUser;
+            const fp = (fiokAdat && fiokAdat.profil) || {};
             jobb.innerHTML = (kezeles.length ? `<div class="uj-nav-csoport jobbra"><button class="uj-nav-fo uj-kezeles ${kezeles.includes(aktivGomb) ? 'aktiv' : ''}" onclick="ujNavLenyilo(this)">Kezelés <span class="uj-nyil">▾</span></button>
                     <div class="uj-nav-lenyilo">${kezeles.map((b, i) => `<button class="uj-nav-elem ${b === aktivGomb ? 'aktiv' : ''}" onclick="ujNavLenyiloBezar(); window.__ujKezelesGombok[${i}].click()">${escapeHtml(emojiNelkul(b.textContent))}</button>`).join('')}</div></div>` : '')
-                + `<button class="uj-fiok" onclick="toggleMenu()">${belepve ? 'Fiók' : 'Belépés'}</button>`;
+                + (fu ? `<button class="uj-fiok belepve" onclick="fiokMegnyit()" title="Fiókom">${fiokAvatarHtml(fu, fp)}<span>${escapeHtml(String(fp.nev || fu.displayName || 'Fiók').split(' ')[0])}</span></button>`
+                      : `<button class="uj-fiok" onclick="fiokMegnyit('belepes')">Belépés</button>`);
         }
 
         // Alsó fülsáv (telefon)
@@ -8062,7 +8872,7 @@
         const lista = gyoker.matches && gyoker.matches(UJ_EMOJI_CELOK) ? [gyoker] : [];
         gyoker.querySelectorAll && lista.push(...gyoker.querySelectorAll(UJ_EMOJI_CELOK));
         lista.forEach(el => {
-            if (el.closest('.uj-ikon, #uj-also-sav, .theme-swatch-row')) return;
+            if (el.closest('.uj-ikon, #uj-also-sav, .theme-swatch-row, .kovetes-gomb, .szurkolas-gomb, .profil-jel, .fiok-kovetett')) return;
             const tn = [...el.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
             if (!tn) return;
             const uj = tn.textContent.replace(EMOJI_ELEJE, '');
@@ -8284,6 +9094,18 @@
             <div class="uj-elo-szamok">${szam(competitors.length, 'nevező')}${szam(palyan, 'pályán / vizsgálaton', 'palyan')}${szam(celban, 'célban', 'cel')}${szam(kiesett, 'kiesett', 'ki')}</div>
         </section>`;
 
+        // 0) A követett versenyzők (a lovasuk vagy a lovuk követett) - legfelül, ha vannak
+        const kovetett = competitors.filter(kovetettVersenyzoE);
+        if (kovetett.length) {
+            const rangok = calculateCurrentRanks(competitors, raceConfig);
+            html += `<section class="uj-szekcio"><div class="uj-szekcio-fej"><h3>⭐ Követett versenyzőid</h3><button class="uj-link" onclick="fiokMegnyit()">Követések →</button></div>
+                <ol class="uj-lista">${kovetett.map(c => {
+                    const k = eloKorok(c);
+                    const r = rangok[c.bib];
+                    return `<li><span class="uj-hely">${r && typeof r.rank === 'number' ? r.rank + '.' : '–'}</span><span class="uj-nev">${nevLink(c)}<small>${escapeHtml(c.internal || '')} · ${escapeHtml(catNames[c.dist] || c.dist)}${k.vart ? ` · ${k.kesz}/${k.vart} kör` : ''} · ${escapeHtml(getCompLiveStatus(c, raceConfig).text)}</small></span>${szurkolasGombHtml(c.bib, true)}</li>`;
+                }).join('')}</ol></section>`;
+        }
+
         // 1) Következő kiindulások visszaszámlálással
         const kovetkezo = eloKiindulasAdatok(most).slice(0, 6);
         html += `<section class="uj-szekcio"><div class="uj-szekcio-fej"><h3>Következő kiindulások</h3><button class="uj-link" onclick="ujNavValaszt('btn-menu-elo-rajtok')">Összes →</button></div>`;
@@ -8310,7 +9132,7 @@
                         const k = eloKorok(c);
                         const all = getCompLiveStatus(c, raceConfig).text;
                         const r = ranks[c.bib];
-                        return `<li><span class="uj-hely">${r.rank}.</span><span class="uj-nev">${nevLink(c)}<small>${escapeHtml(c.internal || '')}${k.vart ? ` · ${k.kesz}/${k.vart} kör` : ''} · ${escapeHtml(all)}</small></span><b>${escapeHtml(r.gapStr || '')}</b></li>`;
+                        return `<li><span class="uj-hely">${r.rank}.</span><span class="uj-nev">${nevLink(c)}<small>${escapeHtml(c.internal || '')}${k.vart ? ` · ${k.kesz}/${k.vart} kör` : ''} · ${escapeHtml(all)}</small></span><b>${escapeHtml(r.gapStr || '')}</b>${szurkolasGombHtml(c.bib, true)}</li>`;
                     }).join('') : '<li class="uj-ures">Még nincs teljesített kör.</li>'}</ol>
                     <button class="uj-gomb" onclick="ujNavValaszt('btn-menu-adatlapok'); setAdatlapFilter('${escapeHtml(dist)}')">Teljes állás</button>
                 </article>`;
@@ -8426,6 +9248,8 @@
     }
 
     function verzioFigyelesInditas() {
+        const jel = document.getElementById('app-verzio-szam');
+        if (jel) jel.textContent = APP_VERZIO ? 'v' + APP_VERZIO : 'helyi';
         if (!APP_VERZIO) return;
         setTimeout(verzioEllenorzes, 4000);
         setInterval(verzioEllenorzes, VERZIO_PERIODUS);
