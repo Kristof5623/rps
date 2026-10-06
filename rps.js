@@ -689,6 +689,7 @@
             betoltesAllapot.live = true;
             szurkolasFigyeles();
             renderLocalRaces();
+            nyitottNezetFrissitese();   // pl. A4 nyomtatványok: az élő verseny is választható
         });
 
         db.ref('races').on('value', (snapshot) => {
@@ -713,7 +714,7 @@
                 if(updatedRace) { viewingPastRaceData = updatedRace; renderPastAdatlapList(); refreshOpenModalIfNeeded(); }
             }
 
-            refreshOpenBajnoksagViews();
+            nyitottNezetFrissitese();
         });
 
         db.ref('raceConfig').on('value', (snapshot) => {
@@ -775,10 +776,12 @@
             ridersCache = snap.val() || {};
             if (document.getElementById('torzs-lovasok')?.classList.contains('active')) renderTorzsLovasokList();
             if (document.getElementById('beallitasok-pontkereso')?.style.display === 'block') renderAdminPontkereso();
+            nyitottNezetFrissitese();   // bajnokság (korosztály, nevek), kezdőlap
         });
         db.ref('horses').on('value', snap => {
             horsesCache = snap.val() || {};
             if (document.getElementById('torzs-lovak')?.classList.contains('active')) renderTorzsLovakList();
+            nyitottNezetFrissitese();   // ló-ranglista, Év Tenyésztője (tenyésztő a lótörzsből), kezdőlap
         });
         db.ref('clubs').on('value', snap => { clubsCache = snap.val() || {}; });
         // Állatorvos-törzsadat: versenyfüggetlen névlista a kereséshez.
@@ -807,9 +810,46 @@
         });
 
         // Bajnoki pontszámítás törzsadatai (bajnoki-pontszamitas.md)
-        db.ref('teams').on('value', snap => { teamsCache = snap.val() || {}; refreshOpenBajnoksagViews(); });
-        db.ref('externalResults').on('value', snap => { externalResultsCache = snap.val() || {}; refreshOpenBajnoksagViews(); });
-        db.ref('settings/bajnokavatasDatum').on('value', snap => { bajnokavatasDatumCache = snap.val() || {}; refreshOpenBajnoksagViews(); });
+        db.ref('teams').on('value', snap => { teamsCache = snap.val() || {}; nyitottNezetFrissitese(); });
+        db.ref('externalResults').on('value', snap => { externalResultsCache = snap.val() || {}; nyitottNezetFrissitese(); });
+        db.ref('settings/bajnokavatasDatum').on('value', snap => { bajnokavatasDatumCache = snap.val() || {}; nyitottNezetFrissitese(); });
+    }
+
+    // ÚJRATÖLTÉS UTÁN: a nézet azonnal kirajzolódik (a legutóbbi helyén), az adatok és a belépés
+    // állapota viszont csak egy pillanattal később érkeznek a Firebase-ből. Korábban emiatt egyes
+    // nézetek (Felhasználók, bajnokság, Év Tenyésztője, lezárt verseny eredménye) üresek maradtak,
+    // amíg a felhasználó ki-be nem lépett. Ezért minden érintett adat (és a belépés) megérkezésekor
+    // az épp nyitott nézet újrarajzolódik - összevonva, hogy egy adatcsomagnál ne fusson le tízszer.
+    let nezetFrissitesIdozito = null;
+    function nyitottNezetFrissitese() {
+        clearTimeout(nezetFrissitesIdozito);
+        nezetFrissitesIdozito = setTimeout(() => {
+            const aktiv = (document.querySelector('.mode-content.active') || {}).id;
+            kezdolapAlso.forras = null; // a kezdőlap alsó része (bajnokság, ló-ranglista) is számolódjon újra
+            refreshOpenBajnoksagViews();
+            if (aktiv === 'kezdolap') renderKezdolap();
+            if (aktiv === 'felhasznalok-mod' && authAllapotIsmert) renderFelhasznalokOldal();
+            if (aktiv === 'nyomtatvanyok-mod') renderNyomtatvanyok();
+            if (aktiv === 'export-mod') renderExportList();
+            if (aktiv === 'past-race-view') multVersenyVisszaallitas();
+        }, 60);
+    }
+
+    // A megnézett lezárt verseny (és kategória) megjegyzése, hogy újratöltés után is ugyanott legyünk
+    const MULT_VERSENY_KULCS = 'rps-mult-verseny';
+    function multVersenyMentes() {
+        try {
+            if (viewingPastRaceData) sessionStorage.setItem(MULT_VERSENY_KULCS, JSON.stringify({ id: viewingPastRaceData.id, dist: pastAdatlapFilter || null }));
+            else sessionStorage.removeItem(MULT_VERSENY_KULCS);
+        } catch (e) {}
+    }
+    function multVersenyVisszaallitas() {
+        if (viewingPastRaceData || !document.getElementById('past-race-view')?.classList.contains('active')) return;
+        let m = null;
+        try { m = JSON.parse(sessionStorage.getItem(MULT_VERSENY_KULCS)); } catch (e) {}
+        const r = m && localRaces.mult.find(x => x.id === m.id);
+        if (r) openPublicPastRace(r.id, m.dist || null);
+        else if (betoltesAllapot.races) switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
     }
 
     // Csak azt a bajnoksági nézetet frissíti, ami épp aktív - a többi majd megnyitáskor újraszámol.
@@ -915,8 +955,7 @@
         return kell.includes('__admin') ? adminE() : kell.some(jogVan);
     }
     function nyitoNezet() {
-        const id = ujDizajnAktiv() ? 'kezdolap' : 'versenyek';
-        switchSidebarMode(id, document.getElementById('btn-menu-' + id));
+        switchSidebarMode('kezdolap', null);
     }
 
     // A szerepkör + a pipák -> a ténylegesen érvényes jogok halmaza
@@ -992,6 +1031,7 @@
         }
         ujNavFrissit();
         if (document.getElementById('kezdolap')?.classList.contains('active')) renderKezdolap();
+        nyitottNezetFrissitese();
     }
 
     // A menügombok a jogok szerint (inline !important, mert a régi szerepkör-osztályok is !important-ok)
@@ -1578,6 +1618,14 @@
     function renderFelhasznalok() {
         const cont = document.getElementById('felh-lista');
         if (!cont) return;
+        // Más felhasználó belépése is frissíti a listát (utolsó belépés) - a nyitott kártyák és a
+        // még el nem mentett szerepkör/pipák ne vesszenek el közben.
+        const nyitva = new Set([...cont.querySelectorAll('.felh-kartya[open]')].map(k => k.dataset.uid));
+        const fuggo = {};
+        cont.querySelectorAll('.felh-kartya').forEach(k => {
+            const g = k.querySelector('.felh-mentes');
+            if (g && !g.disabled) fuggo[k.dataset.uid] = { role: k.querySelector('.felh-szerepkor').value, jogok: [...k.querySelectorAll('input[data-jog]')].filter(i => i.checked).map(i => i.dataset.jog) };
+        });
         const keres = (document.getElementById('felh-kereso')?.value || '').trim().toLowerCase();
         const sajat = auth.currentUser && auth.currentUser.uid;
         const lista = Object.entries(felhasznalokAdat).map(([uid, a]) => ({ uid, a: a || {}, p: (a && a.profil) || {} }));
@@ -1620,6 +1668,17 @@
                 </div>
             </details>`;
         }).join('');
+        cont.querySelectorAll('.felh-kartya').forEach(k => {
+            const uid = k.dataset.uid;
+            if (nyitva.has(uid)) k.open = true;
+            const f = fuggo[uid];
+            if (!f) return;
+            k.open = true;
+            k.querySelector('.felh-szerepkor').value = f.role;
+            k.querySelectorAll('input[data-jog]').forEach(i => { i.checked = f.jogok.includes(i.dataset.jog); i.disabled = !f.role || f.role === 'admin'; });
+            k.querySelector('.felh-jogok').classList.toggle('tiltott', !f.role || f.role === 'admin');
+            k.querySelector('.felh-mentes').disabled = false;
+        });
     }
 
     function felhKartya(uid) { return document.querySelector(`.felh-kartya[data-uid="${CSS.escape(uid)}"]`); }
@@ -1651,8 +1710,9 @@
         db.ref('settings/adatkezelo').once('value').then(s => {
             const a = s.val() || {};
             const n = document.getElementById('adatkezelo-nev'), e = document.getElementById('adatkezelo-email');
-            if (n) n.value = a.nev || '';
-            if (e) e.value = a.email || '';
+            // amíg valaki épp gépel benne, ne írjuk felül
+            if (n && document.activeElement !== n) n.value = a.nev || '';
+            if (e && document.activeElement !== e) e.value = a.email || '';
         }).catch(() => {});
     }
     function adatkezeloMentes() {
@@ -1663,49 +1723,7 @@
             .catch(e => showToast('Hiba: ' + e.message, true));
     }
 
-    // Az admin oldalon megjeleníthető, a Firebase konzolba másolandó szabályok (tests/firebase-szabalyok.json)
-    const FIREBASE_SZABALYOK = {
-        rules: {
-            users: {
-                '.read': "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
-                '.write': "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
-                $uid: {
-                    '.read': 'auth != null && auth.uid === $uid',
-                    profil: {
-                        '.write': 'auth != null && auth.uid === $uid',
-                        $mezo: { '.validate': '(newData.isString() && newData.val().length <= 300) || newData.isNumber() || newData.isBoolean()' }
-                    },
-                    kovetes: {
-                        '.write': 'auth != null && auth.uid === $uid',
-                        $tipus: { $id: { '.validate': "($tipus === 'lovas' || $tipus === 'lo') && (newData.isNumber() || newData.isBoolean())" } }
-                    },
-                    beallitas: {
-                        '.write': 'auth != null && auth.uid === $uid',
-                        $mezo: { '.validate': '(newData.isString() && newData.val().length <= 100) || newData.isNumber() || newData.isBoolean()' }
-                    }
-                }
-            },
-            szurkolas: {
-                '.read': 'true',
-                '.write': "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
-                $verseny: { $bib: { $uid: { '.write': 'auth != null && auth.uid === $uid', '.validate': 'newData.isNumber()' } } }
-            },
-            $other: {
-                '.read': 'true',
-                '.write': "auth != null && root.child('users').child(auth.uid).child('role').exists()"
-            }
-        }
-    };
-    function szabalyokMasolas() {
-        const szoveg = JSON.stringify(FIREBASE_SZABALYOK, null, 2);
-        (navigator.clipboard ? navigator.clipboard.writeText(szoveg) : Promise.reject())
-            .then(() => showToast('A szabályok a vágólapon - illeszd be a Firebase konzolba.'))
-            .catch(() => { const t = document.getElementById('felh-szabalyok'); if (t) { t.style.display = 'block'; t.select(); } });
-    }
-
     function renderFelhasznalokOldal() {
-        const t = document.getElementById('felh-szabalyok');
-        if (t) t.value = JSON.stringify(FIREBASE_SZABALYOK, null, 2);
         adatkezeloBetolt();
         felhasznalokFigyeles(true);
         renderFelhasznalok();
@@ -1752,8 +1770,8 @@
         // Jog nélkül (vagy kijelentkezve) belső nézetre nem lehet menni - pl. egy régi könyvjelzőből
         // vagy a localStorage-ban megjegyzett nézetből. Amíg a belépés állapota nem ismert, nem terelünk.
         if (authAllapotIsmert && !nezetEngedelyezett(targetId)) {
-            targetId = ujDizajnAktiv() ? 'kezdolap' : 'versenyek';
-            btn = document.getElementById('btn-menu-' + targetId);
+            targetId = 'kezdolap';
+            btn = null;
         }
         if (targetId !== 'felhasznalok-mod') felhasznalokFigyeles(false);
         if(btn && btn.id === 'btn-menu-adatlapok') { viewingPastRaceData = null; }
@@ -2187,7 +2205,7 @@
     }
 
     // --- Az ÚJ DIZÁJN versenykártyája ---
-    function raceCardHTMLUj(r, kind, opts = {}) {
+    function raceCardHTML(r, kind, opts = {}) {
         const st = RACE_STATUS[kind] || RACE_STATUS.mult;
         // Az élő futamnál a nevezők és a kiírás nem a verseny-objektumban vannak, hanem a
         // globális állapotban - ezért lehet felülírni az opts-ból.
@@ -2222,51 +2240,6 @@
         </article>`;
     }
 
-    // --- A RÉGI DIZÁJN versenykártyája (a felhasználó kérésére a régi felületen ez marad) ---
-    // A kiírt kategóriák nevezésszámmal. Ha a raceConfig-ban nincs kiírt táv (hiányos adat),
-    // a ténylegesen nevezett távokra esünk vissza; ha úgy sincs egy sem, a sor kimarad.
-    // A junior a felnőtt párja alá számít ("80j" -> "80"), mert a raceConfig is csak alaptávra
-    // van kulcsolva - így a chipek összege kiadja a lábléc nevezésszámát.
-    function raceCardTavChips(cfg, comps) {
-        const alapTav = c => String(c.dist || '').replace('j', '');
-        const kiirt = DIST_ORDER.filter(d => cfg[d] && cfg[d].h !== '');
-        const tavok = kiirt.length ? kiirt : DIST_ORDER.filter(d => comps.some(c => alapTav(c) === d));
-        if (!tavok.length) return '';
-        const chipek = tavok.map(d => {
-            const db = comps.filter(c => alapTav(c) === d).length;
-            return `<span class="race-chip${db ? '' : ' is-empty'}">${escapeHtml(catNames[d] || d)} <b>${db}</b></span>`;
-        }).join('');
-        return `<div class="race-chips">${chipek}</div>`;
-    }
-
-    function raceCardHTMLRegi(r, kind, opts = {}) {
-        const st = RACE_STATUS[kind] || RACE_STATUS.mult;
-        // Az élő futamnál a nevezők és a kiírás nem a verseny-objektumban vannak, hanem a
-        // globális állapotban - ezért lehet felülírni az opts-ból.
-        const comps = opts.comps || parseCompetitors(r.competitors);
-        const cfg = mergeRaceConfig(opts.raceConfig || r.raceConfig);
-
-        const meta = [
-            r.date ? `<span>📅 <b>${escapeHtml(r.date)}</b></span>` : '',
-            r.loc ? `<span>📍 <b>${escapeHtml(r.loc)}</b></span>` : ''
-        ].join('');
-
-        return `<div class="race-card ${st.osztaly}">
-            <div class="race-card-head">
-                <div class="race-card-title">${escapeHtml(r.name || 'Névtelen verseny')}${obBadge(r)}</div>
-                <span class="race-status">${opts.cimke || st.cimke}</span>
-            </div>
-            ${meta ? `<div class="race-card-meta">${meta}</div>` : ''}
-            ${raceCardTavChips(cfg, comps)}
-            <div class="race-card-foot">
-                <span class="race-entries">${comps.length ? `<b>${comps.length}</b> nevezés` : 'Nincs még nevezés'}</span>
-                ${opts.fooGomb || ''}
-            </div>
-            ${opts.adminGombok ? `<div class="race-admin-controls admin-only">${opts.adminGombok}</div>` : ''}
-        </div>`;
-    }
-
-
     // --- A4 NYOMTATVÁNYOK (külön oldal - a menüben csak útban voltak) ---
     function renderNyomtatvanyok() {
         const sel = document.getElementById('nyomtat-verseny');
@@ -2293,10 +2266,6 @@
         try { printEredmenyLista(); } finally { viewingPastRaceData = regi; }
     }
 
-    // Melyik dizájn kártyája: a régi felületen a megszokott (raceCardHTMLRegi), az újon az új.
-    function raceCardHTML(r, kind, opts = {}) {
-        return ujDizajnAktiv() ? raceCardHTMLUj(r, kind, opts) : raceCardHTMLRegi(r, kind, opts);
-    }
 
     function renderLocalRaces() {
         if (document.getElementById('kezdolap')?.classList.contains('active')) setTimeout(renderKezdolap, 0);
@@ -2357,15 +2326,17 @@
         pastAdatlapFilter = dist;
         document.getElementById('pastRaceModalTitle').innerText = r.name + " - Eredmények";
         switchSidebarMode('past-race-view', null);
+        multVersenyMentes();
         renderPastAdatlapList();
     }
 
     function closePastRaceModal() {
         viewingPastRaceData = null;
+        multVersenyMentes();
         switchSidebarMode('versenyek', document.getElementById('btn-menu-versenyek'));
     }
 
-    function setPastAdatlapFilter(cat) { pastAdatlapFilter = cat; renderPastAdatlapList(); }
+    function setPastAdatlapFilter(cat) { pastAdatlapFilter = cat; multVersenyMentes(); renderPastAdatlapList(); }
 
     function renderPastAdatlapList() {
         const cont = document.getElementById('pastRaceAdatlapList');
@@ -5501,7 +5472,11 @@
         return active;
     }
 
-    function setAdatlapFilter(filter) { currentAdatlapFilter = filter; renderAdatlapList(); }
+    function setAdatlapFilter(filter) {
+        currentAdatlapFilter = filter;
+        try { if (filter) sessionStorage.setItem('rps-adatlap-kat', filter); else sessionStorage.removeItem('rps-adatlap-kat'); } catch (e) {}
+        renderAdatlapList();
+    }
 
     function openCatSwapModal() {
         const ctx = getAdatlapContext();
@@ -8741,30 +8716,10 @@
     // (a tenyésztő a ló-törzsbe a tavlovasok_import_v4.json-ból kerül be - horses/{startNum}.breeder)
 
     // ============================================================================
-    // ÚJ DIZÁJN (próba, csak admin kapcsolhatja - eszközönként, localStorage 'rps-uj-dizajn').
-    // A régi felület érintetlen: az új a <html class="uj-dizajn"> alatt él (rps-uj.css), saját felső
-    // menüvel (a meglévő oldalsó menü gombjaira épül, így a jogosultságok ugyanazok), alsó fülsávval
-    // telefonon, és egy Kezdőlappal (képváltó + összefoglaló). Visszakapcsolás: Beállítások > Design téma.
+    // A FELÜLET (2026-10-06 óta az egyetlen): a <html class="uj-dizajn"> alatt él (rps-uj.css), felső
+    // menüvel (az oldalsó menü gombjaira épül, így a jogosultságok ugyanazok), telefonon alsó
+    // fülsávval, és egy Kezdőlappal (képváltó + összefoglaló / élő verseny).
     // ============================================================================
-    function ujDizajnAktiv() { return document.documentElement.classList.contains('uj-dizajn'); }
-
-    function ujDizajnKapcsol(be) {
-        // A régi felület csak vészkijárat (?dizajn=regi) - az új a végleges, mindenkinek.
-        try { if (be) localStorage.removeItem('rps-dizajn'); else localStorage.setItem('rps-dizajn', 'regi'); } catch (e) {}
-        if (be) localStorage.setItem('currentMode', 'kezdolap');
-        else if (localStorage.getItem('currentMode') === 'kezdolap') localStorage.setItem('currentMode', 'versenyek');
-        location.reload();
-    }
-
-    function ujDizajnKapcsoloFrissit() {
-        const allapot = document.getElementById('uj-dizajn-allapot');
-        const gomb = document.getElementById('uj-dizajn-gomb');
-        if (!allapot || !gomb) return;
-        const be = ujDizajnAktiv();
-        allapot.textContent = be ? 'Most az ÚJ dizájn látszik ezen az eszközön.' : 'Most a megszokott (régi) dizájn látszik.';
-        gomb.textContent = be ? 'Vissza a régi dizájnra' : 'Új dizájn bekapcsolása';
-    }
-
     const UJ_NAV = [
         { cim: 'Kezdőlap', mod: 'kezdolap' },
         { cim: 'Versenyek', elemek: ['btn-menu-versenyek'] },
@@ -8811,7 +8766,6 @@
     }
 
     function ujNavFrissit() {
-        if (!ujDizajnAktiv()) return;
         const nav = document.getElementById('uj-nav');
         if (!nav) return;
         const aktivMod = (document.querySelector('.mode-content.active') || {}).id;
@@ -8864,7 +8818,7 @@
         }
     }
 
-    // A régi felületen a címekben és gombokban sok az emoji - az új dizájnban ezek nélkül tisztább.
+    // A HTML-ben a címekben és gombokban sok az emoji - a felületen ezek nélkül tisztább.
     // A szöveg eleji emojit vesszük le (címek, gombok, fülek, lenyitható fejlécek); ha csak emoji
     // volt a szöveg (pl. "⇆" gomb), az marad.
     const UJ_EMOJI_CELOK = 'h2, h3, h4, button, summary, .menu-title, label';
@@ -9169,7 +9123,6 @@
     }
 
     function ujDizajnInditas() {
-        if (!ujDizajnAktiv()) return;
         ujEmojiTisztit(document.body);
         new MutationObserver(valtozasok => valtozasok.forEach(v => v.addedNodes.forEach(n => { if (n.nodeType === 1) ujEmojiTisztit(n); })))
             .observe(document.body, { childList: true, subtree: true });
@@ -9259,12 +9212,10 @@
     window.onload = function() {
         verzioFigyelesInditas();
         ujDizajnInditas();
-        ujDizajnKapcsoloFrissit();
-        let savedMode = localStorage.getItem('currentMode') || (ujDizajnAktiv() ? 'kezdolap' : 'versenyek');
+        let savedMode = localStorage.getItem('currentMode') || 'kezdolap';
         if (savedMode === 'terv') savedMode = 'versenyek';
-        // A kezdőlap csak az új dizájnban létezik
-        if (savedMode === 'kezdolap' && !ujDizajnAktiv()) savedMode = 'versenyek';
-        switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode));
+        try { currentAdatlapFilter = sessionStorage.getItem('rps-adatlap-kat') || null; } catch (e) {}
+        switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode) || document.getElementById('btn-menu-' + savedMode.replace(/-mod$/, '')));
 
         // A versenylistákat egyébként csak a Firebase-figyelők rajzolják, azok viszont már
         // adattal futnak le - enélkül a töltés alatt üres lenne a képernyő a csontváz helyett.

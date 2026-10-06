@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" class="uj-dizajn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -21,7 +21,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="118">
+    <meta name="app-verzio" content="119">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,16 +31,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <!-- Az új dizájn a végleges, mindenkinek (2026-10-06). Vészkijárat, ha valami nagyon elromlana:
-         ...?dizajn=regi visszahozza a régit azon az eszközön, ...?dizajn=uj visszaállít. -->
-    <script>try {
-        var dz = new URLSearchParams(location.search).get('dizajn');
-        if (dz === 'regi') localStorage.setItem('rps-dizajn', 'regi');
-        else if (dz === 'uj') localStorage.removeItem('rps-dizajn');
-        if (localStorage.getItem('rps-dizajn') !== 'regi') document.documentElement.classList.add('uj-dizajn');
-    } catch (e) { document.documentElement.classList.add('uj-dizajn'); }</script>
-    <link rel="stylesheet" href="rps.css?v=118">
-    <link rel="stylesheet" href="rps-uj.css?v=118">
+    <link rel="stylesheet" href="rps.css?v=119">
+    <link rel="stylesheet" href="rps-uj.css?v=119">
 </head>
 <body>
 
@@ -71,7 +63,6 @@
     <div id="uj-nav-jobb"></div>
 </header>
 <nav id="uj-also-sav"></nav>
-<div class="mobile-header"><button class="hamburger-btn" onclick="toggleMenu()">☰ Menü</button></div>
 <div class="overlay" onclick="toggleMenu()"></div>
 
 <div class="sidebar" id="sidebar">
@@ -741,19 +732,6 @@
                 <button class="calc-btn add-btn" style="margin-top:12px;" onclick="adatkezeloMentes()">Mentés</button>
             </details>
 
-            <details class="kiiras-card felh-beall" style="border-left-color: var(--warning);">
-                <summary><b>Firebase beállítás (egyszer kell)</b></summary>
-                <ol class="felh-lepesek">
-                    <li><b>Google-belépés:</b> Firebase konzol → Authentication → Sign-in method → <b>Google</b> → Enable (support e-mailnek a saját címed) → Save.</li>
-                    <li><b>E-mail regisztráció:</b> ugyanott az <b>Email/Password</b> legyen Enable; Authentication → Settings → User actions → „Enable create (sign-up)” bekapcsolva.</li>
-                    <li><b>Engedélyezett címek:</b> Authentication → Settings → Authorized domains → <b>endurancehunracingfk.com</b> (és ha használod, end-ride.com) legyen a listán.</li>
-                    <li><b>Adatbázis-szabályok:</b> Realtime Database → Rules → a teljes szöveget cseréld erre, majd Publish:
-                        <button class="calc-btn" style="width:auto; padding:8px 14px; margin:8px 0 0;" onclick="szabalyokMasolas()">Szabályok másolása</button>
-                        <textarea id="felh-szabalyok" readonly rows="14" style="display:none; margin-top:8px; font-family:monospace; font-size:0.75rem;"></textarea></li>
-                </ol>
-                <p class="field-hint">Mi változik a szabályokban? A belépett felhasználó a <b>saját</b> profilját és követéseit mentheti, és szurkolhat; minden más
-                    írás továbbra is csak szerepkörrel megy. Szerepkört és jogot csak az admin adhat.</p>
-            </details>
         </div>
 
         <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">🔴 Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
@@ -1020,7 +998,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=118"></script>
+<script src="rps.js?v=119"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

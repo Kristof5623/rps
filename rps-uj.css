@@ -1,6 +1,6 @@
 /* ============================================================================
-   ÚJ DIZÁJN - 2026-10-06 óta mindenkinek ez az alap (a <html> "uj-dizajn" osztálya).
-   Vészkijárat: ...?dizajn=regi az adott eszközön visszahozza a régi felületet.
+   AZ END-RIDE FELÜLETE (2026-10-06 óta az egyetlen). Az rps.css az alap (űrlapok, kártyák,
+   táblák), erre épül ez a réteg; a <html> mindig megkapja az "uj-dizajn" osztályt.
 
    Irány: sötét, nyugodt "sport-időmérő" felület. Kevesebb díszítés (nincs ragyogás,
    színátmenet, csupa nagybetű, emoji a címekben), felül vízszintes menü, széles
@@ -51,7 +51,6 @@ html.uj-dizajn[data-theme] {
 
 /* --- Alap elrendezés: fejléc felül, alatta görgethető tartalom ------------------ */
 html.uj-dizajn body { flex-direction: column; background: var(--bg); letter-spacing: -0.005em; }
-html.uj-dizajn .mobile-header { display: none !important; }
 
 html.uj-dizajn #uj-fejlec {
     display: flex; align-items: center; gap: 18px; flex: 0 0 auto;
