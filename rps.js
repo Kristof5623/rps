@@ -3339,47 +3339,89 @@
         return expectedLaps - 1;
     }
 
+    // A beérkeztetés és az orvosi idő űrlap ABBA a körbe ment, amelyik a megnyitáskor látszott
+    // (data-kor), nem a mentés pillanatában újraszámolt aktív körbe. Az RFID kapu (rfid_kapu.py)
+    // ugyanezeket a mezőket írja: ha közben beírta ennek a körnek az idejét, a kézi idő korábban
+    // már a KÖVETKEZŐ körbe került (orvosi időnél egy még be sem érkezett körbe). Ha a mező a
+    // megnyitás óta megváltozott (data-eredeti), mentés előtt rákérdezünk.
+    function urlapKor(formId, comp) {
+        const kor = parseInt(document.getElementById(formId).dataset.kor, 10);
+        return kor >= 0 ? kor : getActiveLapIndex(comp, raceConfig);
+    }
+
+    // A kör beérkezési (elotag '') vagy orvosi (elotag 'o') ideje mp-ben, szövegként; '' = üres.
+    function korIdoKulcs(l, elotag) {
+        return (l && l[elotag + 'h']) ? String(toSec(l[elotag + 'h'], l[elotag + 'm'], l[elotag + 's'])) : '';
+    }
+
+    function urlapKorBeallit(form, idx, l, elotag) {
+        form.dataset.kor = idx === null ? '' : idx;
+        form.dataset.eredeti = idx === null ? '' : korIdoKulcs(l, elotag);
+    }
+
+    function kozbenBeirtakKerdes(bib, idx, mit, kozbenSec, sajatSec, felulir) {
+        showConfirm('Közben beírták ezt az időt',
+            `#${bib} ${idx + 1}. kör ${mit}: amióta megnyitottad, valaki más (pl. az RFID kapu) beírta: ${toTimeStr(kozbenSec)}.\n\n` +
+            `Felülírod a te idődre (${toTimeStr(sajatSec)})?\n\n` +
+            `Mégse: a beírt idő marad. A versenyzőt újra kiválasztva látod a mostani állapotot.`,
+            felulir);
+    }
+
     // --- BEÉRKEZTETÉS MÓD ---
     function loadBeerkeztetesData() {
         const bib = document.getElementById('sel-beerkeztetes').value;
         const form = document.getElementById('beerkeztetes-form');
+        urlapKorBeallit(form, null);
         if(!bib) { form.style.display = 'none'; setFormDirty('beerkeztetes-form', false); return; }
-        
+
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
-        
+
         let idx = getActiveLapIndex(comp, raceConfig);
         document.getElementById('bk-lap-title').innerText = `${idx + 1}. Kör Beérkeztetése`;
         let l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
-        
+        urlapKorBeallit(form, idx, l, '');
+
         document.getElementById('bk-h').value = l.h || '';
         document.getElementById('bk-m').value = l.m || '';
         document.getElementById('bk-s').value = l.s || '';
-        
+
         form.style.display = 'block';
         setFormDirty('beerkeztetes-form', false); // frissen betöltve: nincs mentetlen módosítás
     }
 
-    function saveBeerkeztetesData() {
+    function saveBeerkeztetesData(felulirhat = false) {
         const bib = document.getElementById('sel-beerkeztetes').value;
         const h = document.getElementById('bk-h').value, m = document.getElementById('bk-m').value, s = document.getElementById('bk-s').value;
         // Üres rajtszámmal a tranzakció a teljes competitors ágon futna le.
         if (!bib) { showToast('Válassz versenyzőt!', true); return; }
 
+        const form = document.getElementById('beerkeztetes-form');
+        const idx = urlapKor('beerkeztetes-form', competitors.find(c => c.bib == bib));
+        const eredeti = form.dataset.eredeti || '';
+        const sajat = String(toSec(h, m, s));
+        let kozben = '';
+
         // Tranzakció: a szerveren lévő legfrissebb állapotot olvassa be és azon hajtja végre
         // ugyanezt a módosítást - ha közben más (pl. az orvos) is írt, nem veszik el az ő mentése.
         db.ref('competitors/' + bib).transaction(currentComp => {
             if (!currentComp) return currentComp;
-            let idx = getActiveLapIndex(currentComp, raceConfig);
+            kozben = '';
             if (!currentComp.laps) currentComp.laps = [];
             if (!currentComp.laps[idx]) currentComp.laps[idx] = {};
+            const most = korIdoKulcs(currentComp.laps[idx], '');
+            if (!felulirhat && most && most !== eredeti && most !== sajat) { kozben = most; return; }
             currentComp.laps[idx].h = h;
             currentComp.laps[idx].m = m;
             currentComp.laps[idx].s = s;
             const result = recalcCompetitorData(currentComp, raceConfig);
             delete result._timeWarnings; // ideiglenes, kijelzésre való (élőben már jelezve gépeléskor) - nem mentjük el
             return result;
-        }).then(() => {
+        }).then(res => {
+            if (res && res.committed === false) {
+                if (kozben) kozbenBeirtakKerdes(bib, idx, 'beérkezés', Number(kozben), Number(sajat), () => saveBeerkeztetesData(true));
+                return;
+            }
             showAnimatedBtn('btn-bk-mentes');
             document.getElementById('sel-beerkeztetes').value = '';
             document.getElementById('bk-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
@@ -3393,14 +3435,16 @@
     function loadOrvosiIdoData() {
         const bib = document.getElementById('sel-orvosi-ido').value;
         const form = document.getElementById('orvosi-ido-form');
+        urlapKorBeallit(form, null);
         if(!bib) { form.style.display = 'none'; setFormDirty('orvosi-ido-form', false); renderWarningBanner('orv-ido-recovery-warning', null); return; }
-        
+
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
-        
+
         let idx = getActiveLapIndex(comp, raceConfig);
         document.getElementById('bk-vet-lap-title').innerText = `${idx + 1}. Kör Orvosi Idő`;
         let l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
+        urlapKorBeallit(form, idx, l, 'o');
 
         if(l.h && l.h !== '') {
             document.getElementById('orv-ido-arr-time').innerText = `Beérkezett: ${toTimeStr(toSec(l.h, l.m, l.s))} (Rögzítve)`;
@@ -3419,23 +3463,35 @@
         checkOrvosiIdoRecovery();
     }
 
-    function saveOrvosiIdoData() {
+    function saveOrvosiIdoData(felulirhat = false) {
         const bib = document.getElementById('sel-orvosi-ido').value;
         const oh = document.getElementById('bk-v-h').value, om = document.getElementById('bk-v-m').value, os = document.getElementById('bk-v-s').value;
         if (!bib) { showToast('Válassz versenyzőt!', true); return; }
 
+        const form = document.getElementById('orvosi-ido-form');
+        const idx = urlapKor('orvosi-ido-form', competitors.find(c => c.bib == bib));
+        const eredeti = form.dataset.eredeti || '';
+        const sajat = String(toSec(oh, om, os));
+        let kozben = '';
+
         db.ref('competitors/' + bib).transaction(currentComp => {
             if (!currentComp) return currentComp;
-            let idx = getActiveLapIndex(currentComp, raceConfig);
+            kozben = '';
             if (!currentComp.laps) currentComp.laps = [];
             if (!currentComp.laps[idx]) currentComp.laps[idx] = {};
+            const most = korIdoKulcs(currentComp.laps[idx], 'o');
+            if (!felulirhat && most && most !== eredeti && most !== sajat) { kozben = most; return; }
             currentComp.laps[idx].oh = oh;
             currentComp.laps[idx].om = om;
             currentComp.laps[idx].os = os;
             const result = recalcCompetitorData(currentComp, raceConfig);
             delete result._timeWarnings; // ideiglenes, kijelzésre való (élőben már jelezve gépeléskor) - nem mentjük el
             return result;
-        }).then(() => {
+        }).then(res => {
+            if (res && res.committed === false) {
+                if (kozben) kozbenBeirtakKerdes(bib, idx, 'orvosi idő', Number(kozben), Number(sajat), () => saveOrvosiIdoData(true));
+                return;
+            }
             showAnimatedBtn('btn-bk-vet-mentes');
             document.getElementById('sel-orvosi-ido').value = '';
             document.getElementById('oi-bibInput').value = ''; // <--- EZ TÖRLI A KERESŐT
@@ -4974,7 +5030,7 @@
         const comp = competitors.find(c => c.bib == bib);
         if (!comp) { renderWarningBanner('orv-ido-recovery-warning', null); return; }
 
-        const idx = getActiveLapIndex(comp, raceConfig);
+        const idx = urlapKor('orvosi-ido-form', comp);
         const l = (comp.laps && comp.laps[idx]) ? comp.laps[idx] : {};
         const arrSec = toSec(l.h, l.m, l.s);
         const vetSec = toSec(document.getElementById('bk-v-h').value, document.getElementById('bk-v-m').value, document.getElementById('bk-v-s').value);
@@ -4998,7 +5054,7 @@
         if (!comp) { cont.innerHTML = ''; return; }
 
         const baseDist = comp.dist.replace('j', '');
-        const idx = getActiveLapIndex(comp, raceConfig);
+        const idx = urlapKor('beerkeztetes-form', comp);
         const cfg = raceConfig[baseDist] || { laps: [] };
         const savedLap = comp.laps && comp.laps[idx];
         const lapDist = parseFloat((savedLap && savedLap.d) || (cfg.laps && cfg.laps[idx]) || 0);
