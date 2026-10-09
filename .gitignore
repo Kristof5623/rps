@@ -2,3 +2,9 @@
 tests/
 mentes/
 .claude/
+# Az RFID kapuprogram (Python) - csak helyben; benne a Firebase admin-kulcs, ami SOHA nem kerülhet fel
+python rfid kapu/
+# biztosítás: a kulcsfájl sehol a repóban ne kerülhessen fel (átnevezve / máshová másolva sem)
+*serviceAccount*.json
+**/naplo/
+__pycache__/
