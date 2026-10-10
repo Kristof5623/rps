@@ -965,10 +965,59 @@
         return new Set(SZEREP_JOGOK[role] || []);
     }
 
+    // --- NÉZŐSZÁMLÁLÁS (csak az admin látja, a kezdőlap tetején) ---
+    // Minden megnyitott oldal (böngészőfül) fenntart egy jelenlet/{munkamenet} bejegyzést, amit a
+    // Firebase a kapcsolat megszakadásakor magától töröl (onDisconnect) -> "most nézik: N". A napi
+    // látogató: latogatok/{nap}/{böngésző-azonosító}, böngészőnként naponta egyszer írva (az azonosító
+    // a localStorage-ban marad). Személyes adat nincs, csak véletlen azonosító és időpont.
+    // Szabályok: tests/firebase-szabalyok.json (jelenlet, latogatok) - nélkülük az írás csendben elmarad.
+    function veletlenAzon() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+    const jelenletRef = db.ref('jelenlet/' + veletlenAzon());
+    (function nezoSzamlaloIndit() {
+        let azon;
+        try {
+            azon = localStorage.getItem('rps-latogato');
+            if (!azon) { azon = veletlenAzon(); localStorage.setItem('rps-latogato', azon); }
+        } catch (e) { azon = veletlenAzon(); }
+        // Ha ma már járt itt, a szabály elutasítja (!data.exists()) - így egy böngésző naponta egyszer számít.
+        db.ref('latogatok/' + napIso(new Date()) + '/' + azon).set(Date.now()).catch(() => {});
+        db.ref('.info/connected').on('value', snap => {
+            if (snap.val() !== true) return;
+            jelenletRef.onDisconnect().remove()
+                .then(() => jelenletRef.set({ t: Date.now(), s: auth.currentUser ? 1 : 0 }))
+                .catch(() => {});
+        });
+    })();
+
+    let nezoLeallit = null;
+    function nezoSzamlaloFigyeles(be) {
+        if (!be) { if (nezoLeallit) { nezoLeallit(); nezoLeallit = null; } return; }
+        if (nezoLeallit) return;
+        let most = null, belepve = 0, ma = null;
+        const rajzol = () => {
+            const el = document.getElementById('nezo-szamlalo');
+            if (!el) return;
+            el.innerHTML = `👁 Most nézik: <b>${most === null ? '…' : most}</b>`
+                + (typeof most === 'number' ? ` <small>(ebből bejelentkezve: ${belepve})</small>` : '')
+                + ` &nbsp;·&nbsp; Ma eddig: <b>${ma === null ? '…' : ma}</b> látogató`
+                + (most === '–' ? ' <small>(a számlálóhoz a Firebase-szabályok frissítése kell)</small>' : '');
+        };
+        const jRef = db.ref('jelenlet'), lRef = db.ref('latogatok/' + napIso(new Date()));
+        const jCb = jRef.on('value', s => {
+            const lista = Object.values(s.val() || {});
+            most = lista.length; belepve = lista.filter(x => x && x.s).length; rajzol();
+        }, () => { most = '–'; rajzol(); });
+        const lCb = lRef.on('value', s => { ma = Object.keys(s.val() || {}).length; rajzol(); }, () => { ma = '–'; rajzol(); });
+        nezoLeallit = () => { jRef.off('value', jCb); lRef.off('value', lCb); };
+        rajzol();
+    }
+
     auth.onAuthStateChanged(user => {
         if (fiokRef && fiokFigyelo) fiokRef.off('value', fiokFigyelo);
         fiokRef = null; fiokFigyelo = null; fiokAdat = null;
+        jelenletRef.update({ s: user ? 1 : 0 }).catch(() => {});
         if (!user) {
+            nezoSzamlaloFigyeles(false);
             applyAuthUI(false, null);
             kovetesBetoltes(null);
             return;
@@ -980,6 +1029,7 @@
             const role = fiokAdat.role || 'guest';
             applyAuthUI(true, role, jogokSzamit(role, fiokAdat.jogok));
             kovetesBetoltes(fiokAdat.kovetes || {});
+            nezoSzamlaloFigyeles(role === 'admin');
             if (role === 'admin' && !migracioFutott) { migracioFutott = true; runAutoMigration(); }
             if (document.getElementById('fiokModal')?.style.display === 'flex') renderFiok();
         }, () => {

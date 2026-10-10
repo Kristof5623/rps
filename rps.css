@@ -1324,6 +1324,9 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 /* A jogosultsági szabály display:block-ot adna, ami ezeknél a badge-eknél
    eltörné a sort - adminnál vissza kell állítani inline-flex-re. */
 .role-admin .inline-flag.admin-only { display: inline-flex !important; }
+/* Nézőszámláló a kezdőlap tetején (csak admin) */
+.nezo-szamlalo { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 0.92rem; }
+.nezo-szamlalo small { color: var(--text-dim); }
 
 /* --- DESIGN TÉMA VÁLASZTÓ (kártyák, nem kapcsoló) --- */
 .theme-swatch-row { display: flex; gap: 12px; flex-wrap: wrap; }
