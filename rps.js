@@ -914,6 +914,7 @@
         'btn-menu-fomod': ['fomod-verseny', 'fomod-kiiras'],
         'btn-menu-attekinto': ['attekinto'],
         'btn-menu-rfid': ['rfid'],
+        'btn-menu-nezok': ['__admin'],
         'btn-menu-beallitasok': ['beallitasok'],
         'btn-menu-export': ['export'],
         'btn-menu-felhasznalok': ['__admin'],
@@ -926,7 +927,7 @@
     };
     // Belső nézet -> jog. Ami nincs itt, az nyilvános.
     const NEZET_JOG = {
-        'fo-mod': ['fomod-verseny', 'fomod-kiiras'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'],
+        'fo-mod': ['fomod-verseny', 'fomod-kiiras'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'], 'nezok-mod': ['__admin'],
         'beallitasok-mod': ['beallitasok'], 'export-mod': ['export'], 'felhasznalok-mod': ['__admin'],
         'beerkeztetes-mod': ['beerkeztetes'], 'orvosi-ido-mod': ['orvosi-ido'], 'orvosi-mod': ['orvosi'],
         'nyomtatas-mod': ['nyomtatas'], 'nyomtatvanyok-mod': ['nyomtatvanyok'], 'bajnoksag-teny': ['tenyeszto']
@@ -989,27 +990,50 @@
         });
     })();
 
+    // Az admin a háttérben figyeli a számokat (belépéstől), a "👁 Nézők" fül ebből rajzol.
     let nezoLeallit = null;
+    const nezo = { most: null, belepve: 0, napok: null, csucs: 0, csucsIdo: null, hiba: false };
     function nezoSzamlaloFigyeles(be) {
         if (!be) { if (nezoLeallit) { nezoLeallit(); nezoLeallit = null; } return; }
         if (nezoLeallit) return;
-        let most = null, belepve = 0, ma = null;
-        const rajzol = () => {
-            const el = document.getElementById('nezo-szamlalo');
-            if (!el) return;
-            el.innerHTML = `👁 Most nézik: <b>${most === null ? '…' : most}</b>`
-                + (typeof most === 'number' ? ` <small>(ebből bejelentkezve: ${belepve})</small>` : '')
-                + ` &nbsp;·&nbsp; Ma eddig: <b>${ma === null ? '…' : ma}</b> látogató`
-                + (most === '–' ? ' <small>(a számlálóhoz a Firebase-szabályok frissítése kell)</small>' : '');
-        };
-        const jRef = db.ref('jelenlet'), lRef = db.ref('latogatok/' + napIso(new Date()));
+        const jRef = db.ref('jelenlet'), lRef = db.ref('latogatok');
         const jCb = jRef.on('value', s => {
             const lista = Object.values(s.val() || {});
-            most = lista.length; belepve = lista.filter(x => x && x.s).length; rajzol();
-        }, () => { most = '–'; rajzol(); });
-        const lCb = lRef.on('value', s => { ma = Object.keys(s.val() || {}).length; rajzol(); }, () => { ma = '–'; rajzol(); });
+            nezo.most = lista.length; nezo.belepve = lista.filter(x => x && x.s).length; nezo.hiba = false;
+            if (nezo.most >= nezo.csucs) { nezo.csucs = nezo.most; nezo.csucsIdo = new Date(); }
+            renderNezok();
+        }, () => { nezo.hiba = true; renderNezok(); });
+        const lCb = lRef.on('value', s => {
+            const v = s.val() || {};
+            nezo.napok = {};
+            Object.keys(v).forEach(nap => { nezo.napok[nap] = Object.keys(v[nap] || {}).length; });
+            renderNezok();
+        }, () => { nezo.hiba = true; renderNezok(); });
         nezoLeallit = () => { jRef.off('value', jCb); lRef.off('value', lCb); };
-        rajzol();
+    }
+
+    function renderNezok() {
+        const cont = document.getElementById('nezok-tartalom');
+        if (!cont || !document.getElementById('nezok-mod')?.classList.contains('active')) return;
+        if (nezo.hiba) { cont.innerHTML = '<p class="field-hint">Nem olvasható – a Firebase-szabályok (jelenlet, latogatok) frissítése kell.</p>'; return; }
+        const ma = napIso(new Date());
+        const napok = nezo.napok || {};
+        const szam = v => (v === null || v === undefined) ? '…' : v;
+        const ido = d => d ? String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') : '';
+        // Az utolsó 14 nap (a mai is), akkor is, ha valamelyik napon senki nem járt itt
+        const lista = [];
+        for (let i = 13; i >= 0; i--) { const n = new Date(); n.setDate(n.getDate() - i); lista.push(napIso(n)); }
+        const max = Math.max(1, ...lista.map(n => napok[n] || 0));
+        cont.innerHTML = `<div class="rfid-osszesito">
+                <div><b>${szam(nezo.most)}</b><span>most nézik${typeof nezo.most === 'number' ? ` (bejelentkezve: ${nezo.belepve})` : ''}</span></div>
+                <div><b>${nezo.napok ? (napok[ma] || 0) : '…'}</b><span>látogató ma</span></div>
+                <div><b>${nezo.csucs || '…'}</b><span>mai csúcs egyszerre${nezo.csucsIdo ? ' (' + ido(nezo.csucsIdo) + ')' : ''} – amióta figyeled</span></div>
+            </div>
+            <h4 style="margin:14px 0 4px 0;">Látogatók naponta (utolsó 14 nap)</h4>
+            <div class="nezo-napok">${lista.slice().reverse().map(n => `<div class="nezo-nap ${n === ma ? 'ma' : ''}">
+                <span>${escapeHtml(n.slice(5).replace('-', '.'))}.${n === ma ? ' ma' : ''}</span>
+                <div><div class="sav" style="width:${Math.round((napok[n] || 0) / max * 100)}%"></div></div>
+                <span class="db">${napok[n] || 0}</span></div>`).join('')}</div>`;
     }
 
     auth.onAuthStateChanged(user => {
@@ -1837,6 +1861,7 @@
         if (targetId === 'elo-rajtok') frissitEloKiindulasok();
         if (targetId === 'attekinto-mod') renderAttekinto();
         if (targetId === 'rfid-mod') { renderRfidKapuk(); rfidOraIndit(); }
+        if (targetId === 'nezok-mod') renderNezok();
         if (targetId === 'export-mod') renderExportList();
         if (targetId === 'torzs-lovasok') renderTorzsLovasokList();
         if (targetId === 'torzs-lovak') renderTorzsLovakList();
