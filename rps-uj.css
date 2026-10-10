@@ -299,6 +299,9 @@ html.uj-dizajn .uj-elo-szam.cel b { color: var(--success); }
 html.uj-dizajn .uj-elo-szam.ki b { color: var(--danger); }
 html.uj-dizajn .uj-visszaszam { font-size: 1.15rem; font-weight: 900; min-width: 64px; text-align: right; }
 html.uj-dizajn .uj-lista b.uj-visszaszam.kozel { color: var(--warning); }
+html.uj-dizajn .uj-varhato { font-size: 1.05rem; font-weight: 900; min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+html.uj-dizajn .uj-varhato.kesik { color: var(--text-dim); }
+html.uj-dizajn .uj-megj { font-size: 0.75rem; color: var(--text-dim); margin: 6px 2px 0; }
 html.uj-dizajn .uj-esemenyek li.rossz .uj-nev small { color: var(--danger); }
 html.uj-dizajn .uj-esemeny-ido { flex: 0 0 46px; font-weight: 800; color: var(--text-dim); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
 html.uj-dizajn .uj-dobogo .uj-nev small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

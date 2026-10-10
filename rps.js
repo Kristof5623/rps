@@ -3345,6 +3345,7 @@
         let curStart = rajt;
         let totalPure = 0;
         let totalD = 0;
+        let osszKorIdo = 0;   // a köridők összege (beérkezésig) - a minimum-sebességhez, 139. §
         for (let i = 0; i < expectedLaps; i++) {
             let l = comp.laps[i] || { h:'', m:'', s:'', oh:'', om:'', os:'' };
             l.d = parseFloat(l.d) || parseFloat(cfg.laps[i]) || 0;
@@ -3391,10 +3392,13 @@
             l.pulzusSec = pulzusTime;
             l.loopSpd = l.d / (loopTime/3600);
             l.phaseSpd = l.d / (phaseTime/3600);
-            // Admin által távonként konfigurált min (időtúllépés/OT kockázat) és max (sebesség/SP kockázat, 139. § (2))
+            // Admin által távonként beállított határok (Beállítások). A MAXIMUM minden körön külön
+            // érvényes (139. § (2)) -> SP. A MINIMUM a teljes táv átlagára vonatkozik (139. § (1), (3)):
+            // az eddig megtett körök össz-átlaga, a beérkezés (célvonal) idejével, a pihenő nélkül -> OT.
             const speedT = speedThresholds[baseDist] || {};
+            osszKorIdo += loopTime;
             l.speedFlagMax = speedT.max != null && (l.loopSpd >= speedT.max || l.phaseSpd >= speedT.max);
-            l.speedFlagMin = speedT.min != null && (l.loopSpd < speedT.min || l.phaseSpd < speedT.min);
+            l.speedFlagMin = speedT.min != null && osszKorIdo > 0 && (totalD + l.d) / (osszKorIdo / 3600) < speedT.min;
 
             totalPure += phaseTime;
             totalD += l.d;
@@ -5216,22 +5220,27 @@
         if (threshold.min == null && threshold.max == null) { cont.innerHTML = ''; return; }
 
         const spd = lapDist / (roll.diff / 3600);
-        cont.innerHTML = renderSpeedBannerHtml(spd, threshold);
+        // A minimumhoz a teljes táv átlaga kell (139. §): az előző kész körök + a most beírt kör.
+        const elozok = (comp.laps || []).slice(0, idx).filter(l => l && l.isComplete && l.loopSec > 0);
+        const osszKm = elozok.reduce((s, l) => s + (parseFloat(l.d) || 0), 0) + lapDist;
+        const osszMp = elozok.reduce((s, l) => s + l.loopSec, 0) + roll.diff;
+        cont.innerHTML = renderSpeedBannerHtml(spd, threshold, osszKm / (osszMp / 3600));
     }
 
     // Közös figyelmeztető-sáv építő a min (időtúllépés/OT kockázat) és max (sebesség/SP kockázat) határokhoz.
-    function renderSpeedBannerHtml(spd, threshold) {
+    function renderSpeedBannerHtml(spd, threshold, osszAtlag) {
+        const ossz = (typeof osszAtlag === 'number' && isFinite(osszAtlag)) ? osszAtlag : spd;
         if (threshold.max != null && spd >= threshold.max) {
             return `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Kör átlag: ${spd.toFixed(2)} km/h — a ${threshold.max} km/h-s maximum fölött (139. § (2)), sebesség miatti kiesés (FTQ-SP) kockázata.</span></div>`;
         }
         if (threshold.max != null && spd >= threshold.max - 1) {
             return `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Kör átlag: ${spd.toFixed(2)} km/h — közelít a ${threshold.max} km/h-s maximumhoz.</span></div>`;
         }
-        if (threshold.min != null && spd < threshold.min) {
-            return `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Kör átlag: ${spd.toFixed(2)} km/h — a ${threshold.min} km/h-s minimum alatt, időtúllépés (FTQ-OT) kockázata.</span></div>`;
+        if (threshold.min != null && ossz < threshold.min) {
+            return `<div class="warning-banner level-danger"><span class="wb-icon">🚨</span><span>Össz-átlag (eddig): ${ossz.toFixed(2)} km/h — a ${threshold.min} km/h-s minimum alatt (139. §: a teljes táv átlaga), időtúllépés (FTQ-OT) kockázata.</span></div>`;
         }
-        if (threshold.min != null && spd < threshold.min + 1) {
-            return `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Kör átlag: ${spd.toFixed(2)} km/h — közelít a ${threshold.min} km/h-s minimumhoz.</span></div>`;
+        if (threshold.min != null && ossz < threshold.min + 1) {
+            return `<div class="warning-banner level-warn"><span class="wb-icon">⚠️</span><span>Össz-átlag (eddig): ${ossz.toFixed(2)} km/h — közelít a ${threshold.min} km/h-s minimumhoz.</span></div>`;
         }
         return '';
     }
@@ -5513,7 +5522,7 @@
             if (startSec > 0 && diff > -60) {
                 return { text: "Rajtol", color: "#D4A373", textCol: "#000" };
             }
-            return { text: "Körön van", color: "var(--primary)", textCol: "var(--on-primary, #fff)" };
+            return { text: korontVanSzoveg(c, config), color: "var(--primary)", textCol: "var(--on-primary, #fff)" };
         }
 
         let last = validLaps[completed - 1];
@@ -5536,7 +5545,81 @@
             if (diff > 0) return { text: "Várakozik", color: "var(--warning)", textCol: "#000" };
         }
 
-        return { text: "Körön van", color: "var(--primary)", textCol: "var(--on-primary, #fff)" };
+        return { text: korontVanSzoveg(c, config), color: "var(--primary)", textCol: "var(--on-primary, #fff)" };
+    }
+
+    // "Körön van" - az élő versenyben a várható beérkezéssel (a múltbeli versenyeknél nincs becslés)
+    function korontVanSzoveg(c, config) {
+        const v = config === raceConfig ? eloVarhato(c) : null;
+        return v ? `Körön van · várható ${oraPerc(v.sec)}` : 'Körön van';
+    }
+
+    // --- VÁRHATÓ BEÉRKEZÉS -------------------------------------------------------------------
+    // A futó (vagy a következő) kör indulása + a kör hossza / a versenyző eddigi átlagsebessége
+    // (a köridőkből, mint a 139. §). Az 1. körben még nincs saját átlag: ott a mezőny ugyanazon
+    // körének mediánja, ha már beért valaki - különben nincs becslés. Csak tájékoztató.
+    // Visszaad: { sec (a nap másodperce), spd (km/h), mezony (true = mezőny-átlagból), kor } vagy null.
+    function vartBeerkezes(c, config, mezony) {
+        if (!c || c.isEliminated || c.manualEntry || c.status === 'FNR') return null;
+        const base = String(c.dist || '').replace('j', '');
+        const cfg = (config && config[base]) || {};
+        const korSzam = (cfg.laps || []).length;
+        const laps = c.laps || [];
+        const kesz = laps.filter(l => l && l.isComplete && l.loopSec > 0);
+        const idx = kesz.length;
+        if (!korSzam || idx >= korSzam) return null;
+        const aktual = laps[idx] || {};
+        if (toSec(aktual.h, aktual.m, aktual.s) > 0) return null;          // már beért ebből a körből
+        let indul;
+        if (idx === 0) {
+            const st = c.startTime || {};
+            indul = toSec(st.h !== '' && st.h != null ? st.h : cfg.h, st.m !== '' && st.m != null ? st.m : cfg.m, st.s !== '' && st.s != null ? st.s : cfg.s);
+        } else {
+            const elozo = laps[idx - 1] || {};
+            if (!(toSec(elozo.oh, elozo.om, elozo.os) > 0)) return null;     // még nincs orvosi ideje -> a kimenet sem ismert
+            indul = elozo.nextStart;
+        }
+        if (!(indul > 0)) return null;
+        const km = parseFloat(aktual.d || (cfg.laps && cfg.laps[idx])) || 0;
+        if (!km) return null;
+        let spd = 0, mezonybol = false;
+        if (kesz.length) {
+            const osszKm = kesz.reduce((s, l) => s + (parseFloat(l.d) || 0), 0);
+            const osszMp = kesz.reduce((s, l) => s + l.loopSec, 0);
+            spd = osszKm / (osszMp / 3600);
+        } else if (mezony) {
+            spd = mezony[base + '|' + idx] || 0;
+            mezonybol = true;
+        }
+        if (!(spd > 0) || !isFinite(spd)) return null;
+        return { sec: (indul + Math.round(km / spd * 3600)) % 86400, spd, mezony: mezonybol, kor: idx + 1 };
+    }
+
+    // A mezőny köridő-mediánja távonként és körönként (km/h) - az 1. körös becsléshez.
+    function mezonyKorAtlag(comps) {
+        const gy = {};
+        (comps || []).forEach(c => (c.laps || []).forEach((l, i) => {
+            if (l && l.isComplete && l.loopSec > 0 && parseFloat(l.d) > 0) {
+                const k = String(c.dist || '').replace('j', '') + '|' + i;
+                (gy[k] = gy[k] || []).push(parseFloat(l.d) / (l.loopSec / 3600));
+            }
+        }));
+        const ki = {};
+        Object.keys(gy).forEach(k => { const s = gy[k].sort((a, b) => a - b); ki[k] = s[Math.floor(s.length / 2)]; });
+        return ki;
+    }
+
+    // Az élő verseny becslése (a mezőny-átlag a versenyzőlista változásáig gyorsítótárban).
+    let mezonyAtlagCache = { forras: null, ertek: {} };
+    function eloVarhato(c) {
+        if (!liveRaceMeta || !c) return null;
+        if (mezonyAtlagCache.forras !== competitors) mezonyAtlagCache = { forras: competitors, ertek: mezonyKorAtlag(competitors) };
+        return vartBeerkezes(c, raceConfig, mezonyAtlagCache.ertek);
+    }
+
+    function oraPerc(sec) {
+        const s = ((Math.round(sec) % 86400) + 86400) % 86400;
+        return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`;
     }
 
     // 31. §: ha két, nem kiesett versenyző utolsó teljesített körének menetideje másodpercre
@@ -5727,12 +5810,15 @@
 
     // Admin által (Beállítások fül) távonként beállított min/max alapján adja vissza a jelvényeket:
     // ⚠ SP = elérte/túllépte a maximumot (139. § (2), sebesség miatti kiesés kockázata)
-    // ⚠ OT = a minimum alatt van (időtúllépés / FTQ-OT kockázata)
+    // ⚠ OT = a teljes táv átlaga a minimum alatt van (időtúllépés / FTQ-OT kockázata, 139. §)
     function getSpeedFlagBadgesHtml(comp, completedLaps) {
         const baseDist = comp.dist ? comp.dist.replace('j', '') : null;
         const t = speedThresholds[baseDist] || {};
         const hasMax = completedLaps.some(l => l.speedFlagMax || (t.max != null && (l.loopSpd >= t.max || l.phaseSpd >= t.max)));
-        const hasMin = completedLaps.some(l => l.speedFlagMin || (t.min != null && (l.loopSpd < t.min || l.phaseSpd < t.min)));
+        // Minimum: a teljes táv átlaga (139. §) - a megtett körök össz-távja / a köridők összege.
+        const osszKm = completedLaps.reduce((s, l) => s + (parseFloat(l.d) || 0), 0);
+        const osszMp = completedLaps.reduce((s, l) => s + (l.loopSec > 0 ? l.loopSec : 0), 0);
+        const hasMin = t.min != null && osszKm > 0 && osszMp > 0 && osszKm / (osszMp / 3600) < t.min;
         // A sebesség-figyelmeztetések csak az adminnak látszanak: ezek belső
         // kockázatjelzések (SP = sebességtúllépés, OT = időtúllépés kockázata),
         // a döntést mindig a bíró/orvos hozza meg - a versenyzői listában
@@ -5887,7 +5973,10 @@
                 <div class="vk-fej">
                     <div class="vk-nev">${c.bib} | ${escapeHtml(c.name)}</div>
                     <div class="vk-lo">${escapeHtml(c.internal || "Ló neve hiányzik")}</div>
-                    <div class="vk-info"><span>🏁 <b>Táv:</b> ${distName}</span><span>⏱ <b>Rajtidő:</b> ${rajTidoStr}</span></div>
+                    <div class="vk-info"><span>🏁 <b>Táv:</b> ${distName}</span><span>⏱ <b>Rajtidő:</b> ${rajTidoStr}</span>${(() => {
+                        const v = (!isPast && !viewingPastRaceData) ? eloVarhato(competitors.find(x => x.bib == c.bib)) : null;
+                        return v ? `<span>🕒 <b>Várható beérkezés (${v.kor}. kör):</b> ~${oraPerc(v.sec)} <small>(${kmh(v.spd, 1)} km/h ${v.mezony ? 'mezőny-átlaggal' : 'átlaggal'})</small></span>` : '';
+                    })()}</div>
                 </div>
                 ${adatlapTamogatasHtml(c)}
                 <div data-live-scroll class="vk-gorgeto">
@@ -9464,6 +9553,19 @@
                 <b class="uj-visszaszam${k.diff <= 120 ? ' kozel' : ''}" data-ido="${k.nextStart}">${visszaszamSzoveg(k.diff)}</b></li>`;
         }).join('')}</ol>` : '<p class="uj-ures">Most senki nem várakozik indulásra.</p>';
         html += `</section>`;
+
+        // 1/b) Várható beérkezések: a pályán lévők, az eddigi átlagsebességük alapján
+        const varhatok = competitors
+            .map(c => ({ c, v: eloVarhato(c), st: getCompLiveStatus(c, raceConfig).text }))
+            .filter(x => x.v && /^Körön van/.test(x.st))
+            .map(x => { let diff = x.v.sec - most; if (diff < -43200) diff += 86400; if (diff > 43200) diff -= 86400; return Object.assign(x, { diff }); })
+            .sort((a, b) => a.diff - b.diff).slice(0, 6);
+        if (varhatok.length) {
+            html += `<section class="uj-szekcio"><div class="uj-szekcio-fej"><h3>Várható beérkezések</h3></div>
+                <ol class="uj-lista uj-kiindulas">${varhatok.map(x => `<li><span class="uj-nev">${nevLink(x.c)}<small>${escapeHtml(catNames[x.c.dist] || x.c.dist)} · ${x.v.kor}. kör · ${kmh(x.v.spd, 1)} km/h ${x.v.mezony ? 'mezőny-átlaggal' : 'átlaggal'}</small></span>
+                <b class="uj-varhato${x.diff < 0 ? ' kesik' : ''}">~${oraPerc(x.v.sec)}</b></li>`).join('')}</ol>
+                <p class="uj-megj">Becslés az eddigi átlagsebességből (az 1. körben a mezőnyéből) – tájékoztató.</p></section>`;
+        }
 
         // 2) Élő állás kategóriánként (az első három)
         const ranks = calculateCurrentRanks(competitors, raceConfig);
