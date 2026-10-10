@@ -3651,7 +3651,7 @@
     function loadOrvosiData() {
         const bib = document.getElementById('sel-orvosi').value;
         const form = document.getElementById('orvosi-form');
-        if(!bib) { form.style.display = 'none'; renderWarningBanner('orv-recovery-warning', null); renderExtraCodesCheckboxes([]); return; }
+        if(!bib) { form.style.display = 'none'; orvosiModBib = null; renderWarningBanner('orv-recovery-warning', null); renderExtraCodesCheckboxes([]); return; }
 
         const comp = competitors.find(c => c.bib == bib);
         if(!comp) return;
@@ -3695,6 +3695,21 @@
             renderWarningBanner('orv-recovery-warning', getRecoveryWarning(toSec(l.h, l.m, l.s), toSec(l.oh, l.om, l.os), isFinalLap, comp.dist));
         }
 
+        // RE-CHECK VIZSGÁLAT: külön bejegyzés (laps[i].recheck) - nem írja felül az első vizsgálatot.
+        // Ha a ló re-checkre vár, vagy már volt re-check vizsgálata, két fül jelenik meg; alapból a
+        // re-check vizsgálat nyílik. A kiválasztott fül ugyanannál a lónál az élő frissítéskor megmarad.
+        const vanRecheck = idx >= 0 && (comp.status === 'RECHECK' || !!l.recheck);
+        // Az alapértelmezett fül a ló állapotából: ha az változik (pl. az első vizsgálat Re-check
+        // döntéssel mentve), újra a megfelelő fül nyílik - különben a re-check felülírná az elsőt.
+        const modKulcs = `${comp.bib}|${vanRecheck}|${comp.status || ''}`;
+        if (orvosiModBib !== modKulcs) { orvosiModBib = modKulcs; orvosiRecheckMod = vanRecheck; }
+        if (!vanRecheck) orvosiRecheckMod = false;
+        document.getElementById('orv-mod-valaszto').style.display = vanRecheck ? 'flex' : 'none';
+        document.getElementById('orv-mod-elso').classList.toggle('active', !orvosiRecheckMod);
+        document.getElementById('orv-mod-recheck').classList.toggle('active', orvosiRecheckMod);
+        if (orvosiRecheckMod) document.getElementById('orv-lap-title').innerText = `${idx + 1}. Kör – Re-check vizsgálat`;
+        const vizsg = orvosiRecheckMod ? (l.recheck || {}) : l;
+
         // Re-check mezők + a javasolt idő / figyelmeztetés kiírása
         document.getElementById('orv-rch').value = l.rch || '';
         document.getElementById('orv-rcm').value = l.rcm || '';
@@ -3703,16 +3718,16 @@
         frissitRecheckLathatosag();
 
         // Adatok betöltése
-        document.getElementById('orv-pulse').value = l.pulse || '';
-        document.getElementById('orv-hrri').value = l.hrri || '';
-        document.getElementById('orv-nyalka').value = l.nyalka || '';
-        document.getElementById('orv-crt').value = l.crt || '';
-        document.getElementById('orv-farizom').value = l.farizom || '';
-        document.getElementById('orv-vizhaztartas').value = l.vizhaztartas || '';
-        document.getElementById('orv-belhang').value = l.belhang || '';
-        document.getElementById('orv-mozgas').value = l.mozgas || '';
-        document.getElementById('orv-vet-name').value = l.vetName || '';
-        document.getElementById('orv-notes').value = l.vetNotes || '';
+        document.getElementById('orv-pulse').value = vizsg.pulse || '';
+        document.getElementById('orv-hrri').value = vizsg.hrri || '';
+        document.getElementById('orv-nyalka').value = vizsg.nyalka || '';
+        document.getElementById('orv-crt').value = vizsg.crt || '';
+        document.getElementById('orv-farizom').value = vizsg.farizom || '';
+        document.getElementById('orv-vizhaztartas').value = vizsg.vizhaztartas || '';
+        document.getElementById('orv-belhang').value = vizsg.belhang || '';
+        document.getElementById('orv-mozgas').value = vizsg.mozgas || '';
+        document.getElementById('orv-vet-name').value = vizsg.vetName || '';
+        document.getElementById('orv-notes').value = vizsg.vetNotes || '';
         const rcTipusSel = document.getElementById('orv-rc-tipus');
         if (rcTipusSel) rcTipusSel.value = l.rcTipus || '';
 
@@ -3727,8 +3742,16 @@
         const orvSel = document.getElementById('orvStatusSelect');
         const orvExists = Array.from(orvSel.options).some(opt => opt.value === orvS);
         orvSel.value = orvExists ? orvS : 'Active';
+        // Az első vizsgálat döntése (Re-check) a re-check vizsgálat után már nem írható át innen -
+        // különben a ló státusza visszaállna re-checkre.
+        const elsoZarolt = !orvosiRecheckMod && !!l.recheck;
+        if (elsoZarolt) orvSel.value = 'RECHECK';
+        orvSel.disabled = elsoZarolt;
         // ----------------------------------
         adjustVetDecisionColors(document.getElementById('orvStatusSelect'));
+        // A re-check doboz láthatósága az ÚJ versenyző státuszából: fent még az előző versenyző
+        // döntése (pl. Re-check) állt a legördülőben, így minden utána megnyitott lónál látszott.
+        frissitRecheckLathatosag();
         renderExtraCodesCheckboxes(comp.extraCodes);
 
         form.style.display = 'block';
@@ -3844,7 +3867,13 @@
         const comp = competitors.find(c => c.bib == bib);
         const mentett = comp && comp.status === 'RECHECK';
         const kivalasztott = sel && sel.value === 'RECHECK';
-        box.style.display = (mentett || kivalasztott) ? 'block' : 'none';
+        box.style.display = (mentett || kivalasztott || orvosiRecheckMod) ? 'block' : 'none';
+    }
+
+    let orvosiRecheckMod = false, orvosiModBib = null;
+    function orvosiModValt(recheck) {
+        orvosiRecheckMod = !!recheck;
+        loadOrvosiData();
     }
 
     function clearRecheck() {
@@ -3925,6 +3954,7 @@
         const rcTipus = (document.getElementById('orv-rc-tipus') || {}).value || '';
 
         if (!bib) { showToast('Válassz versenyzőt!', true); return; }
+        const recheckMod = orvosiRecheckMod && document.getElementById('orv-mod-valaszto').style.display !== 'none';
         // A vizsgáló orvos neve a hivatalos lap része (FEI vet card: "Vet. initials") - nélküle nem mentünk.
         if (!vetName) {
             showToast('Válaszd ki a vizsgáló állatorvost!', true);
@@ -3935,16 +3965,21 @@
         db.ref('competitors/' + bib).transaction(currentComp => {
             if (!currentComp) return currentComp;
             let idx = getVetLapIndex(currentComp);
-            let targetObj;
+            let targetObj, lapObj;
 
             if (idx === -1) {
                 if (!currentComp.preVet) currentComp.preVet = {};
-                targetObj = currentComp.preVet;
+                targetObj = lapObj = currentComp.preVet;
             } else {
                 if (!currentComp.laps) currentComp.laps = [];
                 if (!currentComp.laps[idx]) currentComp.laps[idx] = {};
-                targetObj = currentComp.laps[idx];
+                lapObj = currentComp.laps[idx];
+                // Re-check vizsgálat: külön bejegyzés, az első vizsgálat adatai megmaradnak.
+                if (recheckMod) { if (!lapObj.recheck) lapObj.recheck = {}; targetObj = lapObj.recheck; }
+                else targetObj = lapObj;
             }
+            // Az első vizsgálat javítása a re-check után: csak a mezők, a döntés és a státusz marad.
+            const csakMezok = !recheckMod && idx >= 0 && !!lapObj.recheck;
 
             targetObj.pulse = pulse;
             targetObj.hrri = hrri;
@@ -3956,14 +3991,17 @@
             targetObj.mozgas = mozgas;
             targetObj.vetName = vetName;
             targetObj.vetNotes = vetNotes;
-            // Re-check idő és típus (HR / REQ / COMP - a FEI lap szerint; üresen hagyva törlődik)
-            targetObj.rch = rch;
-            targetObj.rcm = rcm;
-            targetObj.rcs = rcs;
-            targetObj.rcTipus = rcTipus;
+            // Re-check idő és típus (HR / REQ / COMP - a FEI lap szerint; üresen hagyva törlődik) -
+            // mindig a körnél, mert az első és a re-check vizsgálathoz is ugyanaz tartozik.
+            lapObj.rch = rch;
+            lapObj.rcm = rcm;
+            lapObj.rcs = rcs;
+            lapObj.rcTipus = rcTipus;
 
             // JAVÍTÁS: Itt is az 'Active' a zöld utat jelentő kód!
-            if (decision === 'Active' || decision === 'Passed') {
+            if (csakMezok) {
+                // a döntés és a státusz változatlan
+            } else if (decision === 'Active' || decision === 'Passed') {
                 currentComp.isEliminated = false;
                 currentComp.status = 'Active';
                 targetObj.vetDecision = "Továbbengedve";
@@ -3994,6 +4032,7 @@
         }).then(() => {
             showAnimatedBtn('btn-orv-mentes');
             setFormDirty('orvosi-form', false); // elmentve -> jöhet megint az élő frissítés
+            orvosiModBib = null;               // a következő megnyitás újra a ló állapotából dönt
             setTimeout(() => {
                 document.getElementById('sel-orvosi').value = '';
                 document.getElementById('orv-bibInput').value = '';
@@ -4250,6 +4289,10 @@
                 if (lap.pulse || lap.vetDecision) {
                     columns.push({ title: `${i+1}. KÖR`, data: lap });
                 }
+                // A re-check vizsgálat külön oszlop (a re-check ideje és típusa a körnél van)
+                if (lap.recheck) {
+                    columns.push({ title: `${i+1}. RE-CHECK`, data: Object.assign({}, lap.recheck, { rch: lap.rch, rcm: lap.rcm, rcs: lap.rcs, rcTipus: lap.rcTipus }) });
+                }
             });
         }
 
@@ -4424,10 +4467,12 @@
             const vegso = i === korSzam - 1;
             const cim = vegso ? 'FINAL INSPECTION<br><small>Záróvizsgálat</small>' : `VET GATE ${i + 1}<br><small>${i + 1}. kör utáni kapu</small>`;
             const pulzusSec = l.pulzusSec > 0 ? l.pulzusSec : 0;
-            sorok += `<tr class="blokk-eleje"><th class="szakasz" rowspan="2">${cim}</th>
+            const rv = l.recheck ? Object.assign({}, l.recheck, { rch: l.rch, rcm: l.rcm, rcs: l.rcs, rcTipus: l.rcTipus }) : null;
+            sorok += `<tr class="blokk-eleje"><th class="szakasz" rowspan="${rv ? 3 : 2}">${cim}</th>
                 <td>${e(ido(l.h, l.m, l.s))}</td><td>${e(ido(l.oh, l.om, l.os))}</td><td>${e(percMp(pulzusSec))}</td>
                 <td>${e(l.pulse)}</td><td colspan="11" class="sorcimke">RECOVERY / regeneráció - pulzus a bemutatáskor</td></tr>
-                <tr><td colspan="3" class="sorcimke">INSPECTION / vizsgálat (CRI = pulzus a felvezetés után)</td><td>${e(l.hrri)}</td>${l.pulse || l.vetDecision ? klinikai(l) : uresKlinikai}</tr>`;
+                <tr><td colspan="3" class="sorcimke">INSPECTION / vizsgálat (CRI = pulzus a felvezetés után)</td><td>${e(l.hrri)}</td>${l.pulse || l.vetDecision ? klinikai(l) : uresKlinikai}</tr>`
+                + (rv ? `<tr><td colspan="3" class="sorcimke">RE-INSPECTION / újravizsgálat ${e(ido(l.rch, l.rcm, l.rcs))}</td><td>${e(rv.pulse)}</td>${klinikai(rv)}</tr>` : '');
         }
 
         const st = c.status || (c.isEliminated ? 'FTQ-ME' : 'Active');
@@ -5357,7 +5402,7 @@
             if ( (d <= 120 && d > 115) || (d <= 60 && d > 55) || (d <= 15 && d > 10) || d < 0 ) { blinkClass = "warning"; }
             // Re-check: a kiindulás előtti utolsó 15 percben kell újra bemutatni (92. § (3)-(4)).
             const ri = recheckInfo(item.comp, raceConfig);
-            const rcSor = ri ? `<br><small class="live-recheck">🔁 ${escapeHtml(recheckSzoveg(ri))}</small>` : '';
+            const rcSor = ri ? `<br><small class="live-recheck">${escapeHtml(recheckSzoveg(ri))}</small>` : '';
             html += `<div class="live-item${ri ? ' is-recheck' : ''}"><div><b>#${item.comp.bib} ${escapeHtml(item.comp.name)}</b><br><small>${item.label}: ${toTimeStr(item.nextStart)}</small>${rcSor}</div><div class="live-time ${blinkClass}">${formatLiveTime(d)}</div></div>`;
         });
         live.innerHTML = html || `<div style="text-align:center; padding:20px; color:var(--text-dim);">${liveRaceMeta ? 'Most senki nem várakozik indulásra.' : 'Jelenleg nincs élő verseny.'}</div>`;
@@ -5432,7 +5477,7 @@
         // FNR: teljesítette, minden vizsgálaton megfelelt, csak helyezést nem kap - zöld (II. melléklet).
         if (c.status === 'FNR') return { text: "Teljesítette (FNR)", color: "var(--success)", textCol: "#000" };
         // Re-check: a FEI lap "Re-Inspection"-je - a nyilvános listán is látszik, mikorra esedékes.
-        if (c.status === 'RECHECK') return { text: '🔁 ' + recheckSzoveg(recheckInfo(c, config)), color: "#FF9F0A", textCol: "#000" };
+        if (c.status === 'RECHECK') return { text: recheckSzoveg(recheckInfo(c, config)), color: "#FF9F0A", textCol: "#000" };
         // "Gyors eredmény": utólag rögzített, célba ért versenyző - nincs köradata, de nem "Körön van".
         if (c.manualEntry) return { text: "Beérkezett", color: "var(--success)", textCol: "#000" };
 
@@ -5629,7 +5674,7 @@
         const cont = document.getElementById('adatlapList'); 
 
         let titleEl = document.getElementById('adatlapok-title');
-        titleEl.innerText = "📊 " + (viewingPastRaceData ? ctx.name + " Eredményei" : "Versenyzői Adatlapok");
+        titleEl.innerText = (viewingPastRaceData ? ctx.name + " Eredményei" : "Versenyzői Adatlapok");
 
         let activeCats = getActiveCategories(ctx.comps, ctx.config);
 
@@ -9196,7 +9241,7 @@
         html += `<section class="uj-szekcio"><div class="uj-szekcio-fej"><h3>Következő kiindulások</h3><button class="uj-link" onclick="ujNavValaszt('btn-menu-elo-rajtok')">Összes →</button></div>`;
         html += kovetkezo.length ? `<ol class="uj-lista uj-kiindulas">${kovetkezo.map(k => {
             const ri = recheckInfo(k.comp, raceConfig);
-            return `<li><span class="uj-nev">${nevLink(k.comp)}<small>${escapeHtml(catNames[k.comp.dist] || k.comp.dist)} · ${k.label}: ${toTimeStr(k.nextStart)}${ri ? ' · 🔁 ' + escapeHtml(recheckSzoveg(ri)) : ''}</small></span>
+            return `<li><span class="uj-nev">${nevLink(k.comp)}<small>${escapeHtml(catNames[k.comp.dist] || k.comp.dist)} · ${k.label}: ${toTimeStr(k.nextStart)}${ri ? ' · ' + escapeHtml(recheckSzoveg(ri)) : ''}</small></span>
                 <b class="uj-visszaszam${k.diff <= 120 ? ' kozel' : ''}" data-ido="${k.nextStart}">${visszaszamSzoveg(k.diff)}</b></li>`;
         }).join('')}</ol>` : '<p class="uj-ures">Most senki nem várakozik indulásra.</p>';
         html += `</section>`;

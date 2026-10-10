@@ -1299,6 +1299,7 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
     font-weight: 700; font-size: 0.85rem; margin-top: 12px; border: 1px solid transparent; line-height: 1.4;
 }
 .warning-banner .wb-icon { font-size: 1.1rem; flex-shrink: 0; }
+.warning-banner .wb-icon:empty { display: none; }
 .warning-banner.level-ok { background: var(--success-dim); color: var(--success); border-color: var(--success-dim); }
 .warning-banner.level-warn { background: var(--warning-dim); color: var(--warning); border-color: var(--warning-dim); }
 .warning-banner.level-danger { background: var(--danger-dim); color: var(--danger); border-color: var(--danger); animation: pulseWarn 1.7s infinite; }
@@ -1492,9 +1493,9 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
 .piheno-mezo span { font-weight: 700; color: var(--text); min-width: 5.6em; }
 .piheno-mezo input { width: 64px; margin-top: 0; padding: 6px; text-align: center; }
 /* Re-check a nyilvános nézetekben (FEI: Re-Inspection) */
-.live-item.is-recheck { border-color: #FF9F0A; }
-.live-recheck { color: #FF9F0A; font-weight: 800; }
-#fullscreenLiveOverlay .live-item small.live-recheck { color: #FF9F0A; }
+.live-item.is-recheck { border-color: var(--danger); }
+.live-recheck { color: var(--danger); font-weight: 800; }
+#fullscreenLiveOverlay .live-item small.live-recheck { color: var(--danger); }
 /* Versenyáttekintő (admin) - a 16 km/h-s jelzés csak itt piros */
 .attekinto-cim { margin: 18px 0 6px 0; color: var(--text); }
 .attekinto-cim small { color: var(--text-dim); font-weight: 600; }
