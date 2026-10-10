@@ -2117,6 +2117,10 @@
                     const megjegyzes = (c.laps || []).slice().reverse().find(l => l && l.vetNotes);
                     if (megjegyzes) megj += ' (' + megjegyzes.vetNotes + ')';
                 }
+                const lapok = szankcioLapok(c);
+                const piros = lapok.filter(l => l.tipus === 'piros');
+                if (piros.length) megj += ' + Piros lap: ' + piros.map(l => l.ok + (l.megj ? ' – ' + l.megj : '')).join('; ');
+                const sargalap = lapok.filter(l => l.tipus === 'sarga').map(l => `${l.ido || ''} ${l.ok || ''}${l.megj ? ' – ' + l.megj : ''}${l.kinek && l.kinek !== 'lovas' ? ' (' + (LAP_KINEK[l.kinek] || l.kinek) + ')' : ''}`.trim()).join('; ');
                 let kategoria = 'Nyitott';
                 if (cat.includes('j')) kategoria = 'Junior';
                 else if (parseInt(cat, 10) >= 80) kategoria = 'Felnőtt';
@@ -2126,7 +2130,7 @@
                     horse: c.internal || '', club: c.club || '', kategoria,
                     // Hely: helyezettnél szám, kiesettnél és FNR-nél "-" (a hivatalos lista így kéri).
                     hely: (kiesett || fnr || typeof rInfo.rank !== 'number') ? '-' : rInfo.rank,
-                    ido, buntetes: 0, megj, sargalap: '',
+                    ido, buntetes: buntetoPontok(c).pont, megj, sargalap,
                     pihenonap: pihenonapok(c, config, loKorabbiKiesesei(sn, race.date, race.id, hivatalos[sn]))
                 };
             })
@@ -3356,6 +3360,12 @@
                 // ezért akkor is kiszámoljuk, ha a kör a hiányzó körtáv miatt még nem
                 // "teljes" (különben az adatlapon és a legjobb pulzusidőnél elveszne).
                 l.pulzusSec = (arr > 0 && vet > 0) ? rollApply(vet - arr, 'pulzus') : 0;
+                // Ha a körnek nincs (vagy már nincs - pl. törölték) érkezési ideje, a korábban
+                // kiszámolt értékek nem maradhatnak benne: különben hamis köridő/sebesség
+                // (pl. 0,86 km/h), OT/SP jelzés és kimeneteli idő látszana.
+                l.loopSec = 0; l.phaseSec = 0; l.loopSpd = 0; l.phaseSpd = 0;
+                l.speedFlagMax = false; l.speedFlagMin = false;
+                delete l.rideTime; delete l.rideSpd; delete l.nextStart;
                 comp.laps[i] = l;
                 continue;
             }
@@ -4840,6 +4850,7 @@
             sel.value = exists ? s : 'Active';
         }
         // ----------------------------------
+        renderSzankciok();
 
         const baseDist = comp.dist.replace('j', '');
         const cfg = raceConfig[baseDist] || { h:'', m:'', s:'', laps:[] };
@@ -5755,6 +5766,7 @@
                 // Admin állítja be távonként (Beállítások fül): max -> SP kockázat, min -> OT kockázat
                 speedFlagHtml = getSpeedFlagBadgesHtml(c, completedLaps);
             }
+            speedFlagHtml += szankcioJelekHtml(c);
             if (pulzusBajnok && pulzusBajnok.bib === String(c.bib)) {
                 speedFlagHtml += `<span class="inline-flag pulzus" title="A táv legjobb átlagos pulzusideje: ${toTimeStr(pulzusBajnok.sec)} (${pulzusBajnok.korok} kör átlaga)">💚</span>`;
             }
@@ -6437,6 +6449,208 @@
         { code: "HYPO", label: "Hyposzenzitivitás (HYPO)" },
     ];
 
+    // --- BÜNTETŐPONTOK (193. §) ÉS FIGYELMEZTETŐ LAPOK (194-195. §) -----------------------------
+    // A kiesés okáért járó pont automatikus (egy kiesés = egy tétel, a legsúlyosabb), a többit a
+    // bíró rögzíti a Teljes verseny fülön. A versenyzőnél: szankciok.lapok (sárga/piros lap) és
+    // szankciok.buntetoKezi (kézi büntetőpont). A szabályzatban "piros lap" nincs: nálunk a
+    // kizárás (195. § (1) c) jele - a versenyző DSQ státuszt kap.
+    const BUNTETO_KIESES = [
+        { kod: 'CI', statusz: 'FTQ-CI', pont: 100, cimke: 'Kiesés végzetes sérülés miatt' },
+        { kod: 'SI MUSCO', statusz: 'FTQ-SIMUSCO', pont: 80, cimke: 'Kiesés súlyos mozgásszervi sérülés miatt' },
+        { kod: 'SI META', statusz: 'FTQ-SIMETA', pont: 25, cimke: 'Kiesés súlyos metabolikai sérülés miatt' },
+        { kod: 'ME', statusz: 'FTQ-ME', pont: 10, cimke: 'Kiesés metabolikai okból' },
+        { kod: 'LP', statusz: null, pont: 10, cimke: 'Kizárás regenerációs idő túllépése miatt' }
+    ];
+    const BUNTETO_KEZI = [
+        { kod: 'VMI', pont: 100, cimke: 'Versenyzés versenymentes időszakban' },
+        { kod: 'ELH', pont: 100, cimke: 'Versenytér elhagyása állatorvosi vizsgálat nélkül' },
+        { kod: 'JEL', pont: 80, cimke: 'Állatorvosi jelentés határidőben be nem mutatva (klinikára beutalt ló)' }
+    ];
+    const LAP_OKOK = {
+        sarga: ['Kegyetlenség (9. §)', 'Tiszteletlen viselkedés (194. §)', 'Fejvédő-szabály megsértése (194. §)',
+            'Sportszerűtlen / szabálytalan viselkedés (194. §)', 'Tiltott segítség (70. §)',
+            'Vizsgálat akadályozása (120-121. §)', 'Ló eltakarása / lószállítóba tétele (45. §)'],
+        piros: ['Kegyetlenség (9. § (3))', 'Súlyos sportszerűtlenség (195. § (1) c)', 'Tiltott segítség (70. § e-g)']
+    };
+    const LAP_KINEK = { lovas: 'lovas', edzo: 'edző', mindketto: 'lovas és edző' };
+
+    function listaBol(v) { return (Array.isArray(v) ? v : Object.values(v || {})).filter(Boolean); }
+    function szankcioLapok(c) { return listaBol(c && c.szankciok && c.szankciok.lapok); }
+
+    // Ezen a versenyen kapott büntetőpontok: { pont, tetelek: [{ cimke, pont, auto }] }
+    function buntetoPontok(c) {
+        const tetelek = [];
+        if (c && c.isEliminated) {
+            const kodok = new Set(c.extraCodes || []);
+            const talalat = BUNTETO_KIESES.filter(b => (b.statusz && c.status === b.statusz) || kodok.has(b.kod));
+            if (talalat.length) {
+                const b = talalat.reduce((a, x) => (x.pont > a.pont ? x : a));
+                tetelek.push({ cimke: b.cimke, pont: b.pont, auto: true });
+            }
+        }
+        listaBol(c && c.szankciok && c.szankciok.buntetoKezi).forEach(k => tetelek.push({ cimke: k.cimke, pont: Number(k.pont) || 0 }));
+        return { pont: tetelek.reduce((s, t) => s + t.pont, 0), tetelek };
+    }
+
+    // Büntetőpont-egyenleg a saját versenyeink alapján (193. § (2)-(3)): a pont a kiosztásától egy
+    // évig él, minden sikeres teljesítés 5 ponttal csökkenti (a legrégebbi tételből), nulla alá nem
+    // megy. Tájékoztató - a hivatalos nyilvántartás a szövetségé (a lovas profilján külön sor).
+    function buntetoEgyenleg(license, napig) {
+        const lic = String(license || '').trim();
+        if (!lic) return 0;
+        const esemenyek = [];
+        const felvesz = (datum, c, cfg) => esemenyek.push({ datum, pont: buntetoPontok(c).pont, kesz: teljesitetteE(c, cfg) });
+        localRaces.mult.forEach(r => {
+            const cfg = mergeRaceConfig(r.raceConfig);
+            parseCompetitors(r.competitors).forEach(c => { if (String(c.license || '').trim() === lic) felvesz(r.date || '', c, cfg); });
+        });
+        if (liveRaceMeta) competitors.forEach(c => { if (String(c.license || '').trim() === lic) felvesz(liveRaceMeta.date || napIso(new Date()), c, raceConfig); });
+        const veg = napig || napIso(new Date());
+        const lejarat = nap => { const x = new Date(nap + 'T12:00:00'); x.setFullYear(x.getFullYear() + 1); return napIso(x); };
+        let tetelek = [];
+        esemenyek.filter(e => e.datum && e.datum <= veg).sort((a, b) => a.datum.localeCompare(b.datum)).forEach(e => {
+            tetelek = tetelek.filter(t => t.lejar > e.datum);
+            if (e.pont > 0) tetelek.push({ lejar: lejarat(e.datum), pont: e.pont });
+            if (e.kesz) {
+                let le = 5;
+                for (const t of tetelek) { const x = Math.min(le, t.pont); t.pont -= x; le -= x; if (!le) break; }
+                tetelek = tetelek.filter(t => t.pont > 0);
+            }
+        });
+        return tetelek.filter(t => t.lejar > veg).reduce((s, t) => s + t.pont, 0);
+    }
+
+    // Az elmúlt egy év sárga lapjai a saját versenyeinken (194/A § (3): az ismételt lapot jelenteni kell).
+    function sargaLapokEvben(license) {
+        const lic = String(license || '').trim();
+        if (!lic) return [];
+        const egyEve = new Date(); egyEve.setFullYear(egyEve.getFullYear() - 1);
+        const tol = napIso(egyEve);
+        const lista = [];
+        const nez = (r, comps) => comps.forEach(c => {
+            if (String(c.license || '').trim() !== lic) return;
+            szankcioLapok(c).filter(l => l.tipus === 'sarga').forEach(l => lista.push({ datum: r.date || '', verseny: r.name || '', ok: l.ok }));
+        });
+        localRaces.mult.forEach(r => nez(r, parseCompetitors(r.competitors)));
+        if (liveRaceMeta) nez(liveRaceMeta, competitors);
+        return lista.filter(x => x.datum >= tol).sort((a, b) => b.datum.localeCompare(a.datum));
+    }
+
+    // A lapok jelvénye a versenyzői listában (csak admin)
+    function szankcioJelekHtml(c) {
+        return szankcioLapok(c).map(l => `<span class="inline-flag lap-${l.tipus === 'piros' ? 'piros' : 'sarga'} admin-only" title="${escapeHtml((l.ido || '') + ' ' + (l.ok || '') + (l.kinek && l.kinek !== 'lovas' ? ' (' + (LAP_KINEK[l.kinek] || l.kinek) + ')' : ''))}">${l.tipus === 'piros' ? 'PIROS LAP' : 'SÁRGA LAP'}</span>`).join('');
+    }
+
+    // --- A Teljes verseny fül "Szankciók" része ---
+    function renderSzankciok() {
+        const cont = document.getElementById('szankcio-blokk');
+        if (!cont) return;
+        const bib = document.getElementById('selectCompetitor').value;
+        const c = competitors.find(x => x.bib == bib);
+        if (!c) { cont.innerHTML = ''; return; }
+        const bp = buntetoPontok(c);
+        const egyenleg = buntetoEgyenleg(c.license);
+        const sargak = sargaLapokEvben(c.license);
+        const lapok = szankcioLapok(c);
+        const kezi = listaBol(c.szankciok && c.szankciok.buntetoKezi);
+        let html = `<div class="szankcio-cim">Szankciók <small>(bírói bizottság, 193-195. §)</small></div>
+            <div class="szankcio-osszeg">Büntetőpont ezen a versenyen: <b>${bp.pont}</b>${bp.tetelek.length ? ' <small>(' + bp.tetelek.map(t => escapeHtml(t.cimke) + ': ' + t.pont).join('; ') + ')</small>' : ''}
+                <br>Egyenleg (saját versenyeink, 1 év, -5/teljesítés): <b class="${egyenleg >= 100 ? 'szankcio-veszely' : ''}">${egyenleg}</b>${egyenleg >= 100 ? ' – 100 pont: 2 hónap eltiltás (193. § (3))' : ''}
+                ${sargak.length > 1 ? `<br><span class="szankcio-veszely">Egy éven belül ${sargak.length} sárga lap – a fegyelmi bizottságnak jelenteni kell (194/A § (3)).</span>` : ''}</div>`;
+        lapok.forEach((l, i) => {
+            html += `<div class="szankcio-tetel"><span class="szankcio-jel ${l.tipus === 'piros' ? 'piros' : 'sarga'}">${l.tipus === 'piros' ? 'PIROS LAP' : 'SÁRGA LAP'}</span>
+                <span>${escapeHtml(l.ido || '')} · ${escapeHtml(LAP_KINEK[l.kinek] || 'lovas')} · ${escapeHtml(l.ok || '')}${l.megj ? ' – ' + escapeHtml(l.megj) : ''}${l.ki ? ' <small>(' + escapeHtml(l.ki) + ')</small>' : ''}</span>
+                <button type="button" class="edit-btn szankcio-torles" onclick="szankcioTorles('lapok', ${i})">Törlés</button></div>`;
+        });
+        kezi.forEach((k, i) => {
+            html += `<div class="szankcio-tetel"><span class="szankcio-jel pont">+${Number(k.pont) || 0} PONT</span>
+                <span>${escapeHtml(k.cimke || '')}</span>
+                <button type="button" class="edit-btn szankcio-torles" onclick="szankcioTorles('buntetoKezi', ${i})">Törlés</button></div>`;
+        });
+        html += `<div class="szankcio-gombok">
+                <button type="button" class="calc-btn szankcio-gomb sarga" onclick="szankcioUrlap('sarga')">Sárga lap</button>
+                <button type="button" class="calc-btn szankcio-gomb piros" onclick="szankcioUrlap('piros')">Piros lap (kizárás)</button>
+                <button type="button" class="calc-btn szankcio-gomb" onclick="szankcioUrlap('pont')">Büntetőpont</button>
+            </div>
+            <div id="szankcio-urlap" class="szankcio-urlap" style="display:none;"></div>`;
+        cont.innerHTML = html;
+    }
+
+    function szankcioUrlap(tipus) {
+        const u = document.getElementById('szankcio-urlap');
+        if (!u) return;
+        u.dataset.tipus = tipus;
+        if (tipus === 'pont') {
+            u.innerHTML = `<label>Büntetőpont oka (193. § (1)):</label>
+                <select id="szk-pont">${BUNTETO_KEZI.map(b => `<option value="${b.kod}">${escapeHtml(b.cimke)} – ${b.pont} pont</option>`).join('')}</select>
+                <p class="field-hint">A kiesésért járó pontot (ME, SI, CI, LP) az app a kiesés okából magától számolja.</p>`;
+        } else {
+            u.innerHTML = `<label>Kinek:</label>
+                <select id="szk-kinek"><option value="lovas">Lovas</option><option value="edzo">Edző</option><option value="mindketto">Lovas és edző</option></select>
+                <label>Ok:</label>
+                <select id="szk-ok">${LAP_OKOK[tipus].map(o => `<option>${escapeHtml(o)}</option>`).join('')}<option value="">Egyéb (a megjegyzésben)</option></select>
+                <label>Megjegyzés:</label>
+                <input type="text" id="szk-megj" maxlength="200" placeholder="Mi történt (rövid leírás)">
+                <label>Kiadta:</label>
+                <input type="text" id="szk-ki" maxlength="80" placeholder="pl. a bírói bizottság elnöke">
+                ${tipus === 'piros' ? '<p class="field-hint" style="color:var(--danger);">A piros lap kizárással jár: a versenyző DSQ státuszt kap.</p>' : ''}`;
+        }
+        u.innerHTML += `<div class="szankcio-gombok"><button type="button" class="calc-btn" onclick="szankcioMentes()">Mentés</button>
+            <button type="button" class="calc-btn szankcio-megse" onclick="document.getElementById('szankcio-urlap').style.display='none'">Mégse</button></div>`;
+        u.style.display = 'block';
+    }
+
+    function szankcioMentes() {
+        const bib = document.getElementById('selectCompetitor').value;
+        const u = document.getElementById('szankcio-urlap');
+        if (!bib || !u) return;
+        const tipus = u.dataset.tipus;
+        const most = new Date();
+        const ido = String(most.getHours()).padStart(2, '0') + ':' + String(most.getMinutes()).padStart(2, '0');
+        let tetel, lista;
+        if (tipus === 'pont') {
+            const b = BUNTETO_KEZI.find(x => x.kod === document.getElementById('szk-pont').value);
+            if (!b) return;
+            lista = 'buntetoKezi';
+            tetel = { kod: b.kod, cimke: b.cimke, pont: b.pont, ido, t: most.getTime() };
+        } else {
+            const ok = document.getElementById('szk-ok').value;
+            const megj = document.getElementById('szk-megj').value.trim();
+            if (!ok && !megj) { showToast('Add meg az okát (vagy írd a megjegyzésbe)!', true); return; }
+            lista = 'lapok';
+            tetel = { tipus, kinek: document.getElementById('szk-kinek').value, ok: ok || 'Egyéb', megj,
+                ki: document.getElementById('szk-ki').value.trim(), ido, t: most.getTime() };
+        }
+        const ir = () => db.ref('competitors/' + bib).transaction(cur => {
+            if (!cur) return cur;
+            if (!cur.szankciok) cur.szankciok = {};
+            cur.szankciok[lista] = listaBol(cur.szankciok[lista]).concat([tetel]);
+            if (tipus === 'piros') { cur.isEliminated = true; cur.status = 'DSQ'; }
+            const r = recalcCompetitorData(cur, raceConfig);
+            delete r._timeWarnings;
+            return r;
+        }).then(() => {
+            showToast(tipus === 'pont' ? 'Büntetőpont rögzítve' : (tipus === 'piros' ? 'Piros lap rögzítve – kizárva (DSQ)' : 'Sárga lap rögzítve'));
+            loadCompetitorData();
+        }).catch(e => showToast('Hiba: ' + e.message, true));
+        if (tipus === 'piros') showConfirm('Piros lap – kizárás', `#${bib}: a piros lap kizárással jár, a versenyző DSQ (kizárva) státuszt kap. Mehet?`, ir);
+        else ir();
+    }
+
+    function szankcioTorles(lista, index) {
+        const bib = document.getElementById('selectCompetitor').value;
+        if (!bib) return;
+        showConfirm('Szankció törlése', 'Biztosan törlöd? (Piros lapnál a DSQ státusz nem áll vissza magától - azt a státusznál kell átállítani.)', () => {
+            db.ref('competitors/' + bib).transaction(cur => {
+                if (!cur || !cur.szankciok) return cur;
+                const l = listaBol(cur.szankciok[lista]);
+                l.splice(index, 1);
+                cur.szankciok[lista] = l.length ? l : null;
+                return cur;
+            }).then(() => loadCompetitorData()).catch(e => showToast('Hiba: ' + e.message, true));
+        });
+    }
+
     function getElimText(c) {
         if (!c || !c.isEliminated) return "";
         const s = c.status;
@@ -6601,7 +6815,8 @@
                     dist: c.dist, km: parseInt(baseDist, 10),
                     completedKm: getCompletedKm(c, cfg), place: place, isEliminated: !!c.isEliminated,
                     status: c.status || (c.isEliminated ? 'FTQ-ME' : 'Active'), extraCodes: c.extraCodes || [],
-                    obPont: c.obPont !== false
+                    obPont: c.obPont !== false,
+                    buntetoPont: buntetoPontok(c).pont, lapok: szankcioLapok(c)
                 });
             });
         });
@@ -6740,7 +6955,8 @@
                 statuszSzoveg: getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes }),
                 partnerNev: tipus === 'lovas' ? r.horseName : r.name,
                 partnerId: tipus === 'lovas' ? r.startNum : r.license,
-                ido: '', sebesseg: null, buntetes: null,
+                ido: '', sebesseg: null, buntetes: r.buntetoPont || null,
+                lapok: (r.lapok || []).map(l => (l.tipus === 'piros' ? 'piros lap' : 'sárga lap') + (l.ok ? ': ' + l.ok : '')),
                 obPont: ob.points, obHely: ob.place, obOsztaly: ob.classKey, obMegj: ob.note, obKlon: ob.klon || 0,
                 raceId: r.raceId, dist: r.dist, kmKulcs: r.km
             };
@@ -6860,6 +7076,7 @@
         if (r.ido) also.push(escapeHtml(r.ido));
         if (r.sebesseg) also.push(escapeHtml(r.sebesseg) + ' km/h');
         if (r.buntetes) also.push('büntető ' + escapeHtml(r.buntetes));
+        (r.lapok || []).forEach(l => also.push(escapeHtml(l)));
         if (r.km) also.push(escapeHtml(r.km) + ' km');
 
         // A helyezésért kapott bajnoki pont (III. melléklet) - a régi "min.pont" helyén.
@@ -6911,6 +7128,8 @@
             ${profilSor('Minősítő pont', profilErtek(adat.minPoint))}
             ${profilSor('FEI szám', profilErtek(adat.feiId))}
             ${profilSor('Büntető pont', profilErtek(adat.penaltyPoints))}
+            ${profilSor('Büntetőpont (saját versenyeink, 1 év)', profilErtek(String(buntetoEgyenleg(license))))}
+            ${profilSor('Sárga lap (saját versenyeink, 1 év)', profilErtek(String(sargaLapokEvben(license).length)))}
             ${profilSor('Nem', profilErtek(adat.gender))}
             ${profilSor('Sárgalap', profilErtek(adat.yellowCards))}
             ${profilSor('Edző', profilErtek(adat.coach))}

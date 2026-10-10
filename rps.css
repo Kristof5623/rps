@@ -1325,6 +1325,28 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 /* A jogosultsági szabály display:block-ot adna, ami ezeknél a badge-eknél
    eltörné a sort - adminnál vissza kell állítani inline-flex-re. */
 .role-admin .inline-flag.admin-only { display: inline-flex !important; }
+/* Sárga / piros lap és büntetőpont (Teljes verseny fül, versenyzői lista) */
+.inline-flag.lap-sarga { background: #FFD60A; color: #000; }
+.inline-flag.lap-piros { background: var(--danger); color: #fff; }
+.szankcio-blokk { margin: 0 0 16px 0; padding: 10px 12px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--border); }
+.szankcio-blokk:empty { display: none; }
+.szankcio-cim { font-weight: 800; margin-bottom: 4px; }
+.szankcio-cim small, .szankcio-osszeg small { color: var(--text-dim); font-weight: 400; }
+.szankcio-osszeg { font-size: 0.85rem; margin-bottom: 6px; }
+.szankcio-veszely { color: var(--danger); font-weight: 800; }
+.szankcio-tetel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--border); font-size: 0.85rem; }
+.szankcio-tetel > span:nth-child(2) { flex: 1; min-width: 160px; }
+.szankcio-jel { font-weight: 800; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.szankcio-jel.sarga { background: #FFD60A; color: #000; }
+.szankcio-jel.piros { background: var(--danger); color: #fff; }
+.szankcio-jel.pont { background: var(--card-3); color: var(--text); border: 1px solid var(--border); }
+.szankcio-gombok { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.szankcio-gombok .calc-btn { width: auto; margin: 0; padding: 8px 12px; font-size: 0.85rem; }
+.szankcio-gomb.sarga { background: #FFD60A; color: #000; }
+.szankcio-gomb.piros { background: var(--danger); color: #fff; }
+.szankcio-megse { background: var(--card-3); color: var(--text); }
+.szankcio-torles { padding: 4px 10px; font-size: 0.75rem; }
+.szankcio-urlap { margin-top: 8px; }
 /* Nézők fül (csak admin): napi látogatók oszlopai */
 .nezo-napok { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .nezo-nap { display: grid; grid-template-columns: 92px 1fr 44px; gap: 8px; align-items: center; font-size: 0.85rem; }

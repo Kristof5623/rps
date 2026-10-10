@@ -21,7 +21,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="123">
+    <meta name="app-verzio" content="124">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,8 +31,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=123">
-    <link rel="stylesheet" href="rps-uj.css?v=123">
+    <link rel="stylesheet" href="rps.css?v=124">
+    <link rel="stylesheet" href="rps-uj.css?v=124">
 </head>
 <body>
 
@@ -649,6 +649,7 @@
                     <option value="FTQ-OT" style="color:var(--danger);">Kiesés: Időtúllépés (OT)</option>
                     <option value="FTQ-FTC" style="color:var(--danger);">Kiesés: Befejezetlen verseny (FTC)</option>
                 </select>
+                    <div id="szankcio-blokk" class="szankcio-blokk"></div>
 
                     <label>Össztáv & Körök:</label>
                     <select id="totalDist" onchange="versenyTavValtas()">
@@ -1011,7 +1012,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=123"></script>
+<script src="rps.js?v=124"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
