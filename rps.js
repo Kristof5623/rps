@@ -2167,32 +2167,115 @@
         const wb = new ExcelJS.Workbook();
         wb.creator = 'Távlovas versenyrendszer';
         wb.created = new Date();
-        const ws = wb.addWorksheet('Eredmények', { pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+        // A sorrend és az oszlopok a tavlovasok.hu hivatalos eredménylistájáé (cím, versenyszám, fejléc,
+        // sorok) - csak a kinézet egységes: színes cím és fejléc, csíkos sorok, halvány keret, az 1-3.
+        // hely kiemelve, a kiesés / büntetőpont / sárga lap jelölve; nyomtatásban minden versenyszám új oldalon.
+        const ws = wb.addWorksheet('Eredmények', {
+            pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+                margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } },
+            headerFooter: { oddFooter: `&L${raceName}&R&P. oldal / &N` },
+            views: [{ showGridLines: false }]
+        });
         const fejlec = ['Rajtszám', 'Igazolási szám', 'Versenyző', 'Ló Startszám', 'Ló', 'Egyesület', 'Kategória', 'Hely', 'Végeredmény (Idő)', 'Büntetőpont', 'Megj. (Kiesés)', 'Sárgalap', 'Pihenőnap'];
-        ws.columns = [9, 14, 28, 12, 26, 26, 11, 7, 22, 11, 22, 9, 10].map(w => ({ width: w }));
-        const keret = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        const OSZLOP = fejlec.length;
+        const blokkok = exportSorok(race, hivatalos);
+        // OSZLOPSZÉLESSÉG: a lehető legkeskenyebb, amiben minden szöveg teljesen olvasható. A fejléc
+        // tördelhető (a leghosszabb szava számít); a hosszú szöveges oszlopok (Megj., Sárgalap) legfeljebb
+        // TORD_MAX karakter szélesek, fölötte tördelnek, és a sor magassága is igazodik hozzá.
+        const BALRA = new Set([3, 5, 6, 11, 12]);          // balra zárt (behúzással) oszlopok
+        const FELKOVER = new Set([1, 3, 8, 9]);
+        const TORDELO = new Set([11, 12]);
+        const TORD_MAX = 45;
+        const hossz = v => String(v === null || v === undefined ? '' : v).length;
+        // A szöveg szélessége az Excel egységében (a "0" számjegy szélessége, Calibri 11) - betűnként
+        // becsülve, 10-es betűméretre: a keskeny betűk (i, l, pont...) kevesebbet, a széles (M, W) és a
+        // nagybetűk többet számítanak; félkövérnél ~7%-kal szélesebb.
+        // Óvatos becslés (inkább egy hajszállal szélesebb, mint hogy egy betű átcsússzon a következő sorba):
+        // keskeny (i, l, pont, szóköz), közepes (t, f, r), széles (M, W), nagybetű / számjegy, kisbetű.
+        const betuSzel = ch => /[MWmw@]/.test(ch) ? 1.35 : /[ilIj.,:;'!|()\[\] ]/.test(ch) ? 0.6
+            : /[tfr]/.test(ch) ? 0.7 : /[A-ZÁÉÍÓÖŐÚÜŰ0-9%#&]/.test(ch) ? 1.05 : 0.95;
+        const szovegSzel = (t, felkover) => [...String(t === null || t === undefined ? '' : t)].reduce((s, ch) => s + betuSzel(ch), 0) * 0.92 * (felkover ? 1.08 : 1) * 1.08;   // +8% ráhagyás
+        const PARNA = 1.8;   // a cella két szélének belső margója
+        const cellaSzel = (t, col) => szovegSzel(t, FELKOVER.has(col)) + PARNA + (BALRA.has(col) ? 1 : 0);
+        // A fejléc tördelhető: a leghosszabb szava (félkövér) számít.
+        const szelesseg = fejlec.map(f => Math.max(...f.split(/\s+/).map(sz => szovegSzel(sz, true))) + PARNA);
+        blokkok.forEach(b => b.sorok.forEach(s => {
+            [s.bib, s.license, s.name, s.startNum, s.horse, s.club, s.kategoria, s.hely, s.ido, s.buntetes, s.megj, s.sargalap, s.pihenonap].forEach((v, i) => {
+                const col = i + 1;
+                let w = cellaSzel(v, col);
+                // A tördelt oszlop legfeljebb TORD_MAX karakternyi, de a leghosszabb szónak ki kell férnie.
+                if (TORDELO.has(col)) w = Math.max(Math.min(w, TORD_MAX * 0.86 + PARNA + 1), ...String(v || '').split(/\s+/).map(sz => cellaSzel(sz, col)));
+                szelesseg[i] = Math.max(szelesseg[i], w);
+            });
+        }));
+        ws.columns = szelesseg.map(w => ({ width: Math.max(4, Math.round(w * 10) / 10) }));
+        const SZIN = { sotet: 'FF1E4D3B', zold: 'FF2E8B57', halvany: 'FFEAF4EE', csik: 'FFF6F8F7', keret: 'FFC9D3CD',
+            szoveg: 'FF1F2A24', halvanySzoveg: 'FF6B7A72', piros: 'FFC0392B', sarga: 'FFFFF2B3',
+            arany: 'FFF6D365', ezust: 'FFDCDFE3', bronz: 'FFE8B48A' };
+        const vekony = { style: 'thin', color: { argb: SZIN.keret } };
+        const keret = { top: vekony, left: vekony, bottom: vekony, right: vekony };
+        const kitolt = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+        const egesz = (sor, magas) => { ws.mergeCells(sor.number, 1, sor.number, OSZLOP); if (magas) sor.height = magas; return sor; };
 
-        exportSorok(race, hivatalos).forEach((blokk, index) => {
-            const cim = ws.addRow([raceName]); cim.font = { bold: true, size: 14 };
-            const vrsz = ws.addRow([`${index + 1}.vrsz.-${blokk.cim}`]); vrsz.font = { bold: true, size: 12 };
+        blokkok.forEach((blokk, index) => {
+            // Minden versenyszám új oldalon kezdődik nyomtatáskor (az első kivételével).
+            if (index > 0) { const elozo = ws.lastRow; if (elozo) elozo.addPageBreak(); }
+
+            const cim = egesz(ws.addRow([raceName]), 30);
+            cim.getCell(1).font = { name: 'Calibri', bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+            cim.getCell(1).fill = kitolt(SZIN.sotet);
+            cim.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+            const vrsz = egesz(ws.addRow([`${index + 1}.vrsz.-${blokk.cim}`]), 22);
+            vrsz.getCell(1).font = { name: 'Calibri', bold: true, size: 12, color: { argb: SZIN.sotet } };
+            vrsz.getCell(1).fill = kitolt(SZIN.halvany);
+            vrsz.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
             ws.addRow([]);
-            ws.addRow(['www.tavlovasok.hu']);
-            ws.addRow(['Elbírálás: Távlovaglás']);
+            [`www.tavlovasok.hu`, 'Elbírálás: Távlovaglás'].forEach(t => {
+                const s = egesz(ws.addRow([t]));
+                s.getCell(1).font = { name: 'Calibri', italic: true, size: 9, color: { argb: SZIN.halvanySzoveg } };
+                s.getCell(1).alignment = { horizontal: 'left', indent: 1 };
+            });
             ws.addRow([]); ws.addRow([]);
+
             const fej = ws.addRow(fejlec);
+            fej.height = 30;
             fej.eachCell(cell => {
-                cell.font = { bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } };
+                cell.font = { name: 'Calibri', bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+                cell.fill = kitolt(SZIN.zold);
                 cell.border = keret;
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
-            blokk.sorok.forEach(s => {
+
+            blokk.sorok.forEach((s, si) => {
                 const sor = ws.addRow([s.bib, s.license, s.name, s.startNum, s.horse, s.club, s.kategoria, s.hely, s.ido, s.buntetes, s.megj, s.sargalap, s.pihenonap]);
+                // A tördelt (Megj., Sárgalap) cellák sorai kiférjenek: soronként kb. 14 pont.
+                const sorokSzama = Math.max(1, ...[11, 12].map(col => {
+                    const hely = Math.max(1, Math.floor((ws.getColumn(col).width - PARNA - 1) / 1.02));
+                    return Math.ceil(hossz(col === 11 ? s.megj : s.sargalap) / hely);
+                }));
+                sor.height = Math.max(20, sorokSzama * 14 + 6);
+                const kiesett = s.hely === '-' && !/^\d/.test(String(s.ido)) && s.megj !== 'FNR';
+                const hatter = si % 2 ? SZIN.csik : 'FFFFFFFF';
                 sor.eachCell({ includeEmpty: true }, (cell, col) => {
                     cell.border = keret;
-                    cell.alignment = { vertical: 'middle', horizontal: [3, 5, 6, 11].includes(col) ? 'left' : 'center', wrapText: col === 11 };
-                    if (col === 1 || col === 9) cell.font = { bold: true };
+                    cell.fill = kitolt(hatter);
+                    cell.font = { name: 'Calibri', size: 10, color: { argb: SZIN.szoveg } };
+                    cell.alignment = { vertical: 'middle', horizontal: [3, 5, 6, 11, 12].includes(col) ? 'left' : 'center', wrapText: [11, 12].includes(col), indent: [3, 5, 6, 11, 12].includes(col) ? 1 : 0 };
                 });
+                sor.getCell(1).font = { name: 'Calibri', bold: true, size: 10, color: { argb: SZIN.szoveg } };
+                sor.getCell(3).font = { name: 'Calibri', bold: true, size: 10, color: { argb: SZIN.szoveg } };
+                // Hely: az első három kiemelve
+                const dobogo = { 1: SZIN.arany, 2: SZIN.ezust, 3: SZIN.bronz }[s.hely];
+                if (dobogo) { sor.getCell(8).fill = kitolt(dobogo); sor.getCell(8).font = { name: 'Calibri', bold: true, size: 11, color: { argb: SZIN.szoveg } }; }
+                // Végeredmény: idő félkövéren, kiesés pirossal
+                sor.getCell(9).font = kiesett
+                    ? { italic: true, size: 10, color: { argb: SZIN.piros } }
+                    : { bold: true, size: 10, color: { argb: SZIN.szoveg } };
+                if (kiesett) sor.getCell(11).font = { name: 'Calibri', size: 10, color: { argb: SZIN.piros } };
+                if (Number(s.buntetes) > 0) sor.getCell(10).font = { name: 'Calibri', bold: true, size: 10, color: { argb: SZIN.piros } };
+                if (s.sargalap) sor.getCell(12).fill = kitolt(SZIN.sarga);
             });
             ws.addRow([]); ws.addRow([]);
         });
