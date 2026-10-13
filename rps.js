@@ -3034,8 +3034,16 @@
     // versenynaptárában jelennek meg; a lejárt esemény magától eltűnik a listákból.
     const ESEMENY_TIPUSOK = {
         szezonzaro: 'Szezonzáró', bajnokavato: 'Bajnokavató', kozgyules: 'Közgyűlés', kepzes: 'Képzés / tanfolyam',
-        rajtengedely: 'Rajtengedély-vizsga', edzotabor: 'Edzőtábor', nyiltnap: 'Nyílt nap', egyeb: 'Esemény'
+        birokepzes: 'Bírói képzés / továbbképzés', rajtengedely: 'Rajtengedély-vizsga', edzotabor: 'Edzőtábor', nyiltnap: 'Nyílt nap', egyeb: 'Esemény'
     };
+    // Egy eseményen több dolog is lehet (pl. szezonzáró + bajnokavató + közgyűlés): tipusok = [kulcsok].
+    // A régi rekordokban csak "tipus" van; mentéskor az elsőt "tipus"-ként is írjuk (régebbi app-változatoknak).
+    function esemenyTipusok(e) {
+        const nyers = e && Array.isArray(e.tipusok) ? e.tipusok : e && e.tipusok && typeof e.tipusok === 'object' ? Object.values(e.tipusok) : [e && e.tipus];
+        const t = nyers.filter(k => ESEMENY_TIPUSOK[k]);
+        return t.length ? [...new Set(t)] : ['egyeb'];
+    }
+    function esemenyTipusSzoveg(e) { return esemenyTipusok(e).map(k => ESEMENY_TIPUSOK[k]).join(' · '); }
     function esemenyVege(e) { return (e && (e.vegDatum && e.vegDatum >= e.datum ? e.vegDatum : e.datum)) || ''; }
     function kozelgoEsemenyek(ma) {
         return (localEsemenyek || []).filter(e => e && e.datum && esemenyVege(e) >= ma).sort((a, b) => a.datum.localeCompare(b.datum));
@@ -3056,7 +3064,7 @@
             <div class="rc-fo">
                 <div class="rc-datum">${ervenyes ? `<span class="rc-nap">${d.getDate()}</span><span class="rc-ho">${HONAP_ROVID[d.getMonth()]}</span><span class="rc-ev">${d.getFullYear()}</span>` : '<span class="rc-ho">?</span>'}</div>
                 <div class="rc-info">
-                    <div class="rc-felso"><span class="race-status">${escapeHtml(ESEMENY_TIPUSOK[e.tipus] || 'Esemény')}</span>${hatraSz ? `<span class="rc-hatra">${hatraSz}</span>` : ''}</div>
+                    <div class="rc-felso">${esemenyTipusok(e).map(k => `<span class="race-status">${escapeHtml(ESEMENY_TIPUSOK[k])}</span>`).join('')}${hatraSz ? `<span class="rc-hatra">${hatraSz}</span>` : ''}</div>
                     <h4 class="rc-cim">${escapeHtml(e.cim || 'Esemény')}</h4>
                     <div class="rc-hely">${[e.helyszin ? '📍 ' + escapeHtml(e.helyszin) : '', e.ido ? '🕘 ' + escapeHtml(e.ido) : '', ervenyes ? HET_NAPJA[d.getDay()] : ''].filter(Boolean).join(' · ')}</div>
                     ${biztonsagosUrl(e.link) ? `<div class="rc-linkek"><a class="rc-link" href="${escapeHtml(e.link.trim())}" target="_blank" rel="noopener">Részletek a szervezőnél ↗</a></div>` : ''}
@@ -3076,7 +3084,7 @@
         document.getElementById('infoModalTitle').innerText = e.cim || 'Esemény';
         const sor = (cimke, ertek) => ertek ? `<div class="reszlet-sor"><span>${cimke}</span><b>${ertek}</b></div>` : '';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek">
-            ${sor('Típus', escapeHtml(ESEMENY_TIPUSOK[e.tipus] || 'Esemény'))}
+            ${sor(esemenyTipusok(e).length > 1 ? 'Program' : 'Típus', escapeHtml(esemenyTipusSzoveg(e)))}
             ${sor('Időpont', esemenyDatumSzoveg(e))}
             ${sor('Helyszín', escapeHtml(e.helyszin || ''))}
             ${e.leiras ? `<p class="reszlet-leiras">${escapeHtml(e.leiras).replace(/\n/g, '<br>')}</p>` : ''}
@@ -3090,11 +3098,12 @@
     function esemenyUrlap(id) {
         const e = id ? (localEsemenyek || []).find(x => x.id === id) : null;
         document.getElementById('esemenyModalCim').innerText = e ? 'Esemény szerkesztése' : 'Új esemény';
-        document.getElementById('es-tipus').innerHTML = Object.keys(ESEMENY_TIPUSOK).map(k => `<option value="${k}">${escapeHtml(ESEMENY_TIPUSOK[k])}</option>`).join('');
+        const valasztott = e ? esemenyTipusok(e) : [];
+        document.getElementById('es-tipusok').innerHTML = Object.keys(ESEMENY_TIPUSOK).map(k =>
+            `<label class="es-tipus"><input type="checkbox" value="${k}"${valasztott.includes(k) ? ' checked' : ''}><span>${escapeHtml(ESEMENY_TIPUSOK[k])}</span></label>`).join('');
         const ertek = (mezo, v) => { document.getElementById(mezo).value = v || ''; };
         ertek('es-id', e && e.id);
         ertek('es-cim', e && e.cim);
-        document.getElementById('es-tipus').value = (e && e.tipus) || 'szezonzaro';
         ertek('es-datum', e && e.datum);
         ertek('es-vegDatum', e && e.vegDatum);
         ertek('es-ido', e && e.ido);
@@ -3108,9 +3117,11 @@
 
     function esemenyMentes() {
         const v = mezo => String(document.getElementById(mezo).value || '').trim();
-        const adat = { cim: v('es-cim'), tipus: v('es-tipus') || 'egyeb', datum: v('es-datum'), vegDatum: v('es-vegDatum'),
+        const tipusok = [...document.querySelectorAll('#es-tipusok input:checked')].map(c => c.value).filter(k => ESEMENY_TIPUSOK[k]);
+        const adat = { cim: v('es-cim'), tipus: tipusok[0] || 'egyeb', tipusok: tipusok.length ? tipusok : ['egyeb'], datum: v('es-datum'), vegDatum: v('es-vegDatum'),
             ido: v('es-ido'), helyszin: v('es-helyszin'), leiras: v('es-leiras'), link: v('es-link') };
         if (!adat.cim) { showToast('Add meg az esemény nevét!', true); return; }
+        if (!tipusok.length) { showToast('Jelöld be, mi lesz az eseményen (több is lehet)!', true); return; }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(adat.datum)) { showToast('Add meg a dátumot!', true); return; }
         if (adat.vegDatum && adat.vegDatum < adat.datum) { showToast('Az utolsó nap nem lehet a kezdés előtt.', true); return; }
         if (adat.link && !biztonsagosUrl(adat.link)) { showToast('A linknek http:// vagy https:// címmel kell kezdődnie.', true); return; }
@@ -10913,7 +10924,7 @@
                 const e = x.e;
                 return `<button class="uj-naptar-elem esemeny" onclick="esemenyReszletek('${escapeHtml(e.id)}')">
                     <span class="uj-nd"><b>${d.getDate()}</b>${HONAP_ROVID[d.getMonth()]}</span>
-                    <span class="uj-nt"><b>${escapeHtml(e.cim || '')}</b><small>${escapeHtml(ESEMENY_TIPUSOK[e.tipus] || 'Esemény')}${e.helyszin ? ' · ' + escapeHtml(e.helyszin) : ''} · ${hatraSzoveg(hatra)}</small></span>
+                    <span class="uj-nt"><b>${escapeHtml(e.cim || '')}</b><small>${escapeHtml(esemenyTipusSzoveg(e))}${e.helyszin ? ' · ' + escapeHtml(e.helyszin) : ''} · ${hatraSzoveg(hatra)}</small></span>
                 </button>`;
             }
             const r = x.r;
@@ -13418,7 +13429,9 @@
         'Hibát találtál? Ötleted van?': 'Found a problem? Have an idea?', 'Mi a hiba / mi az ötleted?': 'What is the problem / your idea?', 'Küldés': 'Send',
         'Elérhetőség': 'Contact', 'Eredménykártya (kép) a megosztáshoz': 'Result card (image) to share', 'Frissítés elérhető': 'Update available', 'Mentsd el a munkádat, mielőtt frissítesz.': 'Save your work before you refresh.',
         'Frissítés': 'Refresh', 'Később': 'Later', 'Impresszum': 'Legal notice', 'Adatvédelmi tájékoztató': 'Privacy notice', 'Kapcsolat': 'Contact', 'Üzemeltető': 'Operator',
-        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', '(nem kötelező – e-mail vagy telefon)': '(optional – e-mail or phone)', 'Technikai adatok csatolása': 'Attach technical details',
+        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Mi lesz?': 'What is on?', '(több is bejelölhető)': '(tick all that apply)',
+        'Szezonzáró': 'Season closing', 'Bajnokavató': 'Championship awards', 'Közgyűlés': 'General assembly', 'Képzés / tanfolyam': 'Training / course',
+        'Bírói képzés / továbbképzés': 'Judge training / refresher', 'Rajtengedély-vizsga': 'Licence exam', 'Edzőtábor': 'Training camp', 'Nyílt nap': 'Open day', '(nem kötelező – e-mail vagy telefon)': '(optional – e-mail or phone)', 'Technikai adatok csatolása': 'Attach technical details',
         'Köszönjük! A jelentés megérkezett.': 'Thank you! Your report has arrived.',
         // további nyilvános szövegek
         'Egy kattintással nyílik, saját ablakban, és szól, ha a követett lovasod beér. Ingyenes, áruház nélkül.': 'Opens with one click in its own window and tells you when a rider you follow arrives. Free, no app store.',

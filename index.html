@@ -1173,11 +1173,11 @@
         <input type="hidden" id="es-id">
         <label>Megnevezés:</label>
         <input type="text" id="es-cim" maxlength="120" placeholder="pl. Szezonzáró és bajnokavató 2026">
-        <label>Típus:</label>
-        <select id="es-tipus"></select>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <label>Mi lesz? <small>(több is bejelölhető)</small></label>
+        <div id="es-tipusok" class="es-tipusok"></div>
+        <div class="es-datumok">
             <div><label>Dátum:</label><input type="date" id="es-datum"></div>
-            <div><label>Utolsó nap (ha több napos):</label><input type="date" id="es-vegDatum"></div>
+            <div><label>Utolsó nap (ha többnapos):</label><input type="date" id="es-vegDatum"></div>
         </div>
         <label>Kezdés (óra:perc, opcionális):</label>
         <input type="time" id="es-ido">

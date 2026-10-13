@@ -2692,3 +2692,11 @@ button.calc-btn {
 body.fullscreen-active #lablec, body.lablec-nelkul #lablec { display: none !important; }
 body.lablec-nelkul .main-wrapper > .container { margin-bottom: 0; }
 @media print { #lablec { display: none !important; } }
+/* esemény: több típus is bejelölhető (pl. szezonzáró + bajnokavató + közgyűlés) */
+.es-tipusok { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.es-tipus { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 7px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-2); color: var(--text-dim); font-size: 0.86rem; font-weight: 600; cursor: pointer; }
+.es-tipus input { flex: 0 0 auto; width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; accent-color: var(--primary); }
+.es-datumok { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 10px; align-items: end; }
+.es-datumok > div { min-width: 0; }
+.es-datumok input { width: 100%; min-width: 0; }
+.es-tipus:has(input:checked) { border-color: var(--primary); color: var(--text); background: var(--primary-dim); }
