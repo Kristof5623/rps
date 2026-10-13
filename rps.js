@@ -2288,6 +2288,9 @@
     // kijelzőn kitágul alattuk a hasáb. Mindenhol máshol az űrlapokhoz szabott keskeny hasáb
     // marad - egy input nem lesz szebb attól, ha 1300px széles (l. .szeles-nezet a CSS-ben).
     const SZELES_NEZETEK = ['bajnoksag-egyeni', 'bajnoksag-lo', 'bajnoksag-csapat', 'attekinto-mod', 'bajnoksag-teny'];
+    // Az élő verseny nézeteiben (nézőké és a stáb munkafelületei) nincs lábléc - ott csak az élő adat számít.
+    const LABLEC_NELKUL = ['elo-rajtok', 'adatlapok', 'kovetesek', 'hirfolyam', 'palyaterkep', 'fo-mod', 'beerkeztetes-mod',
+        'orvosi-mod', 'orvosi-ido-mod', 'nyomtatas-mod', 'rfid-mod', 'iranyitopult-mod', 'attekinto-mod'];
 
     function switchSidebarMode(targetId, btn) {
         // Jog nélkül (vagy kijelentkezve) belső nézetre nem lehet menni - pl. egy régi könyvjelzőből
@@ -2302,6 +2305,7 @@
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
         document.body.classList.toggle('szeles-nezet', SZELES_NEZETEK.includes(targetId));
+        document.body.classList.toggle('lablec-nelkul', LABLEC_NELKUL.includes(targetId));
         if(btn) btn.classList.add('active');
         // Csak ebben a fülben él (újratöltéskor - F5, automatikus frissítés - itt marad); aki később újra
         // megnyitja az oldalt, a kezdőlapon kezd, nem ott, ahol legutóbb abbahagyta.

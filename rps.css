@@ -2689,5 +2689,6 @@ button.calc-btn {
     .lablec-linkek { gap: 0 14px; }
     .lablec-linkek button { padding: 4px 0; }
 }
-body.fullscreen-active #lablec { display: none !important; }
+body.fullscreen-active #lablec, body.lablec-nelkul #lablec { display: none !important; }
+body.lablec-nelkul .main-wrapper > .container { margin-bottom: 0; }
 @media print { #lablec { display: none !important; } }
