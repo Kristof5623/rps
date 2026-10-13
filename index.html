@@ -21,7 +21,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="126">
+    <meta name="app-verzio" content="127">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,8 +31,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=126">
-    <link rel="stylesheet" href="rps-uj.css?v=126">
+    <link rel="stylesheet" href="rps.css?v=127">
+    <link rel="stylesheet" href="rps-uj.css?v=127">
 </head>
 <body>
 
@@ -112,6 +112,7 @@
     <div class="menu-title">Eszközök</div>
     <button id="btn-menu-reszido" class="sidebar-btn" onclick="switchSidebarMode('reszido', this)">Részidő</button>
     <button id="btn-menu-minosites" class="sidebar-btn" onclick="switchSidebarMode('minosites', this)">Kör Avg</button>
+    <button id="btn-menu-app" class="sidebar-btn app-menu-gomb" onclick="appUtmutato()">📲 App a telefonodra</button>
 
     <div style="margin-top: 40px;"></div>
     
@@ -177,8 +178,9 @@
                 <div style="background:var(--card-3); padding:15px; border-radius:12px; margin-top:5px; border-left:4px solid var(--primary);">
                     <h4 id="bk-vet-lap-title" style="margin-top:0; color:var(--text);">X. Kör</h4>
                     <div style="font-size:0.9rem; font-weight:bold; margin-bottom:15px; color:var(--success);" id="orv-ido-arr-time">Beérkezett: --:--:--</div>
+                    <div id="orv-ido-bem2-info"></div>
 
-                    <label>Orvosi (Vet) ideje:</label>
+                    <label id="orv-ido-cimke">Orvosi (Vet) ideje:</label>
                     <div class="time-group">
                         <input type="number" id="bk-v-h" placeholder="00" oninput="jump(this, 'bk-v-m'); checkOrvosiIdoRecovery();"> :
                         <input type="number" id="bk-v-m" placeholder="00" oninput="jump(this, 'bk-v-s'); checkOrvosiIdoRecovery();"> :
@@ -216,7 +218,6 @@
                     <div style="font-size:0.85rem; font-weight:bold;" id="orv-recheck-info">Re-check: --</div>
                     <select id="orv-rc-tipus" style="margin-top:8px;">
                         <option value="">Re-check oka (FEI: Re-Inspection)...</option>
-                        <option value="HR">HR - pulzus miatt újra bemutatva (100. §)</option>
                         <option value="REQ">REQ - az orvos kérte (92. § (4))</option>
                         <option value="COMP">COMP - kötelező ismételt vizsgálat (92. § (3), 101. §)</option>
                     </select>
@@ -229,6 +230,7 @@
                     </div>
                 </div>
 
+                <div id="orv-bem2-box"></div>
                 <div id="orv-recovery-warning" style="margin-bottom:15px;"></div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -249,6 +251,7 @@
                 <select id="orvStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);" onchange="adjustVetDecisionColors(this); frissitRecheckLathatosag();">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
                     <option value="RECHECK" style="color:var(--warning);">Re-check (újra bemutatandó)</option>
+                    <option value="BEM2" style="color:var(--warning);">2. bemutatás – magas pulzus (100. §)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
@@ -298,6 +301,8 @@
                 <button id="btn-v-mult" class="tab-btn" onclick="switchVersenyekTab('v-mult', this)">Múltbéli verseny</button>
                 <button id="btn-v-jovo" class="tab-btn active" onclick="switchVersenyekTab('v-jovo', this)">Jövőbeli verseny</button>
                 <button id="btn-v-jelen" class="tab-btn" onclick="switchVersenyekTab('v-jelen', this)">Jelenlegi verseny</button>
+                <button id="btn-v-terkep" class="tab-btn" onclick="switchVersenyekTab('v-terkep', this)">Térkép</button>
+                <button id="btn-v-stat" class="tab-btn" onclick="switchVersenyekTab('v-stat', this)">Statisztika</button>
             </div>
 
             <div id="v-mult" class="verseny-tab-content" style="display:none;">
@@ -310,12 +315,34 @@
             <div id="v-jovo" class="verseny-tab-content" style="display:block;">
                 <div class="admin-only" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
+                    <button class="calc-btn" style="padding:10px; margin-top:8px;" onclick="esemenyUrlap()">+ Új esemény (szezonzáró, közgyűlés…)</button>
                 </div>
                 <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
             <div id="v-jelen" class="verseny-tab-content" style="display:none;">
                 <div id="v-jelen-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
+            </div>
+
+            <div id="v-terkep" class="verseny-tab-content" style="display:none;">
+                <div class="terkep-fej">
+                    <p class="field-hint" style="margin:0;">Az idei és a következő versenyek, események helyszíne. Kattints egy pontra a részletekért.</p>
+                    <select id="terkep-hatokor" onchange="szezonTerkepRajzol()">
+                        <option value="ev">Idei szezon és a következők</option>
+                        <option value="osszes">Minden verseny</option>
+                    </select>
+                </div>
+                <div class="terkep-jelmagyarazat"><span><i class="jel elo"></i>élő</span><span><i class="jel jovo"></i>következő</span><span><i class="jel mult"></i>lezárult</span><span><i class="jel esemeny"></i>esemény</span></div>
+                <div id="szezon-terkep" class="szezon-terkep"></div>
+                <div id="szezon-terkep-allapot" class="field-hint"></div>
+            </div>
+
+            <div id="v-stat" class="verseny-tab-content" style="display:none;">
+                <div class="terkep-fej">
+                    <p class="field-hint" style="margin:0;">A szezon számokban – a rendszerben rögzített versenyekből.</p>
+                    <select id="stat-ev" onchange="renderSzezonStat()"></select>
+                </div>
+                <div id="szezon-stat"></div>
             </div>
         </div>
 
@@ -635,6 +662,7 @@
                     <select id="compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
                     <option value="RECHECK" style="color:var(--warning);">Re-check (újra bemutatandó)</option>
+                    <option value="BEM2" style="color:var(--warning);">2. bemutatás – magas pulzus (100. §)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
@@ -809,6 +837,13 @@
             <input type="date" id="rm-date" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: var(--card-3); color: var(--text); width: 100%; box-sizing: border-box; margin-top: 5px;">
             <label>Leírás:</label>
             <textarea id="rm-desc" rows="3" style="padding: 12px; border-radius: 10px; border: 1px solid #444; background: var(--card-3); color: var(--text); width: 100%; box-sizing: border-box; margin-top: 5px; font-family: inherit; resize: vertical;"></textarea>
+            <label>Nevezési link (a nevezési rendszer oldala):</label>
+            <input type="url" id="rm-nevezesLink" placeholder="https://nevezes.tavlovasok.hu/…" inputmode="url">
+            <label>Versenykiírás (Word / PDF) link:</label>
+            <input type="url" id="rm-kiirasLink" placeholder="https://tavlovasok.hu/… a kiírás dokumentuma" inputmode="url">
+            <label>Helyszín a térképen (ha a település neve nem elég pontos):</label>
+            <input type="text" id="rm-terkep" placeholder="pl. Hajós, Lovaspálya – vagy koordináta: 46.40, 19.12">
+            <p class="field-hint" style="margin-top:4px;">A versenylistában a név és a helyszín alatt jelennek meg kattintható linkként; a részleteknél kis térkép mutatja a helyszínt. Üresen hagyva nem látszanak.</p>
 
             <div class="kiiras-card" style="border-left-color: var(--primary); margin-top:20px; margin-bottom:0;">
                 <label class="ob-round-check" style="margin-top:0; display:flex; align-items:center; gap:10px; cursor:pointer; text-transform:none;">
@@ -886,6 +921,7 @@
                 <select id="rm-compStatusSelect" style="font-weight:bold; margin-bottom:15px; background:var(--card-2);">
                     <option value="Active" style="color:var(--success);">Versenyben (Bent van)</option>
                     <option value="RECHECK" style="color:var(--warning);">Re-check (újra bemutatandó)</option>
+                    <option value="BEM2" style="color:var(--warning);">2. bemutatás – magas pulzus (100. §)</option>
                     <option value="WD" style="color:var(--warning);">Visszalépett (WD)</option>
                     <option value="RET" style="color:var(--warning);">Feladta (RET)</option>
                     <option value="DSQ" style="color:var(--danger);">Kizárva (DSQ)</option>
@@ -1005,6 +1041,34 @@
     <div class="modal-content fiok-ablak"><span class="close-btn" onclick="fiokBezar()">&times;</span><div id="fiokTartalom"></div></div>
 </div>
 
+<div id="esemenyModal" class="modal" onclick="if(event.target==this) esemenyUrlapBezar()">
+    <div class="modal-content" style="max-width: 480px;">
+        <span class="close-btn" onclick="esemenyUrlapBezar()">&times;</span>
+        <h3 id="esemenyModalCim" style="margin-top:0; color:var(--primary);">Új esemény</h3>
+        <input type="hidden" id="es-id">
+        <label>Megnevezés:</label>
+        <input type="text" id="es-cim" maxlength="120" placeholder="pl. Szezonzáró és bajnokavató 2026">
+        <label>Típus:</label>
+        <select id="es-tipus"></select>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div><label>Dátum:</label><input type="date" id="es-datum"></div>
+            <div><label>Utolsó nap (ha több napos):</label><input type="date" id="es-vegDatum"></div>
+        </div>
+        <label>Kezdés (óra:perc, opcionális):</label>
+        <input type="time" id="es-ido">
+        <label>Helyszín:</label>
+        <input type="text" id="es-helyszin" maxlength="150" placeholder="pl. Budapest, Lovas Szövetség">
+        <label>Leírás:</label>
+        <textarea id="es-leiras" rows="4" maxlength="2000" style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
+        <label>Link (meghívó, regisztráció, dokumentum – opcionális):</label>
+        <input type="url" id="es-link" placeholder="https://…" inputmode="url">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:15px;">
+            <button class="calc-btn" id="btn-es-mentes" onclick="esemenyMentes()">Mentés</button>
+            <button class="calc-btn" id="btn-es-torles" style="background:var(--danger); color:#fff; display:none;" onclick="esemenyTorles()">Törlés</button>
+        </div>
+    </div>
+</div>
+
 <div id="catSwapModal" class="modal" onclick="if(event.target==this) closeCatSwapModal()">
     <div class="modal-content" style="max-width: 350px; padding: 30px 20px;">
         <h3 style="text-align:center; color:var(--text); margin-top:0; margin-bottom:20px;">Kategória váltás</h3>
@@ -1012,7 +1076,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=126"></script>
+<script src="rps.js?v=127"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

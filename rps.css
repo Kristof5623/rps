@@ -1349,7 +1349,26 @@ details.kiiras-card > summary:hover { background: var(--card-3); }
 .szankcio-urlap { margin-top: 8px; }
 /* Nézők fül (csak admin): napi látogatók oszlopai */
 .nezo-napok { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-.nezo-nap { display: grid; grid-template-columns: 92px 1fr 44px; gap: 8px; align-items: center; font-size: 0.85rem; }
+.nezo-nap { display: grid; grid-template-columns: 70px 1fr 40px 118px; gap: 8px; align-items: center; font-size: 0.85rem;
+    width: 100%; background: none; border: 0; border-radius: 8px; padding: 4px 6px; color: inherit; font-family: inherit; text-align: left; cursor: pointer; }
+.nezo-nap:hover { background: var(--card-2); }
+.nezo-nap.valasztott { background: var(--primary-dim); outline: 1px solid var(--primary); }
+.nezo-nap .csucs { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; text-align: right; }
+@media (max-width: 480px) { .nezo-nap { grid-template-columns: 54px 1fr 32px; } .nezo-nap .csucs { grid-column: 1 / -1; text-align: left; margin-top: -4px; } }
+.nezo-napvalaszto { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.nezo-napvalaszto input[type=date] { width: auto; margin: 0; padding: 8px 10px; }
+.nezo-napvalaszto .stat-btn:disabled { opacity: .35; cursor: default; }
+.nezo-orak { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; align-items: end; height: 120px; margin: 10px 0 4px; }
+.nezo-ora { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; text-align: center; }
+.nezo-ora .oszlop { background: var(--primary); border-radius: 3px 3px 0 0; min-height: 1px; opacity: .75; }
+.nezo-ora.csucs .oszlop { opacity: 1; background: var(--warning); }
+.nezo-ora span { font-size: 0.65rem; color: var(--text-dim); height: 14px; line-height: 14px; }
+
+/* Második bemutatás (pulzus, 100. §) */
+.bem2-doboz { background: var(--card-2); border-left: 3px solid var(--warning); border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: .88rem; line-height: 1.45; }
+.bem2-doboz.lejart { border-left-color: var(--danger); }
+.bem2-doboz.kesz { border-left-color: var(--success); }
+.bem2-doboz .bem2-gomb { margin: 8px 0 4px; width: auto; padding: 8px 16px; }
 .nezo-nap .sav { height: 10px; border-radius: 5px; background: var(--primary); min-width: 2px; }
 .nezo-nap .db { text-align: right; font-variant-numeric: tabular-nums; }
 .nezo-nap.ma { font-weight: 700; }
@@ -1862,3 +1881,133 @@ button.calc-btn.vk-fei { width: auto; padding: 10px 24px; border-radius: 25px; b
 .fiok-temak .theme-swatch { width: auto; min-width: 0; padding: 6px; }
 .fiok-temak .theme-swatch-preview { height: 28px; margin-bottom: 5px; }
 .fiok-temak .theme-swatch-label { font-size: 0.72rem; line-height: 1.25; }
+
+/* ============================================================================
+   2026-10 (v127): versenylinkek, események, részletek ablak, időjárás, körszínek,
+   kör-grafikon, app-ajánló, szezontérkép és szezonstatisztika
+   ============================================================================ */
+/* Nevezés / versenykiírás link a verseny neve és helyszíne alatt */
+.rc-linkek { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rc-link {
+    display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 999px; font-size: 0.8rem; font-weight: 700;
+    text-decoration: none; color: var(--text); background: var(--card-2); border: 1px solid var(--border); white-space: nowrap;
+}
+.rc-link:hover { border-color: var(--primary); color: var(--primary); }
+.rc-link.fo { background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff); }
+.rc-link.fo:hover { filter: brightness(1.08); color: var(--on-primary, #fff); }
+
+/* Esemény (szezonzáró, közgyűlés...) a versenyek között - lila jelölés */
+.race-card.is-esemeny { --status-color: #BF5AF2; }
+.is-esemeny .race-status { color: #BF5AF2; background: rgba(191, 90, 242, .14); border-color: transparent; }
+html.uj-dizajn .uj-naptar-elem.esemeny .uj-nd { color: #BF5AF2; }
+html.uj-dizajn .uj-naptar-elem.esemeny { border-left: 3px solid #BF5AF2; }
+
+/* Részletek ablak (jövőbeli verseny, esemény, app útmutató) */
+.reszletek { display: flex; flex-direction: column; gap: 8px; color: var(--text); }
+.reszlet-sor { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.92rem; }
+.reszlet-sor span { color: var(--text-dim); }
+.reszlet-sor b { text-align: right; }
+.reszlet-leiras { margin: 4px 0; color: var(--text); line-height: 1.55; }
+.reszlet-cim { margin-top: 6px; font-size: 0.7rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.reszlet-tavok { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.reszlet-tavok li { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); font-size: 0.9rem; }
+.reszlet-tavok small { color: var(--text-dim); }
+.reszlet-gombok { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+button.calc-btn.kicsi {
+    width: auto; margin: 0; padding: 8px 14px; font-size: 0.82rem; text-transform: none; letter-spacing: 0;
+    background: var(--card-3); color: var(--text); border: 1px solid var(--border); box-shadow: none;
+}
+button.calc-btn.kicsi:hover { border-color: var(--primary); transform: none; box-shadow: none; }
+
+/* Mini térkép a helyszínről (Google Térkép beágyazás) */
+.terkep-doboz { margin-top: 6px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); background: var(--card-2); }
+.terkep-doboz iframe { display: block; width: 100%; height: 230px; border: 0; }
+.terkep-doboz a { display: block; padding: 8px 12px; font-size: 0.82rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+
+/* Időjárás a helyszínen */
+.idojaras-doboz:empty { display: none; }
+.idojaras-sor { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); font-size: 0.9rem; line-height: 1.45; }
+.idojaras-sor small { display: block; color: var(--text-dim); font-size: 0.74rem; }
+.idojaras-sor.halvany { color: var(--text-dim); font-size: 0.84rem; }
+.idojaras-ikon { font-size: 1.9rem; line-height: 1; }
+.idojaras-figy { margin-top: 6px; padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.45; }
+.idojaras-figy.meleg { background: var(--warning-dim); border-left: 3px solid var(--warning); }
+.idojaras-figy.hoseg { background: var(--danger-dim); border-left: 3px solid var(--danger); }
+html.uj-dizajn .uj-idojaras { display: inline-block; margin-left: 8px; font-size: 0.85rem; font-weight: 600; opacity: .92; }
+
+/* Körök színe (pályajelölés) */
+.kor-potty {
+    display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 4px; vertical-align: -1px;
+    background: var(--kor-szin, transparent); border: 1px solid rgba(128, 128, 128, .6); flex: 0 0 auto;
+}
+.kor-potty.ures { background: transparent; border-style: dashed; }
+.kor-szin-sor { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 10px; }
+.kor-szin-mezo { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); }
+.kor-szin-mezo select { width: auto; margin: 0; padding: 4px 6px; font-size: 0.82rem; }
+/* A TV (teljes képernyős) kiindulási listán nem jelenik meg a kör színe - ott nem változik semmi */
+#fullscreenLiveContent .csak-lista { display: none; }
+
+/* Körök összevetése a versenyzői adatlapon (kör átlagsebesség és pulzusidő) */
+.kor-grafikon { margin: 14px 20px 4px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); }
+.kg-cim { font-size: 0.85rem; font-weight: 800; color: var(--text); margin-bottom: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.kg-cim small { font-weight: 500; color: var(--text-dim); }
+.kg-jel { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin: 0 4px 0 8px; vertical-align: -1px; }
+.kg-jel.seb, .kg-sav.seb { background: var(--primary); }
+.kg-jel.pulzus, .kg-sav.pulzus { background: var(--teal); }
+.kg-sor { display: grid; grid-template-columns: 52px 1fr; gap: 8px; align-items: center; padding: 4px 0; }
+.kg-kor { font-size: 0.78rem; font-weight: 700; color: var(--text-dim); }
+.kg-savok { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.kg-sav { height: 18px; border-radius: 5px; position: relative; min-width: 2px; }
+.kg-sav span { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+
+/* "End-Ride app a telefonodra" sáv a kezdőlapon + menügomb + útmutató */
+html.uj-dizajn .app-reklam {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px;
+    background: linear-gradient(120deg, var(--primary-dim), var(--card) 70%); border: 1px solid var(--border);
+}
+.app-reklam-ikon img { display: block; width: 56px; height: 56px; border-radius: 13px; box-shadow: var(--shadow-sm); }
+.app-reklam-szoveg { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; color: var(--text); }
+.app-reklam-szoveg b { font-size: 1rem; }
+.app-reklam-szoveg span { font-size: 0.84rem; color: var(--text-dim); line-height: 1.4; }
+.app-reklam-gombok { display: flex; align-items: center; gap: 6px; }
+html.uj-dizajn .app-reklam .uj-gomb { white-space: nowrap; }
+.app-reklam-bezar { background: none; border: none; color: var(--text-dim); font-size: 1rem; cursor: pointer; padding: 8px; border-radius: 50%; }
+.app-reklam-bezar:hover { color: var(--text); background: var(--card-2); }
+@media (max-width: 520px) {
+    html.uj-dizajn .app-reklam { flex-wrap: wrap; }
+    .app-reklam-ikon img { width: 44px; height: 44px; border-radius: 10px; }
+    .app-reklam-gombok { width: 100%; justify-content: space-between; }
+    html.uj-dizajn .app-reklam .uj-gomb { flex: 1; }
+}
+.sidebar-btn.app-menu-gomb { color: var(--primary); }
+.app-utmutato p { margin: 0; color: var(--text); }
+.app-lepesek { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--border); font-size: 0.88rem; }
+.app-lepesek.kiemelt { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+.app-lepesek ol { margin: 6px 0 0; padding-left: 20px; color: var(--text); }
+.app-lepesek li { margin: 2px 0; }
+
+/* Kezdőkép: vízszintes húzás a képváltóé, függőleges görgetés az oldalé */
+#uj-hero { touch-action: pan-y; }
+
+/* Versenyek > Térkép és Statisztika */
+.terkep-fej { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+.terkep-fej select { width: auto; margin: 0; }
+.terkep-jelmagyarazat { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 8px; }
+.terkep-jelmagyarazat span { display: inline-flex; align-items: center; gap: 5px; }
+.terkep-jelmagyarazat .jel { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 2px solid #fff; box-sizing: content-box; }
+.jel.elo { background: #FF453A; } .jel.jovo { background: #0A84FF; } .jel.mult { background: #8E8E93; } .jel.esemeny { background: #BF5AF2; }
+.szezon-terkep { height: min(62vh, 560px); min-height: 320px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--card-2); position: relative; z-index: 0; isolation: isolate; }
+#szezon-terkep-allapot { margin-top: 8px; }
+.terkep-popup-sor { padding: 4px 0; font-size: 0.85rem; line-height: 1.4; }
+.terkep-popup-sor + .terkep-popup-sor { border-top: 1px solid #ddd; margin-top: 4px; padding-top: 8px; }
+.stat-racs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.stat-racs.ketto { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.stat-kartya { padding: 14px 16px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat-kartya b { font-size: 1.6rem; font-weight: 900; color: var(--text); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat-kartya span { font-size: 0.78rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.stat-kartya small { font-size: 0.82rem; color: var(--text-dim); line-height: 1.4; margin-top: 4px; }
+.stat-okok { display: flex; flex-direction: column; gap: 6px; }
+.stat-ok { display: grid; grid-template-columns: 150px 1fr 36px; gap: 10px; align-items: center; font-size: 0.85rem; color: var(--text); }
+.stat-ok .sav { height: 10px; border-radius: 5px; background: var(--danger); min-width: 3px; }
+.stat-ok b { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .stat-ok { grid-template-columns: 110px 1fr 30px; } .stat-kartya b { font-size: 1.35rem; } }

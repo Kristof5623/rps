@@ -350,7 +350,9 @@ html.uj-dizajn #uj-also-sav { display: none; }
     html.uj-dizajn .uj-hero { height: 58vh; min-height: 340px; border-radius: 12px; margin: -4px 0 26px; }
     html.uj-dizajn .uj-hero-szoveg { padding: 22px 20px 44px; }
     html.uj-dizajn .uj-hero-nyil { display: none; }
-    html.uj-dizajn .uj-hero-pontok { left: 20px; right: auto; bottom: 18px; }
+    html.uj-dizajn .uj-hero-pontok { left: 20px; right: 20px; bottom: 18px; gap: 4px; flex-wrap: wrap; }
+    html.uj-dizajn .uj-pont { width: 6px; height: 6px; }
+    html.uj-dizajn .uj-pont.aktiv { width: 16px; border-radius: 3px; }
     html.uj-dizajn #v-mult-list, html.uj-dizajn #v-jovo-list { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
