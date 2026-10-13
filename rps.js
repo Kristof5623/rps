@@ -2138,7 +2138,7 @@
     function appTelepithetoHtml() {
         if (appTelepitve()) return '';
         return `<div class="fiok-blokk">
-            <h4>📲 End-Ride a telefonodon</h4>
+            <h4>${bongeszoTipus().gep ? '💻 End-Ride a gépeden' : '📲 End-Ride a telefonodon'}</h4>
             ${telepitesKeres && !bongeszoTipus().gep ? `<button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre a telefonra</button>`
                 : `<p class="fiok-megj">Saját ikonnal, teljes képernyőn nyílik, mint egy app.</p><button class="calc-btn" onclick="appUtmutato()">Hogyan telepítsem?</button>`}
         </div>`;
@@ -2171,6 +2171,11 @@
             </div>
         </section>`;
     }
+    // Az oldalmenü pontja gépen "App a gépedre" (a HTML-ben a telefonos szöveg van)
+    (function appMenuSzoveg() {
+        const g = document.getElementById('btn-menu-app');
+        if (g && bongeszoTipus().gep) g.textContent = '💻 App a gépedre';
+    })();
     function appReklamElrejt() {
         try { localStorage.setItem(APP_REKLAM_KULCS, String(Date.now())); } catch (e) {}
         appAjanloJelzes('elrejtve');
@@ -2225,12 +2230,13 @@
             safari: ['A felső menüsorban: <b>Fájl</b> → <b>„Hozzáadás a Dockhoz…”</b>.', 'Erősítsd meg: <b>Hozzáadás</b>.']
         };
         const gepResz = gep ? lepes(`Számítógép (${GEP_NEV[b] || 'Chrome'})`, GEP_LEPESEK[b] || GEP_LEPESEK.chrome, true) : '';
-        // a saját eszköz lépései elöl
-        const sorrend = android ? [androidLepes, iphone] : ios ? [iphone, androidLepes] : [gepResz, iphone, androidLepes];
-        document.getElementById('infoModalTitle').innerText = 'End-Ride app a telefonodra';
+        // csak a saját eszköz és böngésző leírása látszik
+        const sorrend = android ? [androidLepes] : ios ? [iphone] : [gepResz];
+        document.getElementById('infoModalTitle').innerText = gep ? 'End-Ride app a gépedre' : 'End-Ride app a telefonodra';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek app-utmutato">
             ${telepitett ? '<p><b>Már telepítve van – innen nyitod most is.</b></p>' : ''}
-            <p>Az End-Ride webes app: nem kell áruházból letölteni, a telefon kezdőképernyőjére (gépen az asztalra / a tálcára) kerül saját ikonnal, és onnan teljes képernyőn, appként nyílik.</p>
+            <p>${gep ? 'Az End-Ride webes app: nem kell letölteni semmit, a gépeden az asztalra / a tálcára kerül saját ikonnal, és onnan külön ablakban, appként nyílik.'
+                : 'Az End-Ride webes app: nem kell áruházból letölteni, a telefon kezdőképernyőjére kerül saját ikonnal, és onnan teljes képernyőn, appként nyílik.'}</p>
             ${gomb}${gombKesobb}
             ${sorrend.join('')}
             <p class="field-hint">Telepítés után a Fiók ablakban kapcsolhatod be az értesítéseket a követett lovasokról.</p>
