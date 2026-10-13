@@ -2569,7 +2569,7 @@ button.calc-btn {
 .hir-kartya.nagy .hir-kep { position: absolute; inset: 0; aspect-ratio: auto; }
 .hir-kartya.nagy .hir-kep::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,10,13,.08) 20%, rgba(8,10,13,.55) 55%, rgba(8,10,13,.92) 100%); }
 .hir-kartya.nagy .hir-cimke { z-index: 1; }
-.hir-kartya.nagy .hir-tartalom { position: relative; z-index: 1; justify-content: flex-end; padding: 22px 24px; min-height: 320px; max-width: 780px; pointer-events: none; }
+.hir-kartya.nagy .hir-tartalom { position: relative; z-index: 1; justify-content: flex-end; padding: 52px 24px 22px; min-height: 320px; max-width: 780px; pointer-events: none; }
 .hir-kartya.nagy .hir-tartalom a, .hir-kartya.nagy .hir-tartalom button { pointer-events: auto; }
 .hir-kartya.nagy h4 { font-size: clamp(1.2rem, 2.6vw, 1.6rem); color: #fff; line-height: 1.25; }
 .hir-kartya.nagy p { color: rgba(255,255,255,.86); font-size: 0.95rem; }
@@ -2577,7 +2577,22 @@ button.calc-btn {
 .hir-kartya.nagy .uj-link { color: #fff; margin-top: 4px; }
 .hir-kartya.nagy .hir-cim-link:hover { color: #7ee2b3; }
 .hir-kartya.nagy .hir-lab small { color: rgba(255,255,255,.7); }
-@media (max-width: 600px) { .hir-kartya.nagy, .hir-kartya.nagy .hir-tartalom { min-height: 260px; } .hir-kartya.nagy .hir-tartalom { padding: 16px; } }
+/* telefonon a nagy kártya is sima kártya: kép felül, szöveg alatta - a képre írt szöveg ott nehezen olvasható,
+   és hosszabb címnél a dátum felcsúszott a kép bal felső sarkában lévő címkére (tavlovasok.hu) */
+@media (max-width: 600px) {
+    .hir-kartya.nagy { min-height: 0; border-color: var(--border); }
+    .hir-kartya.nagy.kiemelt { border-color: var(--primary); }
+    .hir-kartya.nagy .hir-kep { position: relative; inset: auto; aspect-ratio: 16 / 9; }
+    .hir-kartya.nagy .hir-kep::after { display: none; }
+    .hir-kartya.nagy .hir-tartalom { min-height: 0; padding: 12px 16px 14px; justify-content: flex-start; max-width: none; pointer-events: auto; }
+    .hir-kartya.nagy h4 { font-size: 1.12rem; color: var(--text); line-height: 1.35; }
+    .hir-kartya.nagy p { color: var(--text-dim); font-size: 0.9rem; }
+    .hir-kartya.nagy .hir-forras { color: var(--primary); }
+    .hir-kartya.nagy.kulso .hir-forras { color: var(--text-dim); }
+    .hir-kartya.nagy .uj-link { color: var(--primary); margin-top: auto; }
+    .hir-kartya.nagy .hir-cim-link:hover { color: var(--primary); }
+    .hir-kartya.nagy .hir-lab small { color: var(--text-dim-2); }
+}
 .hir-lab { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin-top: 4px; }
 .hir-lab small { color: var(--text-dim-2); }
 .hir-lab .edit-btn { margin-left: 6px; }
