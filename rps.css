@@ -712,12 +712,45 @@ button, input, select, textarea { font-family: inherit; }
 .role-admin .admin-only, .role-admin .doctor-only, .role-admin .checkin-only, .role-admin .judge-only, .role-admin .printer-only { display: block !important; }
 .role-admin #szerepkor-menu, .role-admin #admin-menu { display: flex !important; }
 
-/* JOGOSULTSÁG SZERINT (Felhasználók oldal): a menügombokat a JS kapcsolja (menukJogSzerint),
-   az ÉLŐ Verseny Kezelés füleit ez. "jogos" = belépett, nem admin felhasználó. */
-body.jog-fomod-kiiras .csak-fomod-kiiras { display: block !important; }
-body.jogos:not(.jog-fomod-kiiras) #btn-sebesseg, body.jogos:not(.jog-fomod-kiiras) #btn-kiiras, body.jogos:not(.jog-fomod-kiiras) #btn-versenyzok,
-body.jogos:not(.jog-fomod-kiiras) #sebesseg, body.jogos:not(.jog-fomod-kiiras) #kiiras, body.jogos:not(.jog-fomod-kiiras) #versenyzok { display: none !important; }
-body.jogos:not(.jog-fomod-verseny) #btn-verseny, body.jogos:not(.jog-fomod-verseny) #verseny { display: none !important; }
+/* JOGOSULTSÁGOK (Felhasználók oldal, pipánként): a "csak-jog-<kulcs>" osztályú elem csak annak látszik,
+   akinek a <body>-ján ott a "jog-<kulcs>" (applyAuthUI). Az admin minden jog-osztályt megkap. A menügombokat
+   a JS kapcsolja (menukJogSzerint). Minden JOG_LISTA és JOG_BARMELY kulcshoz kell itt egy sor (teszt figyeli). */
+body:not(.jog-fomod-verseny) .csak-jog-fomod-verseny,
+body:not(.jog-szankciok) .csak-jog-szankciok,
+body:not(.jog-fomod-kiiras) .csak-jog-fomod-kiiras,
+body:not(.jog-fomod-versenyzok) .csak-jog-fomod-versenyzok,
+body:not(.jog-fomod-sebesseg) .csak-jog-fomod-sebesseg,
+body:not(.jog-fomod-orvosok) .csak-jog-fomod-orvosok,
+body:not(.jog-verseny-allapot) .csak-jog-verseny-allapot,
+body:not(.jog-beerkeztetes) .csak-jog-beerkeztetes,
+body:not(.jog-orvosi-ido) .csak-jog-orvosi-ido,
+body:not(.jog-orvosi) .csak-jog-orvosi,
+body:not(.jog-nyomtatas) .csak-jog-nyomtatas,
+body:not(.jog-fei-lap) .csak-jog-fei-lap,
+body:not(.jog-rfid) .csak-jog-rfid,
+body:not(.jog-versenynaptar) .csak-jog-versenynaptar,
+body:not(.jog-esemenyek) .csak-jog-esemenyek,
+body:not(.jog-mult-eredmenyek) .csak-jog-mult-eredmenyek,
+body:not(.jog-verseny-torles) .csak-jog-verseny-torles,
+body:not(.jog-ob-pont) .csak-jog-ob-pont,
+body:not(.jog-csapatok) .csak-jog-csapatok,
+body:not(.jog-kulfoldi) .csak-jog-kulfoldi,
+body:not(.jog-bajnokavatas) .csak-jog-bajnokavatas,
+body:not(.jog-tenyeszto) .csak-jog-tenyeszto,
+body:not(.jog-ujonc) .csak-jog-ujonc,
+body:not(.jog-orvos-torzs) .csak-jog-orvos-torzs,
+body:not(.jog-pontkereso) .csak-jog-pontkereso,
+body:not(.jog-attekinto) .csak-jog-attekinto,
+body:not(.jog-nyomtatvanyok) .csak-jog-nyomtatvanyok,
+body:not(.jog-export) .csak-jog-export,
+body:not(.jog-nezok) .csak-jog-nezok,
+body:not(.jog-kozos-tema) .csak-jog-kozos-tema,
+body:not(.jog-fomod) .csak-jog-fomod,
+body:not(.jog-beallitasok) .csak-jog-beallitasok,
+body:not(.jog-versenymodal) .csak-jog-versenymodal,
+body:not(.jog-kezeles-jovo) .csak-jog-kezeles-jovo,
+body:not(.jog-kezeles-mult) .csak-jog-kezeles-mult,
+body:not(.jog-jovo-gombok) .csak-jog-jovo-gombok { display: none !important; }
 
 /* EGYÉB SZEREPKÖRÖK */
 .role-doctor .doctor-only, .role-doctor #szerepkor-menu { display: flex !important; display: block !important; }
@@ -1843,6 +1876,25 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
 .felh-jogcsoport b { display: block; font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
 .felh-jogcsoport label { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 0.86rem; color: var(--text); margin: 4px 0; cursor: pointer; font-weight: 500; }
 .felh-jogcsoport input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+/* v127: finomabb jogok - csoportonként "mind / egyik sem", a pipák alatt rövid magyarázat */
+.felh-jogcsoport { background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 8px 10px; }
+.felh-jogcsoport-fej { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.felh-jogcsoport-fej b { margin-bottom: 0; }
+.felh-csoport-gombok { display: flex; gap: 4px; flex-shrink: 0; }
+.felh-csoport-gombok button { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: 999px; padding: 2px 9px; font-size: 0.72rem; cursor: pointer; font-family: inherit; }
+.felh-csoport-gombok button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.felh-csoport-gombok button:disabled { opacity: .4; cursor: default; }
+.felh-jogcsoport label { align-items: flex-start; }
+.felh-jogcsoport label input[type=checkbox] { margin-top: 1px; height: 18px; min-height: 0; padding: 0; }
+.felh-jogcsoport label small { display: block; font-size: 0.74rem; color: var(--text-dim); font-weight: 400; line-height: 1.35; }
+.felh-jogszam { margin-top: 10px; font-size: 0.85rem; color: var(--text-dim); }
+.felh-jogszam b { color: var(--text); }
+/* Nézők > App-letöltések napi bontás */
+.app-napok { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; font-size: 0.84rem; }
+.app-nap { display: grid; grid-template-columns: 70px repeat(4, 1fr); gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--card-2); font-variant-numeric: tabular-nums; }
+.app-nap span:not(:first-child) { text-align: right; }
+.app-nap.fej { background: none; color: var(--text-dim); font-size: 0.74rem; font-weight: 700; }
+@media (max-width: 480px) { .app-nap { grid-template-columns: 48px repeat(4, 1fr); gap: 4px; font-size: 0.78rem; } .app-nap.fej { font-size: 0.66rem; } }
 .felh-gombok { margin-top: 10px; }
 .felh-gombok .calc-btn { width: auto; padding: 10px 22px; margin-top: 0; }
 .felh-gombok .calc-btn:disabled { opacity: .45; cursor: default; filter: none; }

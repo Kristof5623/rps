@@ -21,7 +21,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="127">
+    <meta name="app-verzio" content="128">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,8 +31,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=127">
-    <link rel="stylesheet" href="rps-uj.css?v=127">
+    <link rel="stylesheet" href="rps.css?v=128">
+    <link rel="stylesheet" href="rps-uj.css?v=128">
 </head>
 <body>
 
@@ -306,16 +306,16 @@
             </div>
 
             <div id="v-mult" class="verseny-tab-content" style="display:none;">
-                <div class="admin-only" style="margin-bottom: 15px;">
+                <div class="csak-jog-mult-eredmenyek" style="margin-bottom: 15px;">
                     <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('mult')">+ Új múltbéli verseny</button>
                 </div>
                 <div id="v-mult-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
 
             <div id="v-jovo" class="verseny-tab-content" style="display:block;">
-                <div class="admin-only" style="margin-bottom: 15px;">
-                    <button class="calc-btn" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
-                    <button class="calc-btn" style="padding:10px; margin-top:8px;" onclick="esemenyUrlap()">+ Új esemény (szezonzáró, közgyűlés…)</button>
+                <div class="csak-jog-jovo-gombok" style="margin-bottom: 15px;">
+                    <button class="calc-btn csak-jog-versenynaptar" style="background:var(--success); color:black; padding:10px; margin-top:0;" onclick="openRaceModal('jovo')">+ Új jövőbeli verseny</button>
+                    <button class="calc-btn csak-jog-esemenyek" style="padding:10px; margin-top:8px;" onclick="esemenyUrlap()">+ Új esemény (szezonzáró, közgyűlés…)</button>
                 </div>
                 <div id="v-jovo-list"><div style="text-align:center; padding: 20px; color: var(--text-dim);">Betöltés folyamatban...</div></div>
             </div>
@@ -404,9 +404,9 @@
             <h3 style="color:var(--primary); margin-bottom: 15px;">Csapatbajnokság</h3>
             <div class="tabs">
                 <button id="btn-csapat-rang" class="tab-btn active" onclick="switchCsapatTab('csapat-rang', this)">Ranglista</button>
-                <button id="btn-csapat-kezel" class="tab-btn admin-only" onclick="switchCsapatTab('csapat-kezel', this)">Csapatok kezelése</button>
-                <button id="btn-csapat-kulf" class="tab-btn admin-only" onclick="switchCsapatTab('csapat-kulf', this)">Külföldi eredmények</button>
-                <button id="btn-csapat-datum" class="tab-btn admin-only" onclick="switchCsapatTab('csapat-datum', this)">Bajnokavatás dátuma</button>
+                <button id="btn-csapat-kezel" class="tab-btn csak-jog-csapatok" onclick="switchCsapatTab('csapat-kezel', this)">Csapatok kezelése</button>
+                <button id="btn-csapat-kulf" class="tab-btn csak-jog-kulfoldi" onclick="switchCsapatTab('csapat-kulf', this)">Külföldi eredmények</button>
+                <button id="btn-csapat-datum" class="tab-btn csak-jog-bajnokavatas" onclick="switchCsapatTab('csapat-datum', this)">Bajnokavatás dátuma</button>
             </div>
 
             <div id="csapat-rang" class="sub-mode-content" style="display:block;">
@@ -422,7 +422,7 @@
                 <div id="csapat-ranglista-content"></div>
             </div>
 
-            <div id="csapat-kezel" class="sub-mode-content" style="display:none;">
+            <div id="csapat-kezel" class="sub-mode-content csak-jog-csapatok" style="display:none;">
                 <h4 style="margin-bottom: 15px; color: var(--text);">Új csapat létrehozása</h4>
                 <label>Csapat neve:</label> <input type="text" id="team-name" placeholder="pl. Alföldi Lovasok SE">
                 <label>Kapcsolattartó:</label> <input type="text" id="team-contact" placeholder="pl. telefonszám vagy email" autocomplete="off">
@@ -430,14 +430,14 @@
                 <input type="text" id="team-member-search" placeholder="Lovas keresése név vagy igazolási szám alapján..." autocomplete="off">
                 <div id="team-member-list" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;"></div>
 
-                <button id="btn-team-mentes" class="calc-btn add-btn admin-only" onclick="saveTeam()">Csapat mentése</button>
+                <button id="btn-team-mentes" class="calc-btn add-btn csak-jog-csapatok" onclick="saveTeam()">Csapat mentése</button>
                 <button id="team-cancel-btn" class="cancel-btn" onclick="cancelTeamEdit()">Mégse</button>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Regisztrált csapatok:</h4>
                 <div id="team-list-container"></div>
             </div>
 
-            <div id="csapat-kulf" class="sub-mode-content" style="display:none;">
+            <div id="csapat-kulf" class="sub-mode-content csak-jog-kulfoldi" style="display:none;">
                 <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--text);">Külföldi (CEI/CEIO) eredmény felvitele</h4>
                 <p class="field-hint">Ugyanazok a mezők, mint amiket a FEI import is tölt - így a kézzel felvitt eredmény pontosan úgy néz ki és úgy is számít, mint egy importált. A csapatbajnokságba a helyezés és a táv alapján számít pontot, a ló-ranglistába pedig a km - de csak akkor, ha nincs kiesési státusz.</p>
                 <label>Lovas:</label>
@@ -467,14 +467,14 @@
                 </select>
                 <label>Eredmény (menetidő vagy átlagsebesség):</label>
                 <input type="text" id="ext-score" placeholder="pl. 11:21:42 vagy 16.83">
-                <button id="btn-ext-mentes" class="calc-btn add-btn admin-only" onclick="saveExternalResult()">Eredmény mentése</button>
+                <button id="btn-ext-mentes" class="calc-btn add-btn csak-jog-kulfoldi" onclick="saveExternalResult()">Eredmény mentése</button>
                 <button id="ext-cancel-btn" class="cancel-btn" onclick="cancelExternalEdit()">Mégse</button>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Rögzített külföldi eredmények:</h4>
                 <div id="ext-list-container"></div>
             </div>
 
-            <div id="csapat-datum" class="sub-mode-content" style="display:none;">
+            <div id="csapat-datum" class="sub-mode-content csak-jog-bajnokavatas" style="display:none;">
                 <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:0;">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">📅 Bajnokavatás dátuma évenként</h4>
                     <p class="field-hint" style="margin-bottom:0;">
@@ -514,9 +514,9 @@
             <h3 style="color:var(--primary); margin-bottom: 15px;">Beállítások</h3>
             <div class="tabs">
                 <button id="btn-beallitasok-tema" class="tab-btn active" onclick="switchBeallitasokTab('beallitasok-tema', this)">Design téma</button>
-                <button id="btn-beallitasok-pontkereso" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-pontkereso', this)">Versenyző pontkereső</button>
-                <button id="btn-beallitasok-kulfoldi" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-kulfoldi', this)">Nemzetközi versenyek</button>
-                <button id="btn-beallitasok-vetek" class="tab-btn" onclick="switchBeallitasokTab('beallitasok-vetek', this)">Állatorvosok</button>
+                <button id="btn-beallitasok-pontkereso" class="tab-btn csak-jog-pontkereso" onclick="switchBeallitasokTab('beallitasok-pontkereso', this)">Versenyző pontkereső</button>
+                <button id="btn-beallitasok-kulfoldi" class="tab-btn csak-jog-kulfoldi" onclick="switchBeallitasokTab('beallitasok-kulfoldi', this)">Nemzetközi versenyek</button>
+                <button id="btn-beallitasok-vetek" class="tab-btn csak-jog-orvos-torzs" onclick="switchBeallitasokTab('beallitasok-vetek', this)">Állatorvosok</button>
             </div>
 
             <div id="beallitasok-tema" class="sub-mode-content" style="display:block;">
@@ -528,20 +528,20 @@
                     <button class="calc-btn" style="background:var(--card-3); color:var(--text); border:1px solid var(--border); margin-top:15px; width:auto; padding:8px 18px;" onclick="resetUiTheme()">Vissza a közös témához</button>
                 </div>
 
-                <div class="kiiras-card admin-only" style="border-left-color: var(--warning);">
+                <div class="kiiras-card csak-jog-kozos-tema" style="border-left-color: var(--warning);">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">👑 Közös (alapértelmezett) téma</h4>
                     <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">Ezt kapja mindenki, aki még nem választott magának sajátot.</p>
                     <div class="theme-swatch-row" id="kozosThemeSwatchRow"></div>
                 </div>
             </div>
 
-            <div id="beallitasok-pontkereso" class="sub-mode-content" style="display:none;">
+            <div id="beallitasok-pontkereso" class="sub-mode-content csak-jog-pontkereso" style="display:none;">
                 <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Keress rá egy versenyzőre, és nézd meg versenyenkénti bontásban, hányadik helyen végzett, milyen távon, és mennyi bajnoki pontot ért ez.</p>
                 <input type="text" id="admin-pontkereso-search" placeholder="Keresés név, igazolási szám vagy egyesület alapján..." autocomplete="off" oninput="renderAdminPontkereso()">
                 <div id="admin-pontkereso-list" style="margin-top:15px;"></div>
             </div>
 
-            <div id="beallitasok-vetek" class="sub-mode-content" style="display:none;">
+            <div id="beallitasok-vetek" class="sub-mode-content csak-jog-orvos-torzs" style="display:none;">
                 <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🩺 Állatorvosok</h4>
                     <p class="field-hint" style="margin-bottom:0;">Az összes létező állatorvos. Elírt nevet itt javíts ki, majd <b>Mentés</b> - a név mindenhol átíródik
@@ -551,7 +551,7 @@
                 <div id="vet-torzs-lista" style="margin-top:15px;"></div>
             </div>
 
-            <div id="beallitasok-kulfoldi" class="sub-mode-content" style="display:none;">
+            <div id="beallitasok-kulfoldi" class="sub-mode-content csak-jog-kulfoldi" style="display:none;">
                 <div class="kiiras-card" style="border-left-color: var(--teal); margin-top:0;">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">🌍 Nemzetközi (FEI) eredmények</h4>
                     <p class="field-hint" style="margin-bottom:0;">
@@ -569,14 +569,14 @@
         <div id="fo-mod" class="mode-content">
             <h3 style="color:var(--primary); margin-top:0; margin-bottom:15px;">ÉLŐ Verseny Kezelés</h3>
             <div class="tabs">
-                <button id="btn-sebesseg" class="tab-btn active" onclick="switchSubMode('sebesseg', this)">Sebességhatár</button>
-                <button id="btn-kiiras" class="tab-btn" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
-                <button id="btn-orvosok" class="tab-btn admin-only" onclick="switchSubMode('orvosok', this)">Állatorvosok</button>
-                <button id="btn-versenyzok" class="tab-btn" onclick="switchSubMode('versenyzok', this)">Versenyzők</button>
-                <button id="btn-verseny" class="tab-btn" onclick="switchSubMode('verseny', this)">Teljes verseny</button>
+                <button id="btn-sebesseg" class="tab-btn active csak-jog-fomod-sebesseg" onclick="switchSubMode('sebesseg', this)">Sebességhatár</button>
+                <button id="btn-kiiras" class="tab-btn csak-jog-fomod-kiiras" onclick="switchSubMode('kiiras', this)">Verseny Kiírás</button>
+                <button id="btn-orvosok" class="tab-btn csak-jog-fomod-orvosok" onclick="switchSubMode('orvosok', this)">Állatorvosok</button>
+                <button id="btn-versenyzok" class="tab-btn csak-jog-fomod-versenyzok" onclick="switchSubMode('versenyzok', this)">Versenyzők</button>
+                <button id="btn-verseny" class="tab-btn csak-jog-fomod-verseny" onclick="switchSubMode('verseny', this)">Teljes verseny</button>
             </div>
 
-            <div id="sebesseg" class="sub-mode-content" style="display:block;">
+            <div id="sebesseg" class="sub-mode-content csak-jog-fomod-sebesseg" style="display:block;">
                 <div class="kiiras-card" style="border-left-color: var(--warning); margin-top:0;">
                     <h4 style="margin-top:0; margin-bottom:5px; color:var(--text);">⚠️ Sebesség-szabályok távonként</h4>
                     <p style="font-size:0.78rem; color:var(--text-dim); margin-bottom:15px;">
@@ -588,14 +588,14 @@
                 </div>
             </div>
 
-            <div id="kiiras" class="sub-mode-content" style="display:none;">
+            <div id="kiiras" class="sub-mode-content csak-jog-fomod-kiiras" style="display:none;">
                 <h4 style="color:var(--warning); margin-bottom:5px;">ÉLŐ: Hivatalos adatok beállítása</h4>
                 <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt add meg a távok rajtidejét és a köröket a futó versenyhez.</p>
                 <div id="kiirasContainer"></div>
-                <button id="saveKiirasBtn" class="calc-btn admin-only csak-fomod-kiiras" style="background:var(--primary); color:white;" onclick="saveKiiras()">Beállítások Mentése</button>
+                <button id="saveKiirasBtn" class="calc-btn csak-jog-fomod-kiiras" style="background:var(--primary); color:white;" onclick="saveKiiras()">Beállítások Mentése</button>
             </div>
 
-            <div id="versenyzok" class="sub-mode-content" style="display:none;">
+            <div id="versenyzok" class="sub-mode-content csak-jog-fomod-versenyzok" style="display:none;">
                 <h4 style="margin-bottom: 15px; color: var(--text);">ÉLŐ: Új versenyző regisztrálása</h4>
                 <label>Rajtszám:</label> <input type="number" id="regBib" placeholder="pl. 23">
                 <label>Versenyző neve:</label> <input type="text" id="regName" placeholder="pl. Kovács János" autocomplete="off">
@@ -618,7 +618,7 @@
                     <option value="160">160 km</option>
                 </select>
                 
-                <button id="addCompBtn" class="calc-btn add-btn admin-only csak-fomod-kiiras" onclick="saveCompetitor()">Hozzáadás</button>
+                <button id="addCompBtn" class="calc-btn add-btn csak-jog-fomod-versenyzok" onclick="saveCompetitor()">Hozzáadás</button>
                 <button id="cancelEditBtn" class="cancel-btn" onclick="cancelEdit()">Mégse</button>
                 <button id="deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteCompetitor()">Törlés</button>
 
@@ -633,21 +633,21 @@
                 <div id="competitorList"></div>
             </div>
 
-            <div id="orvosok" class="sub-mode-content" style="display:none;">
+            <div id="orvosok" class="sub-mode-content csak-jog-fomod-orvosok" style="display:none;">
                 <h4 style="margin-bottom: 15px; color: var(--text);">ÉLŐ: Állatorvosok felvitele</h4>
                 <label>Állatorvos neve (pl. Dr. Szabó János):</label>
                 <input type="text" id="regVetName" placeholder="Kezdd el gépelni a nevet..." autocomplete="off">
                 <div style="font-size:0.75rem; color:var(--text-dim); margin:6px 0 10px 2px;">
                     A korábbi versenyeken szerepelt orvosok gépelés közben felajánlódnak.
                 </div>
-                <button class="calc-btn add-btn admin-only" onclick="saveVet()">Orvos Hozzáadása</button>
+                <button class="calc-btn add-btn csak-jog-fomod-orvosok" onclick="saveVet()">Orvos Hozzáadása</button>
 
                 <h4 style="margin-top: 30px; margin-bottom: 10px; color: var(--text-dim);">Orvosok ehhez a versenyhez:</h4>
                 <div id="vetListContainer"></div>
-                <button class="calc-btn admin-only" style="background:var(--danger); margin-top:12px;" onclick="clearLiveVets()">Lista ürítése (új versenyhez)</button>
+                <button class="calc-btn csak-jog-fomod-orvosok" style="background:var(--danger); margin-top:12px;" onclick="clearLiveVets()">Lista ürítése (új versenyhez)</button>
             </div>
             
-            <div id="verseny" class="sub-mode-content" style="display:none;">
+            <div id="verseny" class="sub-mode-content csak-jog-fomod-verseny" style="display:none;">
                 <h4 style="color:var(--text); margin-bottom:15px; margin-top:0;">ÉLŐ: Eredmények bevitele</h4>
                 <label style="color: var(--primary);">Versenyző kiválasztása:</label>
                 <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
@@ -677,7 +677,7 @@
                     <option value="FTQ-OT" style="color:var(--danger);">Kiesés: Időtúllépés (OT)</option>
                     <option value="FTQ-FTC" style="color:var(--danger);">Kiesés: Befejezetlen verseny (FTC)</option>
                 </select>
-                    <div id="szankcio-blokk" class="szankcio-blokk"></div>
+                    <div id="szankcio-blokk" class="szankcio-blokk csak-jog-szankciok"></div>
 
                     <label>Össztáv & Körök:</label>
                     <select id="totalDist" onchange="versenyTavValtas()">
@@ -759,7 +759,7 @@
         <div id="felhasznalok-mod" class="mode-content">
             <h3 style="color:var(--primary); margin-bottom: 10px;">Felhasználók</h3>
             <p class="field-hint" style="margin-top:0;">Mindenki, aki belépett vagy regisztrált (Google-lel vagy e-maillel). Itt adhatsz <b>szerepkört</b> (bíró, állatorvos,
-                beérkeztető, nyomtató, admin) és menünként <b>jogot</b>. Szerepkör nélkül mindenki néző: követhet és szurkolhat, de az adatbázisba nem írhat.</p>
+                beérkeztető, nyomtató, szervező, admin), és a szerepkörön belül pipánként <b>jogokat</b>: menük, fülek és gombok egyenként. Szerepkör nélkül mindenki néző: követhet és szurkolhat, de az adatbázisba nem írhat.</p>
             <div class="tabs" id="felh-szurok"></div>
             <input type="text" id="felh-kereso" placeholder="Keresés név vagy e-mail alapján..." autocomplete="off" oninput="renderFelhasznalok()">
             <div id="felh-lista" style="margin-top:12px;"><p class="field-hint">Betöltés...</p></div>
@@ -853,21 +853,21 @@
                 <p class="field-hint" style="margin-bottom:0;">Alapból minden verseny OB-fordulónak számít - ha ez a verseny mégsem az, itt veheted ki a pipát. Az OB-forduló eredményei számítanak bele az egyéni bajnokságba, az egyesületi bontásba és a csapatbajnokság jogosultsági feltételébe.</p>
             </div>
 
-            <button class="calc-btn admin-only" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
+            <button class="calc-btn csak-jog-versenymodal" id="btn-rm-alap-mentes" onclick="saveRaceData()">Mentés a listába</button>
         </div>
 
         <div id="rm-kiiras" class="rm-tab-content" style="display:none;">
             <h4 style="color:var(--warning); margin-bottom:5px;">Adatok beállítása ehhez a versenyhez</h4>
             <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Itt adhatod meg a távok rajtidejét és a köröket a kiválasztott versenyhez.</p>
             <div id="rm-kiirasContainer"></div>
-            <button id="saveRmKiirasBtn" class="calc-btn admin-only" style="background:var(--primary); color:white;" onclick="saveRmKiiras()">Beállítások Mentése</button>
+            <button id="saveRmKiirasBtn" class="calc-btn csak-jog-versenymodal" style="background:var(--primary); color:white;" onclick="saveRmKiiras()">Beállítások Mentése</button>
         </div>
 
         <div id="rm-orvosok" class="rm-tab-content" style="display:none;">
             <h4 style="margin-bottom: 15px; color: var(--text);">Állatorvosok ehhez a versenyhez</h4>
             <label>Állatorvos neve:</label>
             <input type="text" id="rm-regVetName" placeholder="pl. Dr. Kovács János">
-            <button id="rm-saveVetBtn" class="calc-btn add-btn admin-only" style="margin-top:10px;" onclick="saveRmVet()">Orvos hozzáadása</button>
+            <button id="rm-saveVetBtn" class="calc-btn add-btn csak-jog-versenymodal" style="margin-top:10px;" onclick="saveRmVet()">Orvos hozzáadása</button>
             <div id="rm-vetListContainer" style="margin-top:20px;"></div>
         </div>
 
@@ -893,10 +893,10 @@
                 <option value="140">140 km</option>
                 <option value="160">160 km</option>
             </select>
-            <button id="rm-addCompBtn" class="calc-btn add-btn admin-only" onclick="saveRmCompetitor()">Hozzáadás</button>
+            <button id="rm-addCompBtn" class="calc-btn add-btn csak-jog-versenymodal" onclick="saveRmCompetitor()">Hozzáadás</button>
             <button id="rm-cancelEditBtn" class="cancel-btn" onclick="cancelRmEdit()">Mégse</button>
             <button id="rm-deleteCompBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmCompetitor()">Törlés</button>
-            <div class="admin-only" style="background: var(--card-2); padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning); text-align: center;">
+            <div class="csak-jog-versenymodal" style="background: var(--card-2); padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--warning); text-align: center;">
                 <h4 style="margin-top: 0; color: var(--warning);">Tömeges Importálás</h4>
                 <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 15px;">Kattints a gombra, és a böngésző felugró ablakába illeszd be a kódot!</p>
                 <button class="calc-btn" style="background: var(--warning); color: black; margin-top: 0;" onclick="importCompetitorsFromPrompt(true)">Kód beillesztése és Hozzáadás</button>
@@ -959,7 +959,7 @@
                     <input type="number" id="rm-vsR" placeholder="00" oninput="jump(this, 'rm-vh1')">
                 </div>
                 <div id="rm-lapInputsContainer"></div>
-                <button class="calc-btn admin-only" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés</button>
+                <button class="calc-btn csak-jog-versenymodal" id="rm-btn-kiertel-mentes" onclick="calcRmVerseny()">Kiértékelés / Mentés</button>
                 <div id="rm-res2" style="display:none"></div>
             </div>
         </div>
@@ -1021,7 +1021,7 @@
                 <input type="number" id="rm-gy-s" placeholder="00">
             </div>
 
-            <button id="rm-gy-addBtn" class="calc-btn add-btn admin-only" onclick="saveRmGyorsCompetitor()">Hozzáadás</button>
+            <button id="rm-gy-addBtn" class="calc-btn add-btn csak-jog-versenymodal" onclick="saveRmGyorsCompetitor()">Hozzáadás</button>
             <button id="rm-gy-cancelBtn" class="cancel-btn" onclick="cancelRmGyorsEdit()">Mégse</button>
             <button id="rm-gy-deleteBtn" class="cancel-btn" style="background:var(--danger); color:white; margin-top:5px;" onclick="deleteRmGyorsCompetitor()">Törlés</button>
 
@@ -1076,7 +1076,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=127"></script>
+<script src="rps.js?v=128"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

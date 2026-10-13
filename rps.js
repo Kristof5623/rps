@@ -899,42 +899,82 @@
     // Íráshoz a szabályok a szerepkör meglétét kérik: aki csak regisztrált, az néző marad.
     // ============================================================================
 
-    // A menük / belső nézetek jogai. A szerepkör adja az alapot (SZEREP_JOGOK), az admin a
+    // A menük, fülek és gombok jogai. A szerepkör adja az alapot (SZEREP_JOGOK), az admin a
     // Felhasználók oldalon pipánként felülírhatja. Az admin szerepkör mindent lát.
+    // A felületen: az elem "csak-jog-<kulcs>" osztályt kap, és a CSS elrejti, ha a <body>-n nincs
+    // "jog-<kulcs>" (rps.css, "JOGOSULTSÁGOK" blokk) - minden kulcshoz kell ott egy sor.
     const JOG_LISTA = [
-        { kulcs: 'fomod-verseny', csoport: 'Élő verseny', cimke: 'Eredmények bevitele (Teljes verseny fül)' },
-        { kulcs: 'fomod-kiiras', csoport: 'Élő verseny', cimke: 'Kiírás, versenyzők, sebességhatár' },
-        { kulcs: 'beerkeztetes', csoport: 'Feladatkörök', cimke: 'Beérkeztetés' },
-        { kulcs: 'orvosi-ido', csoport: 'Feladatkörök', cimke: 'Orvosi idő' },
-        { kulcs: 'orvosi', csoport: 'Feladatkörök', cimke: 'Állatorvosi vizsgálat' },
-        { kulcs: 'nyomtatas', csoport: 'Feladatkörök', cimke: 'Nyomtatás (orvosi lap)' },
-        { kulcs: 'nyomtatvanyok', csoport: 'Admin eszközök', cimke: 'A4 nyomtatványok' },
-        { kulcs: 'attekinto', csoport: 'Admin eszközök', cimke: 'Versenyáttekintő' },
-        { kulcs: 'rfid', csoport: 'Admin eszközök', cimke: 'RFID kapuk' },
-        { kulcs: 'export', csoport: 'Admin eszközök', cimke: 'Verseny exportálás' },
-        { kulcs: 'beallitasok', csoport: 'Admin eszközök', cimke: 'Beállítások' },
-        { kulcs: 'tenyeszto', csoport: 'Admin eszközök', cimke: 'Év Tenyésztője' }
+        { kulcs: 'fomod-verseny', csoport: 'ÉLŐ verseny kezelése', cimke: 'Eredmények bevitele', reszlet: 'Teljes verseny fül: idők, státusz, kiértékelés' },
+        { kulcs: 'szankciok', csoport: 'ÉLŐ verseny kezelése', cimke: 'Szankciók', reszlet: 'sárga / piros lap, büntetőpont – a Teljes verseny fülön, az eredménybevitel mellett' },
+        { kulcs: 'fomod-kiiras', csoport: 'ÉLŐ verseny kezelése', cimke: 'Verseny kiírás', reszlet: 'rajtidők, körök, pihenők, körszínek' },
+        { kulcs: 'fomod-versenyzok', csoport: 'ÉLŐ verseny kezelése', cimke: 'Versenyzők (nevezések)', reszlet: 'felvétel, módosítás, törlés, tömeges importálás' },
+        { kulcs: 'fomod-sebesseg', csoport: 'ÉLŐ verseny kezelése', cimke: 'Sebességhatárok' },
+        { kulcs: 'fomod-orvosok', csoport: 'ÉLŐ verseny kezelése', cimke: 'Állatorvosok a versenyen', reszlet: 'az élő verseny orvoslistája' },
+        { kulcs: 'verseny-allapot', csoport: 'ÉLŐ verseny kezelése', cimke: 'Verseny élesítése / lezárása', reszlet: 'jövőbeli → ÉLŐ, ÉLŐ → múltbéli, visszahelyezés' },
+        { kulcs: 'beerkeztetes', csoport: 'Feladatkörök verseny közben', cimke: 'Beérkeztetés' },
+        { kulcs: 'orvosi-ido', csoport: 'Feladatkörök verseny közben', cimke: 'Orvosi idő' },
+        { kulcs: 'orvosi', csoport: 'Feladatkörök verseny közben', cimke: 'Állatorvosi vizsgálat' },
+        { kulcs: 'nyomtatas', csoport: 'Feladatkörök verseny közben', cimke: 'Nyomtatás', reszlet: 'orvosi lap, matrica' },
+        { kulcs: 'fei-lap', csoport: 'Feladatkörök verseny közben', cimke: 'FEI orvosi lap', reszlet: 'nyomtatás a versenyzői adatlapról' },
+        { kulcs: 'rfid', csoport: 'Feladatkörök verseny közben', cimke: 'RFID kapuk' },
+        { kulcs: 'versenynaptar', csoport: 'Versenyek és események', cimke: 'Jövőbeli versenyek', reszlet: 'új verseny, szerkesztés: dátum, helyszín, nevezési és kiírás link, leírás, kiírás, nevezők' },
+        { kulcs: 'esemenyek', csoport: 'Versenyek és események', cimke: 'Események', reszlet: 'szezonzáró, közgyűlés, bajnokavató… felvétele, szerkesztése, törlése' },
+        { kulcs: 'mult-eredmenyek', csoport: 'Versenyek és események', cimke: 'Lezárt versenyek', reszlet: 'múltbéli verseny felvétele, javítása: kiírás, versenyzők, eredmények, gyors eredmény' },
+        { kulcs: 'verseny-torles', csoport: 'Versenyek és események', cimke: 'Verseny törlése' },
+        { kulcs: 'ob-pont', csoport: 'Versenyek és események', cimke: 'OB-pontra jogosultság váltása', reszlet: 'a versenyzői adatlapon' },
+        { kulcs: 'csapatok', csoport: 'Bajnokság és nyilvántartás', cimke: 'Csapatok kezelése' },
+        { kulcs: 'kulfoldi', csoport: 'Bajnokság és nyilvántartás', cimke: 'Nemzetközi (FEI) eredmények', reszlet: 'felvétel, szerkesztés, külföldi licenc jelölése' },
+        { kulcs: 'bajnokavatas', csoport: 'Bajnokság és nyilvántartás', cimke: 'Bajnokavatás dátuma' },
+        { kulcs: 'tenyeszto', csoport: 'Bajnokság és nyilvántartás', cimke: 'Év Tenyésztője' },
+        { kulcs: 'ujonc', csoport: 'Bajnokság és nyilvántartás', cimke: 'FEI újonc fül', reszlet: 'a lovas és a ló profilján' },
+        { kulcs: 'orvos-torzs', csoport: 'Bajnokság és nyilvántartás', cimke: 'Állatorvosok törzslistája', reszlet: 'nevek javítása, összevonás, törlés' },
+        { kulcs: 'pontkereso', csoport: 'Bajnokság és nyilvántartás', cimke: 'Versenyző pontkereső' },
+        { kulcs: 'attekinto', csoport: 'Kimutatások és eszközök', cimke: 'Versenyáttekintő' },
+        { kulcs: 'nyomtatvanyok', csoport: 'Kimutatások és eszközök', cimke: 'A4 nyomtatványok' },
+        { kulcs: 'export', csoport: 'Kimutatások és eszközök', cimke: 'Verseny exportálás (Excel)' },
+        { kulcs: 'nezok', csoport: 'Kimutatások és eszközök', cimke: 'Nézők és app-letöltések', reszlet: 'látogatottság, csúcsok, telepítések' },
+        { kulcs: 'kozos-tema', csoport: 'Kimutatások és eszközök', cimke: 'Közös (alapértelmezett) téma' }
     ];
+    // Ami csak az adminé marad (nem adható pipával): a jogok osztása maga - a Firebase szabályai is
+    // csak az adminnak engedik a users/ ág írását.
+    const CSAK_ADMIN = ['Felhasználók: szerepkörök és jogok', 'Adatvédelmi tájékoztató – adatkezelő', 'Automatikus adatjavítás belépéskor'];
+    // "Bármelyik" jogok: egy menü / gombsor akkor látszik, ha ezek közül legalább egy megvan
+    const JOG_BARMELY = {
+        'fomod': ['fomod-verseny', 'szankciok', 'fomod-kiiras', 'fomod-versenyzok', 'fomod-sebesseg', 'fomod-orvosok'],
+        'beallitasok': ['orvos-torzs', 'pontkereso', 'kulfoldi', 'kozos-tema'],
+        'versenymodal': ['versenynaptar', 'mult-eredmenyek'],
+        'kezeles-jovo': ['versenynaptar', 'verseny-allapot', 'verseny-torles'],
+        'kezeles-mult': ['mult-eredmenyek', 'verseny-allapot', 'verseny-torles'],
+        'jovo-gombok': ['versenynaptar', 'esemenyek']
+    };
+    // A korábbi, tágabb jogokból öröklődik az új, ha a felhasználónál még nincs róla külön döntés
+    // (a v127 előtt mentett pipák csak a bekapcsoltakat tárolták).
+    const JOG_OROKLES = {
+        'szankciok': 'fomod-verseny', 'fomod-versenyzok': 'fomod-kiiras', 'fomod-sebesseg': 'fomod-kiiras',
+        'kulfoldi': 'beallitasok', 'orvos-torzs': 'beallitasok', 'pontkereso': 'beallitasok'
+    };
     const SZEREPKOROK = [
         { kulcs: '', cimke: 'Nincs – csak néző' },
         { kulcs: 'judge', cimke: 'Bíró' },
         { kulcs: 'doctor', cimke: 'Állatorvos' },
         { kulcs: 'checkin', cimke: 'Beérkeztető' },
         { kulcs: 'printer', cimke: 'Nyomtató' },
+        { kulcs: 'organizer', cimke: 'Szervező (versenyiroda)' },
         { kulcs: 'admin', cimke: 'Admin – mindent lát és kezel' }
     ];
     const SZEREP_JOGOK = {
-        judge: ['fomod-verseny'],
+        judge: ['fomod-verseny', 'szankciok'],
         doctor: ['beerkeztetes', 'orvosi-ido', 'orvosi', 'nyomtatas'],
         checkin: ['beerkeztetes', 'orvosi-ido'],
-        printer: ['nyomtatas']
+        printer: ['nyomtatas'],
+        organizer: ['fomod-kiiras', 'fomod-versenyzok', 'fomod-orvosok', 'verseny-allapot', 'versenynaptar', 'esemenyek', 'nyomtatvanyok', 'export']
     };
     // Menügomb -> melyik jog kell hozzá ('__admin': csak az admin szerepkör)
     const JOG_MENU = {
-        'btn-menu-fomod': ['fomod-verseny', 'fomod-kiiras'],
+        'btn-menu-fomod': ['fomod'],
         'btn-menu-attekinto': ['attekinto'],
         'btn-menu-rfid': ['rfid'],
-        'btn-menu-nezok': ['__admin'],
+        'btn-menu-nezok': ['nezok'],
         'btn-menu-beallitasok': ['beallitasok'],
         'btn-menu-export': ['export'],
         'btn-menu-felhasznalok': ['__admin'],
@@ -947,7 +987,7 @@
     };
     // Belső nézet -> jog. Ami nincs itt, az nyilvános.
     const NEZET_JOG = {
-        'fo-mod': ['fomod-verseny', 'fomod-kiiras'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'], 'nezok-mod': ['__admin'],
+        'fo-mod': ['fomod'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'], 'nezok-mod': ['nezok'],
         'beallitasok-mod': ['beallitasok'], 'export-mod': ['export'], 'felhasznalok-mod': ['__admin'],
         'beerkeztetes-mod': ['beerkeztetes'], 'orvosi-ido-mod': ['orvosi-ido'], 'orvosi-mod': ['orvosi'],
         'nyomtatas-mod': ['nyomtatas'], 'nyomtatvanyok-mod': ['nyomtatvanyok'], 'bajnoksag-teny': ['tenyeszto']
@@ -957,7 +997,8 @@
         doctor: { nezet: 'orvosi-mod', gomb: 'btn-menu-orvosi' },
         checkin: { nezet: 'beerkeztetes-mod', gomb: 'btn-menu-beerkeztetes' },
         printer: { nezet: 'nyomtatas-mod', gomb: 'btn-menu-nyomtatas' },
-        judge: { nezet: 'fo-mod', gomb: 'btn-menu-fomod' }
+        judge: { nezet: 'fo-mod', gomb: 'btn-menu-fomod' },
+        organizer: { nezet: 'fo-mod', gomb: 'btn-menu-fomod' }
     };
 
     let aktivSzerep = null;        // null = nincs belépve, 'guest' = belépett, de nincs szerepköre
@@ -968,7 +1009,10 @@
     let fiokRef = null, fiokFigyelo = null, migracioFutott = false;
 
     function adminE() { return aktivSzerep === 'admin'; }
-    function jogVan(kulcs) { return adminE() || aktivJogok.has(kulcs); }
+    function jogVan(kulcs) {
+        if (adminE() || aktivJogok.has(kulcs)) return true;
+        return !!JOG_BARMELY[kulcs] && JOG_BARMELY[kulcs].some(k => aktivJogok.has(k));
+    }
     function nezetEngedelyezett(id) {
         const kell = NEZET_JOG[id];
         if (!kell) return true;
@@ -982,8 +1026,10 @@
     // A szerepkör + a pipák -> a ténylegesen érvényes jogok halmaza
     function jogokSzamit(role, jogok) {
         if (role === 'admin') return new Set(JOG_LISTA.map(j => j.kulcs));
-        if (jogok && typeof jogok === 'object') return new Set(Object.keys(jogok).filter(k => jogok[k]));
-        return new Set(SZEREP_JOGOK[role] || []);
+        if (!jogok || typeof jogok !== 'object') return new Set(SZEREP_JOGOK[role] || []);
+        const halmaz = new Set(Object.keys(jogok).filter(k => jogok[k] === true && JOG_LISTA.some(j => j.kulcs === k)));
+        Object.entries(JOG_OROKLES).forEach(([uj, regi]) => { if (jogok[uj] === undefined && jogok[regi] === true) halmaz.add(uj); });
+        return halmaz;
     }
 
     // --- NÉZŐSZÁMLÁLÁS (csak az admin látja, a kezdőlap tetején) ---
@@ -993,15 +1039,20 @@
     // a localStorage-ban marad). Személyes adat nincs, csak véletlen azonosító és időpont.
     // Szabályok: tests/firebase-szabalyok.json (jelenlet, latogatok) - nélkülük az írás csendben elmarad.
     function veletlenAzon() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+    // A böngésző (telepített appnál: az app) véletlen azonosítója - személyes adat nincs benne
+    let latogatoAzonMemo = null;
+    function latogatoAzon() {
+        if (latogatoAzonMemo) return latogatoAzonMemo;
+        try {
+            latogatoAzonMemo = localStorage.getItem('rps-latogato');
+            if (!latogatoAzonMemo) { latogatoAzonMemo = veletlenAzon(); localStorage.setItem('rps-latogato', latogatoAzonMemo); }
+        } catch (e) { latogatoAzonMemo = veletlenAzon(); }
+        return latogatoAzonMemo;
+    }
     const jelenletRef = db.ref('jelenlet/' + veletlenAzon());
     (function nezoSzamlaloIndit() {
-        let azon;
-        try {
-            azon = localStorage.getItem('rps-latogato');
-            if (!azon) { azon = veletlenAzon(); localStorage.setItem('rps-latogato', azon); }
-        } catch (e) { azon = veletlenAzon(); }
         // Ha ma már járt itt, a szabály elutasítja (!data.exists()) - így egy böngésző naponta egyszer számít.
-        db.ref('latogatok/' + napIso(new Date()) + '/' + azon).set(Date.now()).catch(() => {});
+        db.ref('latogatok/' + napIso(new Date()) + '/' + latogatoAzon()).set(Date.now()).catch(() => {});
         db.ref('.info/connected').on('value', snap => {
             if (snap.val() !== true) return;
             jelenletRef.onDisconnect().remove()
@@ -1031,6 +1082,77 @@
     document.addEventListener('visibilitychange', nezoPercJelzes);
     nezoPercJelzes();
 
+    // APP-LETÖLTÉSEK: az End-Ride nem áruházból jön, a "letöltés" = telepítés a kezdőképernyőre.
+    //  - nezettseg/app/telepites/{nap}/{azon} = { t, p, m }: eszközönként egyszer. Androidon és gépen a
+    //    böngésző "appinstalled" eseményekor (m: 'telepites'); iPhone-on nincs ilyen esemény, ott - és a
+    //    mérés előtt telepítetteknél - az első appként (kezdőképernyőről) indításkor (m: 'elso-inditas').
+    //  - nezettseg/app/hasznalat/{nap}/{azon} = platform: aki aznap appként nyitotta meg.
+    //  - nezettseg/app/ajanlo/{nap}/{esemeny}: az ajánló számai (útmutató, telepítés gomb, elfogadva...).
+    // Szabályok: tests/firebase-szabalyok.json (nezettseg/app).
+    const APP_TELEPITES_JELZES = 'rps-app-telepites-jelezve';
+    function appPlatform() {
+        const ua = String(navigator.userAgent || '');
+        if (/iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+        return /android/i.test(ua) ? 'android' : 'gep';
+    }
+    function appTelepitesRogzit(mod) {
+        try {
+            if (localStorage.getItem(APP_TELEPITES_JELZES)) return;
+            localStorage.setItem(APP_TELEPITES_JELZES, String(Date.now()));
+        } catch (e) { return; }   // tárhely nélkül nem tudnánk, járt-e már itt - inkább kimarad, mint duplán számít
+        db.ref('nezettseg/app/telepites/' + napIso(new Date()) + '/' + latogatoAzon()).set({ t: Date.now(), p: appPlatform(), m: mod }).catch(() => {});
+    }
+    function appAjanloJelzes(esemeny) {
+        const sv = firebase.database && firebase.database.ServerValue;
+        if (!sv || typeof sv.increment !== 'function') return;
+        db.ref('nezettseg/app/ajanlo/' + napIso(new Date()) + '/' + esemeny).set(sv.increment(1)).catch(() => {});
+    }
+    // Appként (kezdőképernyőről) nyitva: napi használat, és ha ezen az eszközön még nincs telepítés, az is
+    function appHasznalatJelzes() {
+        if (!appTelepitve()) return;
+        db.ref('nezettseg/app/hasznalat/' + napIso(new Date()) + '/' + latogatoAzon()).set(appPlatform()).catch(() => {});
+        appTelepitesRogzit('elso-inditas');
+    }
+    appHasznalatJelzes();
+
+    // A Nézők oldal "App-letöltések" része: összesen (platform szerint), napi bontás az utolsó napokra
+    function appOsszegzes(telepites, hasznalat, ajanlo, napok) {
+        const osszes = { db: 0, android: 0, ios: 0, gep: 0 };
+        const napi = {};
+        napok.forEach(n => { napi[n] = { telepites: 0, hasznalat: 0, utmutato: 0, gomb: 0, elfogadva: 0 }; });
+        Object.entries(telepites || {}).forEach(([nap, eszkozok]) => Object.values(eszkozok || {}).forEach(e => {
+            osszes.db++;
+            if (e && osszes[e.p] !== undefined) osszes[e.p]++;
+            if (napi[nap]) napi[nap].telepites++;
+        }));
+        const aktiv = new Set();
+        Object.entries(hasznalat || {}).forEach(([nap, eszkozok]) => {
+            const azonok = Object.keys(eszkozok || {});
+            if (!napi[nap]) return;
+            azonok.forEach(a => aktiv.add(a));
+            napi[nap].hasznalat = azonok.length;
+        });
+        Object.entries(ajanlo || {}).forEach(([nap, a]) => {
+            if (!napi[nap] || !a) return;
+            napi[nap].utmutato = Number(a.utmutato) || 0;
+            napi[nap].gomb = Number(a.telepites_gomb) || 0;
+            napi[nap].elfogadva = Number(a.elfogadva) || 0;
+        });
+        return { osszes, napi, aktiv: aktiv.size };
+    }
+    function nezoAppBetolt() {
+        const tol = datumPlusz(napIso(new Date()), -29);
+        nezo.appTolt = true;
+        Promise.all([
+            db.ref('nezettseg/app/telepites').once('value'),
+            db.ref('nezettseg/app/hasznalat').orderByKey().startAt(tol).once('value'),
+            db.ref('nezettseg/app/ajanlo').orderByKey().startAt(tol).once('value')
+        ]).then(([t, h, a]) => {
+            nezo.app = appOsszegzes(t.val(), h.val(), a.val(), Array.from({ length: 30 }, (_, i) => datumPlusz(tol, i)));
+        }).catch(() => { nezo.app = { hiba: true }; })
+          .finally(() => { nezo.appTolt = false; renderNezok(); });
+    }
+
     // A nap percenkénti adataiból: csúcs (hányan, mikor) és óránkénti legnagyobb érték
     function nezoNapOsszegzes(percek) {
         const p = percek || {};
@@ -1049,7 +1171,7 @@
     // "Nézők" fül ebből rajzol; a korábbi napokat kérésre tölti be (napválasztó, 30 napos lista).
     let nezoLeallit = null;
     const nezo = { most: null, belepve: 0, hiba: false, figyeltNap: '', maLatogato: null, maPercek: null,
-        valasztottNap: '', napAdat: null, napTolt: false, honap: null, honapTolt: false };
+        valasztottNap: '', napAdat: null, napTolt: false, honap: null, honapTolt: false, app: null, appTolt: false };
     function nezoSzamlaloFigyeles(be) {
         if (!be) { if (nezoLeallit) { nezoLeallit(); nezoLeallit = null; } return; }
         if (nezoLeallit) return;
@@ -1122,6 +1244,7 @@
         if (!cont || !document.getElementById('nezok-mod')?.classList.contains('active')) return;
         if (nezo.hiba) { cont.innerHTML = '<p class="field-hint">Nem olvasható – a Firebase-szabályok (jelenlet, latogatok, nezettseg) frissítése kell: tests/firebase-szabalyok.json → Firebase konzol → Realtime Database → Rules → Publish.</p>'; return; }
         if (!nezo.honap && !nezo.honapTolt) nezoHonapBetolt();
+        if (!nezo.app && !nezo.appTolt) nezoAppBetolt();
         const ma = napIso(new Date());
         const szam = v => (v === null || v === undefined) ? '…' : v;
         const maOssz = nezoNapOsszegzes(nezo.maPercek);
@@ -1152,6 +1275,23 @@
                 <span class="csucs">${d.van ? `csúcs ${d.csucs}${d.csucsIdo ? ' · ' + d.csucsIdo : ''}` : '–'}</span></button>`;
         }).join('')}</div>`;
 
+        const app = nezo.app;
+        let appHtml;
+        if (!app) appHtml = betoltoSor('Az app-adatok betöltése…');
+        else if (app.hiba) appHtml = '<p class="field-hint">Az app-adatok nem olvashatók – a Firebase-szabályok frissítése kell (nezettseg/app).</p>';
+        else {
+            const maApp = app.napi[ma] || { hasznalat: 0 };
+            const appNapok = Object.keys(app.napi).sort().reverse().filter(n => { const x = app.napi[n]; return x.telepites || x.hasznalat || x.utmutato || x.gomb; });
+            appHtml = `<div class="rfid-osszesito">
+                    <div><b>${app.osszes.db}</b><span>telepítve összesen · Android ${app.osszes.android} · iPhone ${app.osszes.ios} · gép ${app.osszes.gep}</span></div>
+                    <div><b>${maApp.hasznalat}</b><span>appként nyitotta meg ma</span></div>
+                    <div><b>${app.aktiv}</b><span>eszközön használták appként az utolsó 30 napban</span></div>
+                </div>
+                ${appNapok.length ? `<div class="app-napok"><div class="app-nap fej"><span>Nap</span><span>Telepítés</span><span>Appként nyitotta</span><span>Útmutató</span><span>Telepítés gomb (igen)</span></div>
+                    ${appNapok.map(n => { const x = app.napi[n]; return `<div class="app-nap"><span>${escapeHtml(n.slice(5).replace('-', '.'))}.${n === ma ? ' ma' : ''}</span><span>${x.telepites}</span><span>${x.hasznalat}</span><span>${x.utmutato}</span><span>${x.gomb}${x.gomb ? ` (${x.elfogadva})` : ''}</span></div>`; }).join('')}</div>`
+                    : '<p class="field-hint">Az utolsó 30 napban még nem volt telepítés vagy appként megnyitás.</p>'}`;
+        }
+
         cont.innerHTML = `<div class="rfid-osszesito">
                 <div><b>${szam(nezo.most)}</b><span>most nézik${typeof nezo.most === 'number' ? ` (bejelentkezve: ${nezo.belepve})` : ''}</span></div>
                 <div><b>${szam(nezo.maLatogato)}</b><span>látogató ma</span></div>
@@ -1167,7 +1307,10 @@
             ${napHtml}
             <h4 style="margin:16px 0 4px 0;">Utolsó 30 nap <button type="button" class="uj-link" onclick="nezo.honap = null; renderNezok()">frissítés</button></h4>
             <p class="field-hint" style="margin-top:0;">Látogató: egy böngésző naponta egyszer. Csúcs: a legtöbb egyszerre (ugyanabban a percben) nyitott és látható oldal, a nap elejétől. Egy napra kattintva megnyílik a részletes bontása. Az adatok nem törlődnek.</p>
-            ${honapHtml}`;
+            ${honapHtml}
+            <h4 style="margin:22px 0 4px 0;">📲 App-letöltések <button type="button" class="uj-link" onclick="nezo.app = null; renderNezok()">frissítés</button></h4>
+            <p class="field-hint" style="margin-top:0;">Az End-Ride nem áruházból jön: letöltés = telepítés a kezdőképernyőre, eszközönként egyszer. Androidon és gépen a telepítés pillanatában számít, iPhone-on (ott a böngésző nem szól róla) az első appként indításkor. Aki a mérés indulása (v127) előtt telepítette, akkor jelenik meg, amikor legközelebb appként megnyitja. Az app törlését a böngésző nem jelzi.</p>
+            ${appHtml}`;
     }
 
     auth.onAuthStateChanged(user => {
@@ -1187,7 +1330,7 @@
             const role = fiokAdat.role || 'guest';
             applyAuthUI(true, role, jogokSzamit(role, fiokAdat.jogok));
             kovetesBetoltes(fiokAdat.kovetes || {});
-            nezoSzamlaloFigyeles(role === 'admin');
+            nezoSzamlaloFigyeles(jogokSzamit(role, fiokAdat.jogok).has('nezok'));
             if (role === 'admin' && !migracioFutott) { migracioFutott = true; runAutoMigration(); }
             if (document.getElementById('fiokModal')?.style.display === 'flex') renderFiok();
         }, () => {
@@ -1226,6 +1369,7 @@
             b.classList.add('belepve', 'role-' + aktivSzerep);
             if (!adminE()) b.classList.add('jogos');
             JOG_LISTA.forEach(j => { if (jogVan(j.kulcs)) b.classList.add('jog-' + j.kulcs); });
+            Object.keys(JOG_BARMELY).forEach(k => { if (jogVan(k)) b.classList.add('jog-' + k); });
         }
         menukJogSzerint();
         fiokSavFrissit();
@@ -1271,16 +1415,22 @@
         if ((document.querySelector('.mode-content.active') || {}).id === 'fo-mod') foModFulJogSzerint();
     }
 
-    // Az ÉLŐ Verseny Kezelés fülei: kiírás jog nélkül csak a "Teljes verseny" (eredmény) fül marad
+    // Az ÉLŐ Verseny Kezelés fülei: mindegyiknek saját joga van (a CSS rejti el a többit). Ha a nyitott
+    // fülhöz nincs jog, a Teljes verseny fülre (bíró), különben az első megengedett fülre váltunk.
+    const FOMOD_FULEK = [
+        { gomb: 'btn-sebesseg', ful: 'sebesseg', jog: 'fomod-sebesseg' },
+        { gomb: 'btn-kiiras', ful: 'kiiras', jog: 'fomod-kiiras' },
+        { gomb: 'btn-orvosok', ful: 'orvosok', jog: 'fomod-orvosok' },
+        { gomb: 'btn-versenyzok', ful: 'versenyzok', jog: 'fomod-versenyzok' },
+        { gomb: 'btn-verseny', ful: 'verseny', jog: 'fomod-verseny' }
+    ];
     function foModFulJogSzerint() {
         if (!aktivSzerep || adminE()) return;
         const aktivFul = document.querySelector('#fo-mod .tabs .tab-btn.active');
-        const kiirasFulek = ['btn-sebesseg', 'btn-kiiras', 'btn-versenyzok', 'btn-orvosok'];
-        if (!jogVan('fomod-kiiras') && jogVan('fomod-verseny') && (!aktivFul || kiirasFulek.includes(aktivFul.id))) {
-            switchSubMode('verseny', document.getElementById('btn-verseny'));
-        } else if (!jogVan('fomod-verseny') && aktivFul && aktivFul.id === 'btn-verseny') {
-            switchSubMode('kiiras', document.getElementById('btn-kiiras'));
-        }
+        const most = FOMOD_FULEK.find(f => aktivFul && f.gomb === aktivFul.id);
+        if (most && jogVan(most.jog)) return;
+        const cel = FOMOD_FULEK.find(f => f.jog === 'fomod-verseny' && jogVan(f.jog)) || FOMOD_FULEK.find(f => jogVan(f.jog));
+        if (cel) switchSubMode(cel.ful, document.getElementById(cel.gomb));
     }
 
     function szerepNev(role) {
@@ -1854,8 +2004,14 @@
             const nev = p.nev || (p.email ? p.email.split('@')[0] : '') || 'Névtelen fiók';
             const en = uid === sajat;
             const csoportok = [...new Set(JOG_LISTA.map(j => j.csoport))];
-            const jogHtml = csoportok.map(cs => `<div class="felh-jogcsoport"><b>${escapeHtml(cs)}</b>${JOG_LISTA.filter(j => j.csoport === cs).map(j =>
-                `<label><input type="checkbox" data-jog="${j.kulcs}" ${jogok.has(j.kulcs) ? 'checked' : ''} ${!role || role === 'admin' ? 'disabled' : ''} onchange="felhValtozott('${uid}')"> ${escapeHtml(j.cimke)}</label>`).join('')}</div>`).join('');
+            const tiltott = !role || role === 'admin';
+            const jogHtml = csoportok.map((cs, ci) => `<div class="felh-jogcsoport">
+                <div class="felh-jogcsoport-fej"><b>${escapeHtml(cs)}</b><span class="felh-csoport-gombok">
+                    <button type="button" onclick="felhCsoportPipa('${uid}', ${ci}, true)" ${tiltott ? 'disabled' : ''}>mind</button>
+                    <button type="button" onclick="felhCsoportPipa('${uid}', ${ci}, false)" ${tiltott ? 'disabled' : ''}>egyik sem</button></span></div>
+                ${JOG_LISTA.filter(j => j.csoport === cs).map(j =>
+                    `<label><input type="checkbox" data-jog="${j.kulcs}" data-csoport="${ci}" ${jogok.has(j.kulcs) ? 'checked' : ''} ${tiltott ? 'disabled' : ''} onchange="felhValtozott('${uid}')">
+                        <span>${escapeHtml(j.cimke)}${j.reszlet ? `<small>${escapeHtml(j.reszlet)}</small>` : ''}</span></label>`).join('')}</div>`).join('');
             return `<details class="felh-kartya ${role ? 'stab' : ''}" data-uid="${escapeHtml(uid)}">
                 <summary>
                     ${fiokAvatarHtml(null, p.foto ? p : { nev })}
@@ -1870,8 +2026,10 @@
                         ${SZEREPKOROK.map(s => `<option value="${s.kulcs}" ${s.kulcs === role ? 'selected' : ''}>${escapeHtml(s.cimke)}</option>`).join('')}
                     </select>
                     ${en ? '<p class="field-hint">A saját szerepkörödet nem módosíthatod (nehogy kizárd magad).</p>' : ''}
-                    <div class="felh-jogok ${!role || role === 'admin' ? 'tiltott' : ''}">${jogHtml}</div>
-                    <p class="field-hint">${role === 'admin' ? 'Az admin mindent lát és kezel.' : !role ? 'Szerepkör nélkül néző: semmit nem írhat az adatbázisba.' : 'A szerepkör adja az alapot, a pipákkal menünként szűkítheted vagy bővítheted.'}</p>
+                    <div class="felh-jogszam">Jogok: <b>${role === 'admin' ? JOG_LISTA.length : jogok.size}</b> / ${JOG_LISTA.length}</div>
+                    <div class="felh-jogok ${tiltott ? 'tiltott' : ''}">${jogHtml}</div>
+                    <p class="field-hint">${role === 'admin' ? 'Az admin mindent lát és kezel.' : !role ? 'Szerepkör nélkül néző: semmit nem írhat az adatbázisba – előbb válassz szerepkört.' : 'A szerepkör adja az alapot, a pipákkal egyenként szűkítheted vagy bővítheted. A menü és a fülek is a pipák szerint jelennek meg.'}
+                        <br>Csak az admin: ${CSAK_ADMIN.map(escapeHtml).join(' · ')}.</p>
                     <div class="felh-gombok"><button class="calc-btn add-btn felh-mentes" disabled onclick="felhMentes('${uid}')">Mentés</button></div>
                 </div>
             </details>`;
@@ -1885,17 +2043,32 @@
             k.querySelector('.felh-szerepkor').value = f.role;
             k.querySelectorAll('input[data-jog]').forEach(i => { i.checked = f.jogok.includes(i.dataset.jog); i.disabled = !f.role || f.role === 'admin'; });
             k.querySelector('.felh-jogok').classList.toggle('tiltott', !f.role || f.role === 'admin');
+            k.querySelectorAll('.felh-csoport-gombok button').forEach(g => { g.disabled = !f.role || f.role === 'admin'; });
             k.querySelector('.felh-mentes').disabled = false;
+            felhValtozott(k.dataset.uid);
         });
     }
 
     function felhKartya(uid) { return document.querySelector(`.felh-kartya[data-uid="${CSS.escape(uid)}"]`); }
-    function felhValtozott(uid) { const k = felhKartya(uid); if (k) k.querySelector('.felh-mentes').disabled = false; }
+    function felhValtozott(uid) {
+        const k = felhKartya(uid);
+        if (!k) return;
+        k.querySelector('.felh-mentes').disabled = false;
+        const szam = k.querySelector('.felh-jogszam b');
+        if (szam) szam.textContent = k.querySelector('.felh-szerepkor').value === 'admin' ? JOG_LISTA.length : k.querySelectorAll('input[data-jog]:checked').length;
+    }
+    function felhCsoportPipa(uid, csoport, be) {
+        const k = felhKartya(uid);
+        if (!k) return;
+        k.querySelectorAll(`input[data-csoport="${csoport}"]`).forEach(i => { if (!i.disabled) i.checked = be; });
+        felhValtozott(uid);
+    }
     function felhSzerepValt(uid, role) {
         const k = felhKartya(uid);
         if (!k) return;
         const alap = jogokSzamit(role, null);
         k.querySelectorAll('input[data-jog]').forEach(i => { i.checked = alap.has(i.dataset.jog); i.disabled = !role || role === 'admin'; });
+        k.querySelectorAll('.felh-csoport-gombok button').forEach(g => { g.disabled = !role || role === 'admin'; });
         k.querySelector('.felh-jogok').classList.toggle('tiltott', !role || role === 'admin');
         felhValtozott(uid);
     }
@@ -1907,7 +2080,8 @@
         const jelolt = [...k.querySelectorAll('input[data-jog]')].filter(i => i.checked).map(i => i.dataset.jog);
         const alap = [...jogokSzamit(role, null)].sort().join(',');
         // Ha a pipák a szerepkör alapjával egyeznek, nem tároljuk külön (így egy későbbi alapváltozás is érvényes lesz)
-        const jogok = (!role || role === 'admin' || jelolt.slice().sort().join(',') === alap) ? null : Object.fromEntries(jelolt.map(j => [j, true]));
+        // Minden kulcs kifejezetten (igen/nem): így egy később bevezetett, finomabb jog nem öröklődik a régiből
+        const jogok = (!role || role === 'admin' || jelolt.slice().sort().join(',') === alap) ? null : Object.fromEntries(JOG_LISTA.map(j => [j.kulcs, jelolt.includes(j.kulcs)]));
         // Szerepkör nélkül a role kulcsnak NEM szabad léteznie (a szabályok a meglétét nézik az íráshoz)
         db.ref('users/' + uid).update({ role: role || null, jogok })
             .then(() => showToast('Mentve: ' + (felhasznalokAdat[uid]?.profil?.nev || uid) + ' – ' + szerepNev(role || 'guest')))
@@ -1943,7 +2117,7 @@
     let telepitesKeres = null;
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); telepitesKeres = e; });
-        window.addEventListener('appinstalled', () => { telepitesKeres = null; showToast('Az End-Ride felkerült a kezdőképernyőre.'); });
+        window.addEventListener('appinstalled', () => { telepitesKeres = null; appTelepitesRogzit('telepites'); showToast('Az End-Ride felkerült a kezdőképernyőre.'); });
     }
     function appTelepitve() { return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
     function appTelepithetoHtml() {
@@ -1957,7 +2131,9 @@
     }
     function appTelepites() {
         if (!telepitesKeres) { appUtmutato(); return; }
+        appAjanloJelzes('telepites_gomb');
         telepitesKeres.prompt();
+        telepitesKeres.userChoice.then(v => appAjanloJelzes(v && v.outcome === 'accepted' ? 'elfogadva' : 'elutasitva')).catch(() => {});
         telepitesKeres.userChoice.finally(() => { telepitesKeres = null; renderFiok(); if (document.getElementById('kezdolap')?.classList.contains('active')) renderKezdolap(); });
     }
 
@@ -1983,12 +2159,14 @@
     }
     function appReklamElrejt() {
         try { localStorage.setItem(APP_REKLAM_KULCS, String(Date.now())); } catch (e) {}
+        appAjanloJelzes('elrejtve');
         document.querySelectorAll('.app-reklam').forEach(el => el.remove());
     }
     function appUtmutato() {
         const ua = navigator.userAgent || '';
         const ios = /iphone|ipad|ipod/i.test(ua);
         const android = /android/i.test(ua);
+        appAjanloJelzes('utmutato');
         document.getElementById('infoModalTitle').innerText = 'End-Ride app a telefonodra';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek app-utmutato">
             ${appTelepitve() ? '<p><b>Már telepítve van – innen nyitod most is.</b></p>' : ''}
@@ -2030,7 +2208,9 @@
         document.getElementById(targetId).classList.add('active');
         document.body.classList.toggle('szeles-nezet', SZELES_NEZETEK.includes(targetId));
         if(btn) btn.classList.add('active');
-        localStorage.setItem('currentMode', targetId); 
+        // Csak ebben a fülben él (újratöltéskor - F5, automatikus frissítés - itt marad); aki később újra
+        // megnyitja az oldalt, a kezdőlapon kezd, nem ott, ahol legutóbb abbahagyta.
+        try { sessionStorage.setItem('rps-nezet', targetId); } catch (e) {}
         if(window.innerWidth <= 800) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
         
         if (targetId === 'adatlapok') renderAdatlapList();
@@ -2713,7 +2893,7 @@
             ${raceCardTavok(cfg, comps)}
             ${kind === 'mult' ? raceCardEredmeny(comps, cfg) : (comps.length ? '' : '<div class="rc-osszeg"><span>Nincs még nevezés</span></div>')}
             ${opts.fooGomb ? `<div class="rc-akcio">${opts.fooGomb}</div>` : ''}
-            ${opts.adminGombok ? `<details class="rc-admin admin-only"><summary>⚙️ Kezelés</summary><div class="race-admin-controls">${opts.adminGombok}</div></details>` : ''}
+            ${opts.adminGombok ? `<details class="rc-admin ${opts.kezelesJog ? 'csak-jog-' + opts.kezelesJog : 'admin-only'}"><summary>⚙️ Kezelés</summary><div class="race-admin-controls">${opts.adminGombok}</div></details>` : ''}
         </article>`;
     }
 
@@ -2782,7 +2962,7 @@
                 </div>
             </div>
             <div class="rc-akcio"><button class="calc-btn" onclick="esemenyReszletek('${id}')">Részletek</button></div>
-            <details class="rc-admin admin-only"><summary>⚙️ Kezelés</summary><div class="race-admin-controls">
+            <details class="rc-admin csak-jog-esemenyek"><summary>⚙️ Kezelés</summary><div class="race-admin-controls">
                 <button class="edit-btn" onclick="esemenyUrlap('${id}')">Szerkesztés</button>
                 <button class="edit-btn is-danger" onclick="esemenyUrlap('${id}'); esemenyTorles()">Törlés</button>
             </div></details>
@@ -3250,7 +3430,8 @@
         if(liveRaceMeta) {
             jelenCont.innerHTML = raceCardHTML(liveRaceMeta, 'live', {
                 comps: competitors, raceConfig: raceConfig,
-                fooGomb: `<button class="calc-btn add-btn admin-only" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>`,
+                fooGomb: `<button class="calc-btn add-btn csak-jog-fomod" onclick="switchMainTab('fo-mod', document.getElementById('btn-menu-fomod'))">Ugrás az ÉLŐ Kezelőhöz</button>`,
+                kezelesJog: 'verseny-allapot',
                 adminGombok: `<button class="edit-btn is-danger" onclick="forceMoveToPastFromLive()">🛑 Lezárás (Múltbélivé tétel)</button>`
             });
         } else {
@@ -3262,11 +3443,12 @@
         localRaces.mult.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(r => {
             multCont.innerHTML += raceCardHTML(r, 'mult', {
                 fooGomb: `<button class="calc-btn" onclick="openPublicPastRace('${r.id}')">📊 Eredmények megtekintése</button>`,
+                kezelesJog: 'kezeles-mult',
                 adminGombok: `
-                    <button class="edit-btn" onclick="openRaceModal('mult', '${r.id}')">Szerkesztés</button>
-                    <button class="edit-btn is-info" onclick="forceMoveRace('mult', 'jovo', '${r.id}')">⏪ Vissza Jövőbelibe</button>
-                    <button class="edit-btn is-success" onclick="forceMoveToLive('mult', '${r.id}')">▶️ Újra ÉLŐ-be</button>
-                    <button class="edit-btn is-danger" onclick="deleteRace('mult', '${r.id}')">Törlés</button>`
+                    <button class="edit-btn csak-jog-mult-eredmenyek" onclick="openRaceModal('mult', '${r.id}')">Szerkesztés</button>
+                    <button class="edit-btn is-info csak-jog-verseny-allapot" onclick="forceMoveRace('mult', 'jovo', '${r.id}')">⏪ Vissza Jövőbelibe</button>
+                    <button class="edit-btn is-success csak-jog-verseny-allapot" onclick="forceMoveToLive('mult', '${r.id}')">▶️ Újra ÉLŐ-be</button>
+                    <button class="edit-btn is-danger csak-jog-verseny-torles" onclick="deleteRace('mult', '${r.id}')">Törlés</button>`
             });
         });
 
@@ -3283,10 +3465,11 @@
             jovoCont.innerHTML += raceCardHTML(r, 'jovo', {
                 cimke,
                 fooGomb: `<button class="calc-btn" onclick="showFutureInfo('${r.id}')">ℹ️ Részletek megtekintése</button>`,
+                kezelesJog: 'kezeles-jovo',
                 adminGombok: `
-                    <button class="edit-btn" onclick="openRaceModal('jovo', '${r.id}')">Szerkesztés</button>
-                    <button class="edit-btn is-success" onclick="forceMoveToLive('jovo', '${r.id}')">▶️ Élesítés (ÉLŐ)</button>
-                    <button class="edit-btn is-danger" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>`
+                    <button class="edit-btn csak-jog-versenynaptar" onclick="openRaceModal('jovo', '${r.id}')">Szerkesztés</button>
+                    <button class="edit-btn is-success csak-jog-verseny-allapot" onclick="forceMoveToLive('jovo', '${r.id}')">▶️ Élesítés (ÉLŐ)</button>
+                    <button class="edit-btn is-danger csak-jog-verseny-torles" onclick="deleteRace('jovo', '${r.id}')">Törlés</button>`
             });
         });
         if (versenyekAutoFul && document.getElementById('versenyek')?.classList.contains('active')) versenyekAlapFul();
@@ -3712,7 +3895,7 @@
             <summary>${catNames[d] || d + ' km'} Kategória<span class="kiiras-hiany" id="${p}kiiras-hiany-${d}"${hiany ? '' : ' style="display:none"'}>${hiany ? '⚠️ ' + hiany : ''}</span></summary>
             <div class="kiiras-tartalom">
                 <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-                    <select class="admin-only kiiras-korszam" onchange="kiirasKorszamValtas('${p}', '${d}', this.value)">
+                    <select class="${p ? 'csak-jog-versenymodal' : 'csak-jog-fomod-kiiras'} kiiras-korszam" onchange="kiirasKorszamValtas('${p}', '${d}', this.value)">
                         ${[1,2,3,4,5,6,7,8].map(num => `<option value="${num}" ${lapCount === num ? 'selected' : ''}>${num} kör</option>`).join('')}
                     </select>
                 </div>
@@ -3803,7 +3986,7 @@
         modalVets.sort((a,b) => a.name.localeCompare(b.name)).forEach(v => {
             cont.innerHTML += `<div class="competitor-item">
                 <div style="flex:1;">${escapeHtml(v.name)}</div>
-                <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteRmVet('${v.id}')">Törlés</button>
+                <button class="edit-btn csak-jog-versenymodal" style="background:var(--danger);" onclick="deleteRmVet('${v.id}')">Törlés</button>
             </div>`;
         });
     }
@@ -3937,8 +4120,8 @@
                     <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
                 <div style="display:flex; gap:5px;">
-                    <button class="edit-btn admin-only" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
-                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteRmCompetitorDirect('${c.bib}')">Törlés</button>
+                    <button class="edit-btn csak-jog-versenymodal" onclick="editRmCompetitor('${c.bib}')">Módosítás</button>
+                    <button class="edit-btn csak-jog-versenymodal" style="background:var(--danger);" onclick="deleteRmCompetitorDirect('${c.bib}')">Törlés</button>
                 </div>
             </div>`;
             sel.innerHTML += `<option value="${c.bib}">#${c.bib} - ${c.name}</option>`;
@@ -4113,8 +4296,8 @@
                     <br><span style="color:var(--text-dim); font-size:0.85rem;">${placeStr}${timeStr}</span>
                 </div>
                 <div style="display:flex; gap:5px;">
-                    <button class="edit-btn admin-only" onclick="editRmGyorsCompetitor('${c.bib}')">Módosítás</button>
-                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteRmGyorsCompetitorDirect('${c.bib}')">Törlés</button>
+                    <button class="edit-btn csak-jog-versenymodal" onclick="editRmGyorsCompetitor('${c.bib}')">Módosítás</button>
+                    <button class="edit-btn csak-jog-versenymodal" style="background:var(--danger);" onclick="deleteRmGyorsCompetitorDirect('${c.bib}')">Törlés</button>
                 </div>
             </div>`;
         }).join('');
@@ -4586,7 +4769,7 @@
         liveVets.forEach(v => {
             cont.innerHTML += `<div class="competitor-item">
                 <div style="flex:1;"><b>${v.name}</b></div>
-                <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteVet('${v.id}')">Törlés</button>
+                <button class="edit-btn csak-jog-fomod-orvosok" style="background:var(--danger);" onclick="deleteVet('${v.id}')">Törlés</button>
             </div>`;
         });
     }
@@ -5451,7 +5634,7 @@
                 </div>
 
                 <div class="vk-lab sor">
-                    <button class="calc-btn admin-only vk-fei" onclick="printFeiVetCard('${escapeHtml(forras)}', '${escapeHtml(comp.bib)}')">🖨️ FEI orvosi lap</button>
+                    <button class="calc-btn csak-jog-fei-lap vk-fei" onclick="printFeiVetCard('${escapeHtml(forras)}', '${escapeHtml(comp.bib)}')">🖨️ FEI orvosi lap</button>
                     <button class="calc-btn vk-bezar" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>
@@ -5877,8 +6060,8 @@
                     <span class="competitor-bib">#${c.bib}</span> ${c.name} <b style="color:var(--primary); margin-left:10px;">${catNames[c.dist]}</b>
                 </div>
                 <div style="display:flex; gap:5px;">
-                    <button class="edit-btn admin-only" onclick="editCompetitor('${c.bib}')">Módosítás</button>
-                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteCompetitorDirect('${c.bib}')">Törlés</button>
+                    <button class="edit-btn csak-jog-fomod-versenyzok" onclick="editCompetitor('${c.bib}')">Módosítás</button>
+                    <button class="edit-btn csak-jog-fomod-versenyzok" style="background:var(--danger);" onclick="deleteCompetitorDirect('${c.bib}')">Törlés</button>
                 </div>
             </div>`;
             const opt = `<option value="${c.bib}">#${c.bib} - ${c.name} (${catNames[c.dist]})</option>`;
@@ -6924,8 +7107,8 @@
         // a döntést mindig a bíró/orvos hozza meg - a versenyzői listában
         // félreérthetőek lennének.
         let html = '';
-        if (hasMax) html += `<span class="inline-flag danger admin-only">⚠ SP</span>`;
-        if (hasMin) html += `<span class="inline-flag warning admin-only">⚠ OT</span>`;
+        if (hasMax) html += `<span class="inline-flag danger csak-jog-fomod-verseny">⚠ SP</span>`;
+        if (hasMin) html += `<span class="inline-flag warning csak-jog-fomod-verseny">⚠ OT</span>`;
         return html;
     }
 
@@ -7002,7 +7185,7 @@
                         ${c.club ? `<div class="vk-halvany" style="font-size:0.9rem; margin-top:10px;">${escapeHtml(c.club)}</div>` : ''}
                     </div>
                     <div class="vk-lab">
-                        <button class="admin-only vk-obpont ${c.obPont !== false ? 'igen' : ''}" onclick="toggleObPont('${c.bib}')">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
+                        <button class="csak-jog-ob-pont vk-obpont ${c.obPont !== false ? 'igen' : ''}" onclick="toggleObPont('${c.bib}')">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
                         <button class="calc-btn vk-bezar" onclick="closeAdatlap()">Bezárás</button>
                     </div>
                 </div>`;
@@ -7130,7 +7313,7 @@
                 ${korGrafikonHtml(phases)}
                 <div class="vk-lab">
                     ${(() => { const vid = viewingPastRaceData ? viewingPastRaceData.id : (liveRaceMeta && liveRaceMeta.id); return vid ? megosztasGombHtml('verseny', vid, (viewingPastRaceData || liveRaceMeta).name, c.dist) : ''; })()}
-                    <button class="admin-only vk-obpont ${c.obPont !== false ? 'igen' : ''}" onclick="toggleObPont('${c.bib}')" title="Bajnoki (OB) pontszerzésre jogosult-e ez a versenyző - ha lemond, ennek a versenynek az eredménye nem számít bele az egyéni bajnokságba">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
+                    <button class="csak-jog-ob-pont vk-obpont ${c.obPont !== false ? 'igen' : ''}" onclick="toggleObPont('${c.bib}')" title="Bajnoki (OB) pontszerzésre jogosult-e ez a versenyző - ha lemond, ennek a versenynek az eredménye nem számít bele az egyéni bajnokságba">${c.obPont !== false ? '🏆 OB-pontra jogosult' : '🚫 OB-pontról lemondva'} (kattints a váltáshoz)</button>
                     <button class="calc-btn vk-bezar" onclick="closeAdatlap()">Bezárás</button>
                 </div>
             </div>`;
@@ -7745,7 +7928,7 @@
 
     // A lapok jelvénye a versenyzői listában (csak admin)
     function szankcioJelekHtml(c) {
-        return szankcioLapok(c).map(l => `<span class="inline-flag lap-${l.tipus === 'piros' ? 'piros' : 'sarga'} admin-only" title="${escapeHtml((l.ido || '') + ' ' + (l.ok || '') + (l.kinek && l.kinek !== 'lovas' ? ' (' + (LAP_KINEK[l.kinek] || l.kinek) + ')' : ''))}">${l.tipus === 'piros' ? 'PIROS LAP' : 'SÁRGA LAP'}</span>`).join('');
+        return szankcioLapok(c).map(l => `<span class="inline-flag lap-${l.tipus === 'piros' ? 'piros' : 'sarga'} csak-jog-szankciok" title="${escapeHtml((l.ido || '') + ' ' + (l.ok || '') + (l.kinek && l.kinek !== 'lovas' ? ' (' + (LAP_KINEK[l.kinek] || l.kinek) + ')' : ''))}">${l.tipus === 'piros' ? 'PIROS LAP' : 'SÁRGA LAP'}</span>`).join('');
     }
 
     // --- A Teljes verseny fül "Szankciók" része ---
@@ -8447,7 +8630,7 @@
         const { tipus, id, forras } = profilAllapot;
         const torzs = tipus === 'lovas' ? (ridersCache[sanitizeKey(id)] || {}) : (horsesCache[sanitizeKey(id)] || {});
         const ismert = !!torzs.name;
-        const admin = document.body.classList.contains('role-admin');
+        const admin = jogVan('ujonc');   // a FEI újonc fül
         let ful = profilAllapot.ful || 'eredmenyek';
         if (ful === 'ujonc' && !admin) ful = 'eredmenyek';
 
@@ -9702,7 +9885,7 @@
                             <b>${escapeHtml(nev)}</b> <span style="color:var(--text-dim-2); font-size:0.78rem;">${kulfoldiErtek(ex.license)}</span><br>
                             <span style="color:var(--text-dim); font-size:0.85rem;">${lo}${loJel} · ${escapeHtml(String(ex.distanceKm || '?'))} km · ${eredmeny}${ex.score ? ' · ' + escapeHtml(ex.score) : ''}</span>
                         </div>
-                        <button class="edit-btn admin-only" onclick="kulfoldiSzerkesztes('${escapeHtml(id)}')">Módosítás</button>
+                        <button class="edit-btn csak-jog-kulfoldi" onclick="kulfoldiSzerkesztes('${escapeHtml(id)}')">Módosítás</button>
                     </div>
                     ${kulfoldiSzerkesztettId === id ? kulfoldiSzerkesztoUrlap(id, ex) : ''}
                 </div>`;
@@ -9759,7 +9942,7 @@
             <div style="text-align:center; margin-bottom:15px;">
                 <h3 style="color:var(--primary); margin:0;">${rider.name || license}</h3>
                 <p style="color:var(--text-dim); margin-top:4px;">${rider.club ? rider.club + ' · ' : ''}Ig. szám: ${license}</p>
-                <button class="admin-only" style="width:auto; padding:6px 16px; border-radius:20px; border:none; cursor:pointer; font-weight:700; font-size:0.8rem; margin-top:6px; background:${isForeignLicense(license) ? 'var(--warning)' : 'var(--card-3)'}; color:${isForeignLicense(license) ? 'black' : 'var(--text)'};" onclick="toggleForeign('${escapeHtml(license)}')">${isForeignLicense(license) ? '🌍 Külföldi – kimarad a magyar bajnokságból' : '🇭🇺 Magyar versenyző'} (kattints a váltáshoz)</button>
+                <button class="csak-jog-kulfoldi" style="width:auto; padding:6px 16px; border-radius:20px; border:none; cursor:pointer; font-weight:700; font-size:0.8rem; margin-top:6px; background:${isForeignLicense(license) ? 'var(--warning)' : 'var(--card-3)'}; color:${isForeignLicense(license) ? 'black' : 'var(--text)'};" onclick="toggleForeign('${escapeHtml(license)}')">${isForeignLicense(license) ? '🌍 Külföldi – kimarad a magyar bajnokságból' : '🇭🇺 Magyar versenyző'} (kattints a váltáshoz)</button>
             </div>
         `;
 
@@ -9904,8 +10087,8 @@
             return `<div class="competitor-item">
                 <div style="flex:1;"><b>${t.name}</b><br><span style="color:var(--text-dim); font-size:0.85rem;">${memberNames}</span></div>
                 <div style="display:flex; gap:8px;">
-                    <button class="edit-btn admin-only" onclick="editTeam('${id}')">Módosítás</button>
-                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteTeam('${id}')">Törlés</button>
+                    <button class="edit-btn csak-jog-csapatok" onclick="editTeam('${id}')">Módosítás</button>
+                    <button class="edit-btn csak-jog-csapatok" style="background:var(--danger);" onclick="deleteTeam('${id}')">Törlés</button>
                 </div>
             </div>`;
         }).join('');
@@ -10018,8 +10201,8 @@
                 <div style="flex:1;"><b>${escapeHtml(riderInfo.name || ex.license)}</b> — ${escapeHtml(verseny)}${jelzes} <span style="color:var(--text-dim);">(${escapeHtml(hely + (ex.country || '?'))}, ${ex.date})</span><br>
                 <span style="color:var(--text-dim); font-size:0.85rem;">${ex.distanceKm} km${ex.place ? ', ' + ex.place + '. hely' : (ex.status ? ', ' + escapeHtml(ex.status) : '')}${loNev}</span></div>
                 <div style="display:flex; gap:8px;">
-                    <button class="edit-btn admin-only" onclick="editExternalResult('${id}')">Módosítás</button>
-                    <button class="edit-btn admin-only" style="background:var(--danger);" onclick="deleteExternalResult('${id}')">Törlés</button>
+                    <button class="edit-btn csak-jog-kulfoldi" onclick="editExternalResult('${id}')">Módosítás</button>
+                    <button class="edit-btn csak-jog-kulfoldi" style="background:var(--danger);" onclick="deleteExternalResult('${id}')">Törlés</button>
                 </div>
             </div>`;
         }).join('');
@@ -10886,7 +11069,8 @@
     window.onload = function() {
         verzioFigyelesInditas();
         ujDizajnInditas();
-        let savedMode = localStorage.getItem('currentMode') || 'kezdolap';
+        let savedMode = 'kezdolap';
+        try { savedMode = sessionStorage.getItem('rps-nezet') || 'kezdolap'; localStorage.removeItem('currentMode'); } catch (e) {}
         if (savedMode === 'terv') savedMode = 'versenyek';
         try { currentAdatlapFilter = sessionStorage.getItem('rps-adatlap-kat') || null; } catch (e) {}
         switchSidebarMode(savedMode, document.getElementById('btn-menu-' + savedMode) || document.getElementById('btn-menu-' + savedMode.replace(/-mod$/, '')));
