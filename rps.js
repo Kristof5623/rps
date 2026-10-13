@@ -3034,7 +3034,7 @@
     // versenynaptárában jelennek meg; a lejárt esemény magától eltűnik a listákból.
     const ESEMENY_TIPUSOK = {
         szezonzaro: 'Szezonzáró', bajnokavato: 'Bajnokavató', kozgyules: 'Közgyűlés', kepzes: 'Képzés / tanfolyam',
-        birokepzes: 'Bírói képzés / továbbképzés', rajtengedely: 'Rajtengedély-vizsga', edzotabor: 'Edzőtábor', nyiltnap: 'Nyílt nap', egyeb: 'Esemény'
+        birokepzes: 'Bírói képzés', birotovabbkepzes: 'Bírói továbbképzés', rajtengedely: 'Rajtengedély-vizsga', edzotabor: 'Edzőtábor', nyiltnap: 'Nyílt nap', egyeb: 'Esemény'
     };
     // Egy eseményen több dolog is lehet (pl. szezonzáró + bajnokavató + közgyűlés): tipusok = [kulcsok].
     // A régi rekordokban csak "tipus" van; mentéskor az elsőt "tipus"-ként is írjuk (régebbi app-változatoknak).
@@ -13431,7 +13431,7 @@
         'Frissítés': 'Refresh', 'Később': 'Later', 'Impresszum': 'Legal notice', 'Adatvédelmi tájékoztató': 'Privacy notice', 'Kapcsolat': 'Contact', 'Üzemeltető': 'Operator',
         'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Mi lesz?': 'What is on?', '(több is bejelölhető)': '(tick all that apply)',
         'Szezonzáró': 'Season closing', 'Bajnokavató': 'Championship awards', 'Közgyűlés': 'General assembly', 'Képzés / tanfolyam': 'Training / course',
-        'Bírói képzés / továbbképzés': 'Judge training / refresher', 'Rajtengedély-vizsga': 'Licence exam', 'Edzőtábor': 'Training camp', 'Nyílt nap': 'Open day', '(nem kötelező – e-mail vagy telefon)': '(optional – e-mail or phone)', 'Technikai adatok csatolása': 'Attach technical details',
+        'Bírói képzés': 'Judge training', 'Bírói továbbképzés': 'Judge refresher training', 'Rajtengedély-vizsga': 'Licence exam', 'Edzőtábor': 'Training camp', 'Nyílt nap': 'Open day', '(nem kötelező – e-mail vagy telefon)': '(optional – e-mail or phone)', 'Technikai adatok csatolása': 'Attach technical details',
         'Köszönjük! A jelentés megérkezett.': 'Thank you! Your report has arrived.',
         // további nyilvános szövegek
         'Egy kattintással nyílik, saját ablakban, és szól, ha a követett lovasod beér. Ingyenes, áruház nélkül.': 'Opens with one click in its own window and tells you when a rider you follow arrives. Free, no app store.',
