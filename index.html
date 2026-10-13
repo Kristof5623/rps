@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu" class="uj-dizajn">
+<html lang="hu">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -32,7 +32,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
     <link rel="stylesheet" href="rps.css?v=128">
-    <link rel="stylesheet" href="rps-uj.css?v=128">
 </head>
 <body>
 
@@ -74,6 +73,7 @@
         <button id="btn-menu-attekinto" class="sidebar-btn admin-only" onclick="switchMainTab('attekinto-mod', this)">Versenyáttekintő</button>
         <button id="btn-menu-rfid" class="sidebar-btn admin-only" onclick="switchMainTab('rfid-mod', this)">RFID kapuk</button>
         <button id="btn-menu-nezok" class="sidebar-btn admin-only" onclick="switchMainTab('nezok-mod', this)">Nézők</button>
+        <button id="btn-menu-app-letoltesek" class="sidebar-btn admin-only" onclick="switchMainTab('app-letoltesek-mod', this)">App-letöltések</button>
         <button id="btn-menu-beallitasok" class="sidebar-btn admin-only" onclick="switchMainTab('beallitasok-mod', this)">Beállítások</button>
         <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">Verseny Exportálás</button>
         <button id="btn-menu-felhasznalok" class="sidebar-btn admin-only" onclick="switchMainTab('felhasznalok-mod', this)">Felhasználók</button>
@@ -745,6 +745,15 @@
                 beleszámít); aki bezárja, kikerül. „Látogató”: egy böngésző naponta egyszer számít, akárhányszor jön vissza.
                 Személyes adatot nem tárolunk, csak véletlen azonosítót.</p>
             <div id="nezok-tartalom"></div>
+        </div>
+
+        <div id="app-letoltesek-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 10px;">App-letöltések</h3>
+            <p class="field-hint" style="margin-top:0;">Az End-Ride nem áruházból jön: letöltés = telepítés a kezdőképernyőre, eszközönként egyszer.
+                Androidon és gépen a telepítés pillanatában számít, iPhone-on (ott a böngésző nem szól róla) az első appként indításkor.
+                Aki a mérés indulása (v128) előtt telepítette, akkor jelenik meg, amikor legközelebb appként megnyitja. Az app törlését a böngésző nem jelzi.
+                „Útmutató”: hányszor nyitották meg a telepítési útmutatót; „Telepítés gomb”: hányszor kérték a telepítést (zárójelben: hányszor mondtak rá igent).</p>
+            <div id="app-letoltesek-tartalom"></div>
         </div>
 
         <div id="rfid-mod" class="mode-content">

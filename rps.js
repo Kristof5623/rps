@@ -932,7 +932,8 @@
         { kulcs: 'attekinto', csoport: 'Kimutatások és eszközök', cimke: 'Versenyáttekintő' },
         { kulcs: 'nyomtatvanyok', csoport: 'Kimutatások és eszközök', cimke: 'A4 nyomtatványok' },
         { kulcs: 'export', csoport: 'Kimutatások és eszközök', cimke: 'Verseny exportálás (Excel)' },
-        { kulcs: 'nezok', csoport: 'Kimutatások és eszközök', cimke: 'Nézők és app-letöltések', reszlet: 'látogatottság, csúcsok, telepítések' },
+        { kulcs: 'nezok', csoport: 'Kimutatások és eszközök', cimke: 'Nézők', reszlet: 'látogatottság, napi csúcsok' },
+        { kulcs: 'app-letoltesek', csoport: 'Kimutatások és eszközök', cimke: 'App-letöltések', reszlet: 'telepítések, appként megnyitások' },
         { kulcs: 'kozos-tema', csoport: 'Kimutatások és eszközök', cimke: 'Közös (alapértelmezett) téma' }
     ];
     // Ami csak az adminé marad (nem adható pipával): a jogok osztása maga - a Firebase szabályai is
@@ -975,6 +976,7 @@
         'btn-menu-attekinto': ['attekinto'],
         'btn-menu-rfid': ['rfid'],
         'btn-menu-nezok': ['nezok'],
+        'btn-menu-app-letoltesek': ['app-letoltesek'],
         'btn-menu-beallitasok': ['beallitasok'],
         'btn-menu-export': ['export'],
         'btn-menu-felhasznalok': ['__admin'],
@@ -987,7 +989,7 @@
     };
     // Belső nézet -> jog. Ami nincs itt, az nyilvános.
     const NEZET_JOG = {
-        'fo-mod': ['fomod'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'], 'nezok-mod': ['nezok'],
+        'fo-mod': ['fomod'], 'attekinto-mod': ['attekinto'], 'rfid-mod': ['rfid'], 'nezok-mod': ['nezok'], 'app-letoltesek-mod': ['app-letoltesek'],
         'beallitasok-mod': ['beallitasok'], 'export-mod': ['export'], 'felhasznalok-mod': ['__admin'],
         'beerkeztetes-mod': ['beerkeztetes'], 'orvosi-ido-mod': ['orvosi-ido'], 'orvosi-mod': ['orvosi'],
         'nyomtatas-mod': ['nyomtatas'], 'nyomtatvanyok-mod': ['nyomtatvanyok'], 'bajnoksag-teny': ['tenyeszto']
@@ -1150,7 +1152,7 @@
         ]).then(([t, h, a]) => {
             nezo.app = appOsszegzes(t.val(), h.val(), a.val(), Array.from({ length: 30 }, (_, i) => datumPlusz(tol, i)));
         }).catch(() => { nezo.app = { hiba: true }; })
-          .finally(() => { nezo.appTolt = false; renderNezok(); });
+          .finally(() => { nezo.appTolt = false; renderAppLetoltesek(); });
     }
 
     // A nap percenkénti adataiból: csúcs (hányan, mikor) és óránkénti legnagyobb érték
@@ -1244,7 +1246,6 @@
         if (!cont || !document.getElementById('nezok-mod')?.classList.contains('active')) return;
         if (nezo.hiba) { cont.innerHTML = '<p class="field-hint">Nem olvasható – a Firebase-szabályok (jelenlet, latogatok, nezettseg) frissítése kell: tests/firebase-szabalyok.json → Firebase konzol → Realtime Database → Rules → Publish.</p>'; return; }
         if (!nezo.honap && !nezo.honapTolt) nezoHonapBetolt();
-        if (!nezo.app && !nezo.appTolt) nezoAppBetolt();
         const ma = napIso(new Date());
         const szam = v => (v === null || v === undefined) ? '…' : v;
         const maOssz = nezoNapOsszegzes(nezo.maPercek);
@@ -1275,23 +1276,6 @@
                 <span class="csucs">${d.van ? `csúcs ${d.csucs}${d.csucsIdo ? ' · ' + d.csucsIdo : ''}` : '–'}</span></button>`;
         }).join('')}</div>`;
 
-        const app = nezo.app;
-        let appHtml;
-        if (!app) appHtml = betoltoSor('Az app-adatok betöltése…');
-        else if (app.hiba) appHtml = '<p class="field-hint">Az app-adatok nem olvashatók – a Firebase-szabályok frissítése kell (nezettseg/app).</p>';
-        else {
-            const maApp = app.napi[ma] || { hasznalat: 0 };
-            const appNapok = Object.keys(app.napi).sort().reverse().filter(n => { const x = app.napi[n]; return x.telepites || x.hasznalat || x.utmutato || x.gomb; });
-            appHtml = `<div class="rfid-osszesito">
-                    <div><b>${app.osszes.db}</b><span>telepítve összesen · Android ${app.osszes.android} · iPhone ${app.osszes.ios} · gép ${app.osszes.gep}</span></div>
-                    <div><b>${maApp.hasznalat}</b><span>appként nyitotta meg ma</span></div>
-                    <div><b>${app.aktiv}</b><span>eszközön használták appként az utolsó 30 napban</span></div>
-                </div>
-                ${appNapok.length ? `<div class="app-napok"><div class="app-nap fej"><span>Nap</span><span>Telepítés</span><span>Appként nyitotta</span><span>Útmutató</span><span>Telepítés gomb (igen)</span></div>
-                    ${appNapok.map(n => { const x = app.napi[n]; return `<div class="app-nap"><span>${escapeHtml(n.slice(5).replace('-', '.'))}.${n === ma ? ' ma' : ''}</span><span>${x.telepites}</span><span>${x.hasznalat}</span><span>${x.utmutato}</span><span>${x.gomb}${x.gomb ? ` (${x.elfogadva})` : ''}</span></div>`; }).join('')}</div>`
-                    : '<p class="field-hint">Az utolsó 30 napban még nem volt telepítés vagy appként megnyitás.</p>'}`;
-        }
-
         cont.innerHTML = `<div class="rfid-osszesito">
                 <div><b>${szam(nezo.most)}</b><span>most nézik${typeof nezo.most === 'number' ? ` (bejelentkezve: ${nezo.belepve})` : ''}</span></div>
                 <div><b>${szam(nezo.maLatogato)}</b><span>látogató ma</span></div>
@@ -1307,10 +1291,35 @@
             ${napHtml}
             <h4 style="margin:16px 0 4px 0;">Utolsó 30 nap <button type="button" class="uj-link" onclick="nezo.honap = null; renderNezok()">frissítés</button></h4>
             <p class="field-hint" style="margin-top:0;">Látogató: egy böngésző naponta egyszer. Csúcs: a legtöbb egyszerre (ugyanabban a percben) nyitott és látható oldal, a nap elejétől. Egy napra kattintva megnyílik a részletes bontása. Az adatok nem törlődnek.</p>
-            ${honapHtml}
-            <h4 style="margin:22px 0 4px 0;">📲 App-letöltések <button type="button" class="uj-link" onclick="nezo.app = null; renderNezok()">frissítés</button></h4>
-            <p class="field-hint" style="margin-top:0;">Az End-Ride nem áruházból jön: letöltés = telepítés a kezdőképernyőre, eszközönként egyszer. Androidon és gépen a telepítés pillanatában számít, iPhone-on (ott a böngésző nem szól róla) az első appként indításkor. Aki a mérés indulása (v127) előtt telepítette, akkor jelenik meg, amikor legközelebb appként megnyitja. Az app törlését a böngésző nem jelzi.</p>
-            ${appHtml}`;
+            ${honapHtml}`;
+    }
+
+    // --- APP-LETÖLTÉSEK oldal (külön menüpont, saját jog) ---
+    function renderAppLetoltesek() {
+        const cont = document.getElementById('app-letoltesek-tartalom');
+        if (!cont || !document.getElementById('app-letoltesek-mod')?.classList.contains('active')) return;
+        if (!nezo.app && !nezo.appTolt) nezoAppBetolt();
+        const app = nezo.app;
+        const ma = napIso(new Date());
+        if (!app) { cont.innerHTML = betoltoSor('Az app-adatok betöltése…'); return; }
+        if (app.hiba) { cont.innerHTML = '<p class="field-hint">Az app-adatok nem olvashatók – a Firebase-szabályok frissítése kell (tests/firebase-szabalyok.json → Firebase konzol → Rules → Publish).</p>'; return; }
+        const maApp = app.napi[ma] || { hasznalat: 0, telepites: 0 };
+        const appNapok = Object.keys(app.napi).sort().reverse().filter(n => { const x = app.napi[n]; return x.telepites || x.hasznalat || x.utmutato || x.gomb; });
+        cont.innerHTML = `<div class="rfid-osszesito">
+                <div><b>${app.osszes.db}</b><span>telepítve összesen</span></div>
+                <div><b>${maApp.telepites}</b><span>telepítés ma</span></div>
+                <div><b>${maApp.hasznalat}</b><span>appként nyitotta meg ma</span></div>
+                <div><b>${app.aktiv}</b><span>eszközön használták appként az utolsó 30 napban</span></div>
+            </div>
+            <div class="rfid-osszesito">
+                <div><b>${app.osszes.android}</b><span>Android</span></div>
+                <div><b>${app.osszes.ios}</b><span>iPhone / iPad</span></div>
+                <div><b>${app.osszes.gep}</b><span>számítógép</span></div>
+            </div>
+            <h4 style="margin:18px 0 4px 0;">Utolsó 30 nap <button type="button" class="uj-link" onclick="nezo.app = null; renderAppLetoltesek()">frissítés</button></h4>
+            ${appNapok.length ? `<div class="app-napok"><div class="app-nap fej"><span>Nap</span><span>Telepítés</span><span>Appként nyitotta</span><span>Útmutató</span><span>Telepítés gomb (igen)</span></div>
+                ${appNapok.map(n => { const x = app.napi[n]; return `<div class="app-nap"><span>${escapeHtml(n.slice(5).replace('-', '.'))}.${n === ma ? ' ma' : ''}</span><span>${x.telepites}</span><span>${x.hasznalat}</span><span>${x.utmutato}</span><span>${x.gomb}${x.gomb ? ` (${x.elfogadva})` : ''}</span></div>`; }).join('')}</div>`
+                : '<p class="field-hint">Az utolsó 30 napban még nem volt telepítés vagy appként megnyitás.</p>'}`;
     }
 
     auth.onAuthStateChanged(user => {
@@ -2116,17 +2125,22 @@
     // ============================================================================
     let telepitesKeres = null;
     if (typeof window.addEventListener === 'function') {
-        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); telepitesKeres = e; });
+        // A böngésző (Chrome / Edge / Samsung) akkor ad telepítési lehetőséget, ha az oldalt már egy ideje
+        // használják - ha közben nyitva van az útmutató, a Telepítés gomb azonnal megjelenik benne.
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            telepitesKeres = e;
+            if (document.querySelector('#infoModal .app-utmutato') && document.getElementById('infoModal').style.display === 'flex') appUtmutato(true);
+        });
         window.addEventListener('appinstalled', () => { telepitesKeres = null; appTelepitesRogzit('telepites'); showToast('Az End-Ride felkerült a kezdőképernyőre.'); });
     }
     function appTelepitve() { return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
     function appTelepithetoHtml() {
         if (appTelepitve()) return '';
-        const ios = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
         return `<div class="fiok-blokk">
             <h4>📲 End-Ride a telefonodon</h4>
-            ${telepitesKeres ? `<button class="calc-btn" onclick="appTelepites()">Hozzáadás a kezdőképernyőhöz</button>`
-                : `<p class="fiok-megj">${ios ? 'iPhone-on: Safari → Megosztás gomb → „Főképernyőhöz adás”.' : 'A böngésző menüjében: „Hozzáadás a kezdőképernyőhöz” vagy „Alkalmazás telepítése”.'} Így saját ikonnal, teljes képernyőn nyílik, mint egy app.</p>`}
+            ${telepitesKeres ? `<button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre az eszközre</button>`
+                : `<p class="fiok-megj">Saját ikonnal, teljes képernyőn nyílik, mint egy app.</p><button class="calc-btn" onclick="appUtmutato()">Hogyan telepítsem?</button>`}
         </div>`;
     }
     function appTelepites() {
@@ -2162,19 +2176,57 @@
         appAjanloJelzes('elrejtve');
         document.querySelectorAll('.app-reklam').forEach(el => el.remove());
     }
-    function appUtmutato() {
-        const ua = navigator.userAgent || '';
-        const ios = /iphone|ipad|ipod/i.test(ua);
+    // Melyik eszköz és böngésző: ehhez igazodik a telepítési útmutató
+    function bongeszoTipus() {
+        const ua = String(navigator.userAgent || '');
+        const ios = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
         const android = /android/i.test(ua);
-        appAjanloJelzes('utmutato');
+        let b = 'egyeb';
+        if (/edg(e|a|ios)?\//i.test(ua)) b = 'edge';
+        else if (/samsungbrowser/i.test(ua)) b = 'samsung';
+        else if (/opr\/|opera/i.test(ua)) b = 'opera';
+        else if (/firefox|fxios/i.test(ua)) b = 'firefox';
+        else if (/crios/i.test(ua)) b = 'chrome-ios';
+        else if (/chrome\//i.test(ua)) b = 'chrome';
+        else if (/safari/i.test(ua)) b = 'safari';
+        return { ios, android, gep: !ios && !android, b };
+    }
+    // ujra: a böngésző közben engedte a telepítést - csak frissítjük, nem számoljuk újra megnyitásnak
+    function appUtmutato(ujra) {
+        const { ios, android, gep, b } = bongeszoTipus();
+        if (!ujra) appAjanloJelzes('utmutato');
+        const telepitett = appTelepitve();
+        const gomb = telepitesKeres && !telepitett
+            ? `<p><button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre az eszközre</button></p>
+               <p class="field-hint" style="margin-top:-4px;">Egy kattintás: a böngésző megkérdezi, telepítse-e – utána saját ikonnal indul.</p>` : '';
+        // ha a böngésző tudna gombot adni, de még nem adott (pl. most nyitották meg az oldalt)
+        const gombKesobb = !telepitesKeres && !telepitett && !ios && ['chrome', 'edge', 'samsung', 'opera'].includes(b)
+            ? '<p class="field-hint">A „Telepítés” gomb itt jelenik meg, amint a böngésző engedi (általában fél perc használat után). Addig az alábbi lépésekkel is megy.</p>' : '';
+        const lepes = (cim, lista, kiemelt) => `<div class="app-lepesek${kiemelt ? ' kiemelt' : ''}"><b>${cim}</b><ol>${lista.map(x => `<li>${x}</li>`).join('')}</ol></div>`;
+        const iphone = lepes(b === 'chrome-ios' ? 'iPhone / iPad (Chrome)' : 'iPhone / iPad (Safari)', b === 'chrome-ios'
+            ? ['Koppints a címsor jobb oldalán a <b>Megosztás</b> ikonra.', 'Válaszd: <b>„Főképernyőhöz adás”</b>, majd <b>Hozzáadás</b>.', 'Ha nincs ilyen, nyisd meg az oldalt a <b>Safariban</b>.']
+            : ['Nyisd meg az oldalt a <b>Safariban</b>.', 'Koppints a <b>Megosztás</b> gombra (négyzet felfelé mutató nyíllal) – lent vagy a címsorban.', 'Görgess le: <b>„Főképernyőhöz adás”</b>, majd <b>Hozzáadás</b>.'], ios);
+        const androidLepes = lepes(b === 'samsung' ? 'Android (Samsung Internet)' : 'Android (Chrome)', b === 'samsung'
+            ? ['Koppints a jobb alsó <b>≡</b> menüre.', 'Válaszd: <b>„Oldal hozzáadása”</b> → <b>„Kezdőképernyő”</b>.']
+            : ['Koppints a jobb felső <b>⋮</b> menüre.', 'Válaszd: <b>„Alkalmazás telepítése”</b> (vagy <b>„Hozzáadás a kezdőképernyőhöz”</b> → <b>Telepítés</b>).'], android);
+        const gepLepes = {
+            chrome: lepes('Számítógép – Chrome', ['A címsor jobb szélén kattints a <b>telepítés ikonra</b> (kis képernyő lefelé mutató nyíllal), ha látszik.',
+                'Vagy: jobb felső <b>⋮</b> menü → <b>„Átküldés, mentés és megosztás”</b> → <b>„End-Ride telepítése…”</b> (más változatban: <b>„Oldal telepítése alkalmazásként…”</b>).', 'Erősítsd meg: <b>Telepítés</b>.'], true),
+            edge: lepes('Számítógép – Edge', ['A címsor jobb szélén kattints az <b>„Alkalmazás elérhető”</b> ikonra, ha látszik.',
+                'Vagy: jobb felső <b>⋯</b> menü → <b>„Alkalmazások”</b> → <b>„Webhely telepítése alkalmazásként”</b> (vagy <b>„End-Ride telepítése”</b>).', 'Erősítsd meg: <b>Telepítés</b>.'], true),
+            safari: lepes('Mac – Safari', ['A felső menüsorban: <b>Fájl</b> → <b>„Hozzáadás a Dockhoz…”</b>.', 'Erősítsd meg: <b>Hozzáadás</b>. (macOS Sonoma vagy újabb kell hozzá.)'], true),
+            firefox: lepes('Számítógép – Firefox', ['A Firefox nem tud weboldalt appként telepíteni.', 'Nyisd meg az oldalt <b>Chrome</b>-ban vagy <b>Edge</b>-ben, és ott telepítsd.'], true)
+        };
+        const gepek = gep ? [gepLepes[b] || gepLepes.chrome].concat(['chrome', 'edge', 'safari', 'firefox'].filter(k => k !== b && !(b !== 'chrome' && !gepLepes[b] && k === 'chrome')).map(k => gepLepes[k].replace(' kiemelt', '')))
+            : [gepLepes.chrome.replace(' kiemelt', ''), gepLepes.edge.replace(' kiemelt', '')];
+        // a saját eszköz lépései elöl
+        const sorrend = ios ? [iphone, androidLepes, ...gepek] : android ? [androidLepes, iphone, ...gepek] : [...gepek.slice(0, 1), iphone, androidLepes, ...gepek.slice(1)];
         document.getElementById('infoModalTitle').innerText = 'End-Ride app a telefonodra';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek app-utmutato">
-            ${appTelepitve() ? '<p><b>Már telepítve van – innen nyitod most is.</b></p>' : ''}
-            <p>Az End-Ride webes app: nem kell áruházból letölteni, a telefon kezdőképernyőjére kerül saját ikonnal, és onnan teljes képernyőn, appként nyílik.</p>
-            ${telepitesKeres ? '<p><button class="calc-btn" onclick="appTelepites()">Telepítés most</button></p>' : ''}
-            <div class="app-lepesek${ios ? ' kiemelt' : ''}"><b>iPhone / iPad (Safari)</b><ol><li>Nyisd meg az oldalt a <b>Safariban</b>.</li><li>Koppints a <b>Megosztás</b> gombra (négyzet felfelé nyíllal).</li><li>Válaszd: <b>„Főképernyőhöz adás”</b>, majd <b>Hozzáadás</b>.</li></ol></div>
-            <div class="app-lepesek${android ? ' kiemelt' : ''}"><b>Android (Chrome)</b><ol><li>Koppints a jobb felső <b>⋮</b> menüre.</li><li>Válaszd: <b>„Alkalmazás telepítése”</b> vagy <b>„Hozzáadás a kezdőképernyőhöz”</b>.</li><li>Erősítsd meg: <b>Telepítés</b>.</li></ol></div>
-            <div class="app-lepesek${!ios && !android ? ' kiemelt' : ''}"><b>Számítógép (Chrome / Edge)</b><ol><li>A címsor jobb végén kattints a <b>telepítés</b> ikonra (monitor lefelé nyíllal).</li><li>Vagy a menüben: <b>„Alkalmazás telepítése”</b>.</li></ol></div>
+            ${telepitett ? '<p><b>Már telepítve van – innen nyitod most is.</b></p>' : ''}
+            <p>Az End-Ride webes app: nem kell áruházból letölteni, a telefon kezdőképernyőjére (gépen az asztalra / a tálcára) kerül saját ikonnal, és onnan teljes képernyőn, appként nyílik.</p>
+            ${gomb}${gombKesobb}
+            ${sorrend.join('')}
             <p class="field-hint">Telepítés után a Fiók ablakban kapcsolhatod be az értesítéseket a követett lovasokról.</p>
         </div>`;
         document.getElementById('infoModal').style.display = 'flex';
@@ -2218,6 +2270,7 @@
         if (targetId === 'attekinto-mod') renderAttekinto();
         if (targetId === 'rfid-mod') { renderRfidKapuk(); rfidOraIndit(); }
         if (targetId === 'nezok-mod') renderNezok();
+        if (targetId === 'app-letoltesek-mod') renderAppLetoltesek();
         if (targetId === 'export-mod') renderExportList();
         if (targetId === 'torzs-lovasok') renderTorzsLovasokList();
         if (targetId === 'torzs-lovak') renderTorzsLovakList();
@@ -10505,7 +10558,7 @@
     // (a tenyésztő a ló-törzsbe a tavlovasok_import_v4.json-ból kerül be - horses/{startNum}.breeder)
 
     // ============================================================================
-    // A FELÜLET (2026-10-06 óta az egyetlen): a <html class="uj-dizajn"> alatt él (rps-uj.css), felső
+    // A FELÜLET (2026-10-06 óta az egyetlen; a stílusa az rps.css végén, "AZ END-RIDE FELÜLETE"), felső
     // menüvel (az oldalsó menü gombjaira épül, így a jogosultságok ugyanazok), telefonon alsó
     // fülsávval, és egy Kezdőlappal (képváltó + összefoglaló / élő verseny).
     // ============================================================================
