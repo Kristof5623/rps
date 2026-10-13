@@ -2139,7 +2139,7 @@
         if (appTelepitve()) return '';
         return `<div class="fiok-blokk">
             <h4>${bongeszoTipus().gep ? '💻 End-Ride a gépeden' : '📲 End-Ride a telefonodon'}</h4>
-            ${telepitesKeres && !bongeszoTipus().gep ? `<button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre a telefonra</button>`
+            ${telepitesKeres ? `<button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre a ${bongeszoTipus().gep ? 'gépre' : 'telefonra'}</button>`
                 : `<p class="fiok-megj">Saját ikonnal, teljes képernyőn nyílik, mint egy app.</p><button class="calc-btn" onclick="appUtmutato()">Hogyan telepítsem?</button>`}
         </div>`;
     }
@@ -2160,11 +2160,12 @@
         try { const t = Number(localStorage.getItem(APP_REKLAM_KULCS)) || 0; return Date.now() - t > 30 * 86400000; } catch (e) { return true; }
     }
     function appReklamHtml() {
-        if (!appReklamLathato() || bongeszoTipus().gep) return '';   // gépen nem ajánljuk
+        const t = bongeszoTipus();
+        if (!appReklamLathato() || (t.gep && !['chrome', 'edge', 'safari'].includes(t.b))) return '';   // gépen csak ahol telepíthető
         return `<section class="uj-szekcio app-reklam">
             <div class="app-reklam-ikon"><img src="kepek/ikon-192.png" alt="" width="56" height="56"></div>
-            <div class="app-reklam-szoveg"><b>End-Ride app a telefonodra</b>
-                <span>Egy érintéssel nyílik, teljes képernyőn, és szól, ha a követett lovasod beér. Ingyenes, áruház nélkül.</span></div>
+            <div class="app-reklam-szoveg"><b>End-Ride app a ${t.gep ? 'gépedre' : 'telefonodra'}</b>
+                <span>${t.gep ? 'Egy kattintással nyílik, saját ablakban' : 'Egy érintéssel nyílik, teljes képernyőn'}, és szól, ha a követett lovasod beér. Ingyenes, áruház nélkül.</span></div>
             <div class="app-reklam-gombok">
                 <button class="uj-gomb fo" onclick="appTelepites()">${telepitesKeres ? 'Telepítés' : 'Hogyan?'}</button>
                 <button class="app-reklam-bezar" onclick="appReklamElrejt()" aria-label="Most nem">✕</button>
@@ -2201,12 +2202,12 @@
         const { ios, android, gep, b } = bongeszoTipus();
         if (!ujra) appAjanloJelzes('utmutato');
         const telepitett = appTelepitve();
-        // Gépen nem ajánljuk a telepítést (ott a böngészőben használják) - gomb csak telefonon
-        const gomb = telepitesKeres && !telepitett && !gep
-            ? `<p><button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre a telefonra</button></p>
-               <p class="field-hint" style="margin-top:-4px;">Egy koppintás: a böngésző megkérdezi, telepítse-e – utána saját ikonnal indul.</p>` : '';
-        // ha a böngésző tudna gombot adni, de még nem adott (pl. most nyitották meg az oldalt)
-        const gombKesobb = !telepitesKeres && !telepitett && android && ['chrome', 'edge', 'samsung', 'opera'].includes(b)
+        // Azonnali telepítés (egy gomb), ahol a böngésző engedi - telefonon és gépen is
+        const gomb = telepitesKeres && !telepitett
+            ? `<p><button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre a ${gep ? 'gépre' : 'telefonra'}</button></p>
+               <p class="field-hint" style="margin-top:-4px;">Egy ${gep ? 'kattintás' : 'koppintás'}: a böngésző megkérdezi, telepítse-e – utána saját ikonnal indul.</p>` : '';
+        // ha a böngésző tudna gombot adni, de még nem adott (pl. most nyitották meg az oldalt) - gépen az Opera nem tud
+        const gombKesobb = !telepitesKeres && !telepitett && !ios && ['chrome', 'edge', 'samsung'].concat(android ? ['opera'] : []).includes(b)
             ? '<p class="field-hint">A „Telepítés” gomb itt jelenik meg, amint a böngésző engedi (általában fél perc használat után). Addig az alábbi lépésekkel is megy.</p>' : '';
         const lepes = (cim, lista, kiemelt) => `<div class="app-lepesek${kiemelt ? ' kiemelt' : ''}"><b>${cim}</b><ol>${lista.map(x => `<li>${x}</li>`).join('')}</ol></div>`;
         const iphone = lepes(b === 'chrome-ios' ? 'iPhone / iPad (Chrome)' : 'iPhone / iPad (Safari)', b === 'chrome-ios'
@@ -2230,8 +2231,8 @@
             safari: ['A felső menüsorban: <b>Fájl</b> → <b>„Hozzáadás a Dockhoz…”</b>.', 'Erősítsd meg: <b>Hozzáadás</b>.']
         };
         const gepResz = gep ? lepes(`Számítógép (${GEP_NEV[b] || 'Chrome'})`, GEP_LEPESEK[b] || GEP_LEPESEK.chrome, true) : '';
-        // csak a saját eszköz és böngésző leírása látszik
-        const sorrend = android ? [androidLepes] : ios ? [iphone] : [gepResz];
+        // csak a saját eszköz és böngésző leírása, és csak ha nincs azonnali telepítés (vagy már telepítve van)
+        const sorrend = (gomb || telepitett) ? [] : android ? [androidLepes] : ios ? [iphone] : [gepResz];
         document.getElementById('infoModalTitle').innerText = gep ? 'End-Ride app a gépedre' : 'End-Ride app a telefonodra';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek app-utmutato">
             ${telepitett ? '<p><b>Már telepítve van – innen nyitod most is.</b></p>' : ''}
