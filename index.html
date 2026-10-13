@@ -21,7 +21,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="128">
+    <meta name="app-verzio" content="129">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +31,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=128">
+    <link rel="stylesheet" href="rps.css?v=129">
 </head>
 <body>
 
@@ -45,6 +45,13 @@
             <button class="calc-btn" style="background:var(--card-3); color:var(--text); margin-top:0;" onclick="closeConfirm()">Mégse</button>
             <button class="calc-btn" id="confirmOkBtn" style="background:var(--danger); color:white; margin-top:0;">Igen, mehet</button>
         </div>
+    </div>
+</div>
+
+<div id="segitoModal" class="modal" style="z-index: 2600;" onclick="if(event.target==this) segitoBezar()">
+    <div class="modal-content segito-doboz">
+        <button type="button" class="segito-bezar" onclick="segitoBezar()" aria-label="Bezárás">✕</button>
+        <div id="segito-tartalom"></div>
     </div>
 </div>
 
@@ -70,13 +77,17 @@
     <div id="admin-menu" class="admin-only" style="display: none; flex-direction: column;">
         <div class="menu-title">Fő funkciók</div>
         <button id="btn-menu-fomod" class="sidebar-btn" onclick="switchMainTab('fo-mod', this)">ÉLŐ Verseny Kezelés</button>
+        <button id="btn-menu-iranyitopult" class="sidebar-btn admin-only" onclick="switchMainTab('iranyitopult-mod', this)">Irányítópult</button>
         <button id="btn-menu-attekinto" class="sidebar-btn admin-only" onclick="switchMainTab('attekinto-mod', this)">Versenyáttekintő</button>
         <button id="btn-menu-rfid" class="sidebar-btn admin-only" onclick="switchMainTab('rfid-mod', this)">RFID kapuk</button>
         <button id="btn-menu-nezok" class="sidebar-btn admin-only" onclick="switchMainTab('nezok-mod', this)">Nézők</button>
         <button id="btn-menu-app-letoltesek" class="sidebar-btn admin-only" onclick="switchMainTab('app-letoltesek-mod', this)">App-letöltések</button>
+        <button id="btn-menu-hibajelentesek" class="sidebar-btn admin-only" onclick="switchMainTab('hibajelentesek-mod', this)">Hibajelentések</button>
+        <button id="btn-menu-adatminoseg" class="sidebar-btn admin-only" onclick="switchMainTab('adatminoseg-mod', this)">Adatminőség</button>
         <button id="btn-menu-beallitasok" class="sidebar-btn admin-only" onclick="switchMainTab('beallitasok-mod', this)">Beállítások</button>
         <button id="btn-menu-export" class="sidebar-btn admin-only" onclick="switchMainTab('export-mod', this)">Verseny Exportálás</button>
         <button id="btn-menu-felhasznalok" class="sidebar-btn admin-only" onclick="switchMainTab('felhasznalok-mod', this)">Felhasználók</button>
+        <button id="btn-menu-mentesek" class="sidebar-btn admin-only" onclick="switchMainTab('mentesek-mod', this)">Mentések</button>
     </div>
 
     <div id="szerepkor-menu" style="display: none; flex-direction: column;">
@@ -95,13 +106,18 @@
     <div class="menu-title">Élő adatok</div>
     <button id="btn-menu-elo-rajtok" class="sidebar-btn" onclick="switchSidebarMode('elo-rajtok', this)">Élő Kiindulások</button>
     <button id="btn-menu-adatlapok" class="sidebar-btn" onclick="switchSidebarMode('adatlapok', this)">Versenyzői Adatlapok</button>
+    <button id="btn-menu-kovetesek" class="sidebar-btn" onclick="switchSidebarMode('kovetesek', this)">Követéseim</button>
+    <button id="btn-menu-hirfolyam" class="sidebar-btn" onclick="switchSidebarMode('hirfolyam', this)">Élő hírfolyam</button>
+    <button id="btn-menu-palyaterkep" class="sidebar-btn" onclick="switchSidebarMode('palyaterkep', this)">Pályatérkép</button>
     
     <div class="menu-title">Verseny</div>
     <button id="btn-menu-versenyek" class="sidebar-btn" onclick="switchSidebarMode('versenyek', this)">Versenyek</button>
+    <button id="btn-menu-hirek" class="sidebar-btn" onclick="switchSidebarMode('hirek', this)">Hírek</button>
 
     <div class="menu-title">Törzsadatok</div>
     <button id="btn-menu-torzs-lovasok" class="sidebar-btn" onclick="switchSidebarMode('torzs-lovasok', this)">Lovasok</button>
     <button id="btn-menu-torzs-lovak" class="sidebar-btn" onclick="switchSidebarMode('torzs-lovak', this)">Lovak</button>
+    <button id="btn-menu-osszehasonlitas" class="sidebar-btn" onclick="switchSidebarMode('osszehasonlitas', this)">Összehasonlítás</button>
 
     <div class="menu-title">Bajnokság</div>
     <button id="btn-menu-bajnoksag-egyeni" class="sidebar-btn" onclick="switchSidebarMode('bajnoksag-egyeni', this)">Egyéni bajnokság</button>
@@ -110,9 +126,12 @@
     <button id="btn-menu-bajnoksag-teny" class="sidebar-btn admin-only" onclick="switchSidebarMode('bajnoksag-teny', this)">Év Tenyésztője</button>
 
     <div class="menu-title">Eszközök</div>
+    <button id="btn-menu-tempo" class="sidebar-btn" onclick="switchSidebarMode('tempoterv', this)">Tempótervező</button>
     <button id="btn-menu-reszido" class="sidebar-btn" onclick="switchSidebarMode('reszido', this)">Részidő</button>
     <button id="btn-menu-minosites" class="sidebar-btn" onclick="switchSidebarMode('minosites', this)">Kör Avg</button>
     <button id="btn-menu-app" class="sidebar-btn app-menu-gomb" onclick="appUtmutato()">📲 App a telefonodra</button>
+    <button id="btn-menu-hibajelento" class="sidebar-btn" onclick="hibaJelentoNyit()">Hibát találtam / ötletem van</button>
+    <button id="btn-menu-nyelv" class="sidebar-btn" translate="no" onclick="nyelvValt()">English (EN)</button>
 
     <div style="margin-top: 40px;"></div>
     
@@ -287,9 +306,18 @@
                     <option value="">-- Válassz --</option>
                 </select>
             </div>
+            <div class="nyom-nyelv">
+                <label for="nyom-nyelv">Matrica nyelve:</label>
+                <select id="nyom-nyelv" onchange="matricaNyelvValt(this.value)">
+                    <option value="auto">Automatikus – külföldi versenyzőnél angol</option>
+                    <option value="hu">Mindig magyar</option>
+                    <option value="en">Always English</option>
+                </select>
+                <small id="nyom-nyelv-jel"></small>
+            </div>
 
             <div id="nyomtatas-form" style="display:none; margin-top:20px;">
-                <div id="print-sticker" style="background:#fff; color:#000; padding:20px; border-radius:10px; border:2px solid #000; font-family: sans-serif;">
+                <div id="print-sticker" class="nyelv-nem" translate="no" style="background:#fff; color:#000; padding:20px; border-radius:10px; border:2px solid #000; font-family: sans-serif;">
                     </div>
                 <button id="btn-nyomtatas-indit" class="calc-btn" style="background:var(--primary); color:white; margin-top:20px;" onclick="window.print()">Nyomtatás indítása</button>
             </div>
@@ -358,6 +386,24 @@
             <p style="color:var(--text-dim); margin-bottom: 15px; font-size:0.85rem;">Kattints egy lóra a versenytörténet megtekintéséhez - hol indult, milyen távon, milyen lovassal és mi lett az eredménye.</p>
             <input type="text" id="torzs-lovak-search" placeholder="Keresés ló neve vagy start száma alapján..." autocomplete="off" oninput="renderTorzsLovakList()">
             <div id="torzs-lovak-list" style="margin-top:15px;"></div>
+        </div>
+
+        <div id="palyaterkep" class="mode-content">
+            <h3>Pályatérkép</h3>
+            <p class="field-hint" style="margin-top:0;">A verseny pályája körszínenként, a kapuk helye, és élő versenyen a lovasok <b>becsült</b> helye – a köre indulása óta eltelt időből és a várható köridőből (a kapu csak a célnál és az orvosinál méri az időt, a pályán nem követ). 5 másodpercenként frissül.</p>
+            <div id="palyaterkep-tartalom"></div>
+        </div>
+
+        <div id="hirek" class="mode-content">
+            <h3>Hírek</h3>
+            <p class="field-hint" style="margin-top:0;">Közlemények a versenyekről (kiírás, változás, eredmény), és a szövetség oldalának (tavlovasok.hu) legfrissebb hírei.</p>
+            <div id="hirek-tartalom"></div>
+        </div>
+
+        <div id="osszehasonlitas" class="mode-content">
+            <h3>Összehasonlítás</h3>
+            <p class="field-hint" style="margin-top:0;">Két lovas vagy két ló egymás mellett: versenyek, teljesítési arány, km, helyezések, leggyorsabb idő, pulzusidő – és hogyan szerepeltek, amikor ugyanazon a versenyen, ugyanazon a távon indultak.</p>
+            <div id="osszehasonlitas-tartalom"></div>
         </div>
 
         <div id="bajnoksag-egyeni" class="mode-content">
@@ -761,8 +807,29 @@
             <p class="field-hint" style="margin-top:0;">Az élő verseny minden versenyzője, és hogy melyik kapunál járt utoljára. Az oldal az adatbázisba felírt
                 időkből dolgozik: amint a kapu (az RFID program) vagy valaki kézzel rögzít egy beérkezést vagy orvosi időt, itt azonnal megjelenik.
                 Ha egy ló beérkezett, de sokáig nincs orvosi ideje, figyelmeztet (lehet, hogy a kapu nem olvasta a tag-et).</p>
+            <div id="rfid-allapot"></div>
             <select id="rfid-tav" onchange="setRfidTav(this.value)" style="max-width:220px; margin-top:0;"></select>
             <div id="rfid-tartalom"></div>
+        </div>
+
+        <div id="mentesek-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 10px;">Mentések</h3>
+            <p class="field-hint" style="margin-top:0;">Naponta egy automatikus biztonsági mentés az összes fontos adatról (versenyek, élő verseny, lovasok, lovak, egyesületek, csapatok, események, szövetségi és nemzetközi eredmények, hírek, felhasználók és jogok).
+                A napi mentés az admin első belépésekor készül; a „Mentés most” gomb azonnal ment (a mai mentést felülírja). <b>Legfeljebb 7 napot őrzünk</b> – a nyolcadiknál a legrégebbi törlődik.
+                Bármelyik letölthető (JSON), és adatáganként visszaállítható; visszaállítás előtt a mostani állapotról is készül egy mentés.</p>
+            <div id="mentesek-tartalom"></div>
+        </div>
+
+        <div id="hibajelentesek-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 10px;">Hibajelentések</h3>
+            <p class="field-hint" style="margin-top:0;">A „Hibát találtam / ötletem van” gombbal beküldött jelentések (belépés nélkül is lehet küldeni). Az állapotot és a megjegyzést itt lehet vezetni; a menüben az új jelentések száma látszik.</p>
+            <div id="hibajelentesek-tartalom"></div>
+        </div>
+
+        <div id="adatminoseg-mod" class="mode-content">
+            <h3 style="color:var(--primary); margin-bottom: 10px;">Adatminőség-ellenőrző</h3>
+            <p class="field-hint" style="margin-top:0;">Duplikált és elgépelt nevek, hiányzó vagy ismeretlen azonosítók, eredmény nélküli versenyzők – egy listában, hogy a bajnokság és a profilok pontosak legyenek. Semmit nem módosít.</p>
+            <div id="adatminoseg-tartalom"></div>
         </div>
 
         <div id="felhasznalok-mod" class="mode-content">
@@ -786,6 +853,30 @@
         </div>
 
         <div id="elo-rajtok" class="mode-content"><h3 style="color:var(--danger);">Élő Kiindulások</h3><div id="liveCountdownContainer"></div></div>
+
+        <div id="iranyitopult-mod" class="mode-content">
+            <h3>Versenynapi irányítópult</h3>
+            <p class="field-hint" style="margin-top:0;">Az élő verseny egy képernyőn: ki vár vizsgálatra (a bemutatási határidővel), ki pihen, ki érkezik hamarosan, és mire kell figyelni. Másodpercenként frissül.</p>
+            <div id="iranyitopult-tartalom"></div>
+        </div>
+
+        <div id="tempoterv" class="mode-content">
+            <h3>Tempótervező</h3>
+            <p class="field-hint" style="margin-top:0;">Célidőből vagy tempóból körönkénti terv: mikor indul, mikor érkezik, mikor van a vizsgálat és a kimenet – a kiírás köreivel és pihenőivel. Kinyomtatható a segítőknek.</p>
+            <div id="tempoterv-tartalom"></div>
+        </div>
+
+        <div id="kovetesek" class="mode-content">
+            <h3>Követéseim</h3>
+            <p class="field-hint" style="margin-top:0;">A követett lovasaid és lovaid egy helyen: élő versenyen hol tartanak, mikor érkeznek, mikor indulnak tovább. Követni egy lovas vagy ló adatlapján lehet.</p>
+            <div id="kovetesek-tartalom"></div>
+        </div>
+
+        <div id="hirfolyam" class="mode-content">
+            <h3>Élő hírfolyam</h3>
+            <p class="field-hint" style="margin-top:0;">Percről percre, mi történik a versenyen: rajtok, beérkezések, vizsgálatok, kiindulások, célba érés. Magától frissül.</p>
+            <div id="hirfolyam-tartalom"></div>
+        </div>
         <div id="fullscreenLiveOverlay">
             <div class="fullscreen-panel">
                 <div class="fullscreen-header">
@@ -1085,7 +1176,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=128"></script>
+<script src="rps.js?v=129"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
