@@ -8,3 +8,5 @@ python rfid kapu/
 *serviceAccount*.json
 **/naplo/
 __pycache__/
+# A heti FEI-import agent és adatai (automatika/FEI-AGENT.md) - csak helyben, a Firebase-kulcsot a python rfid kapu mappából használja
+automatika/

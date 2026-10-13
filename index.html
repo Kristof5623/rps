@@ -21,7 +21,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="129">
+    <meta name="app-verzio" content="130">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +31,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=129">
+    <link rel="stylesheet" href="rps.css?v=130">
 </head>
 <body>
 
@@ -607,6 +607,7 @@
                         nemzetközi kilométereit, ezért a helyezés és a kiesési státusz itt számít a legtöbbet.
                     </p>
                 </div>
+                <div id="fei-import-allapot"></div>
                 <input type="text" id="kulfoldi-kereso" placeholder="Szűrés versenyre, helyszínre, lovasra, lóra vagy évre..." autocomplete="off" oninput="renderKulfoldiKezelo()">
                 <div id="kulfoldi-kezelo-lista" style="margin-top:15px;"></div>
             </div>
@@ -841,12 +842,18 @@
             <div id="felh-lista" style="margin-top:12px;"><p class="field-hint">Betöltés...</p></div>
 
             <details class="kiiras-card felh-beall" style="border-left-color: var(--teal); margin-top:22px;">
-                <summary><b>Adatvédelmi tájékoztató – adatkezelő</b></summary>
-                <p class="field-hint">Ez jelenik meg a regisztrációnál és a fiókban az adatvédelmi tájékoztatóban (kötelező feltüntetni, ki kezeli az adatokat).</p>
-                <label>Adatkezelő neve (pl. egyesület vagy magánszemély)</label>
+                <summary><b>Üzemeltető és elérhetőség</b></summary>
+                <p class="field-hint">Ez látszik az oldal alján (lábléc: kapcsolat), az Impresszumban, és az adatvédelmi tájékoztatóban adatkezelőként (a regisztrációnál és a fiókban). Ami üres, az nem jelenik meg.</p>
+                <label>Üzemeltető / adatkezelő neve (magánszemély, egyéni vállalkozó, cég vagy egyesület)</label>
                 <input type="text" id="adatkezelo-nev" maxlength="120">
                 <label>Kapcsolat e-mail</label>
                 <input type="email" id="adatkezelo-email" maxlength="120">
+                <label>Telefonszám</label>
+                <input type="tel" id="adatkezelo-telefon" maxlength="30" placeholder="pl. +36 30 123 4567">
+                <label>Székhely / postacím <small>(nem kötelező – vállalkozásként, cégként kell az Impresszumba)</small></label>
+                <input type="text" id="adatkezelo-cim" maxlength="200">
+                <label>Cégadatok <small>(nem kötelező – pl. „Adószám: … · Nyilvántartási szám: …”)</small></label>
+                <input type="text" id="adatkezelo-cegadatok" maxlength="200">
                 <button class="calc-btn add-btn" style="margin-top:12px;" onclick="adatkezeloMentes()">Mentés</button>
             </details>
 
@@ -909,6 +916,24 @@
             <div id="res3" class="result-box" style="display:none"></div>
         </div>
     </div>
+    <footer id="lablec">
+        <div class="lablec-belso">
+            <div class="lablec-sor">
+                <button type="button" class="lablec-logo" onclick="lablecUgras('kezdolap')" aria-label="End-Ride kezdőlap"><svg class="brand-logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" class="bl-alap"/><path class="bl-lo" d="M29.93 72.29A30 30 0 1 1 70.07 72.29L61.38 62.63A17 17 0 1 0 38.62 62.63Z"/><rect class="bl-lyuk" x="27.38" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-26.0 28.88 60.30)"/><rect class="bl-lyuk" x="25.01" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(2.0 26.51 49.18)"/><rect class="bl-lyuk" x="28.15" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(30.0 29.65 38.25)"/><rect class="bl-lyuk" x="68.85" y="34.85" width="3" height="6.8" rx="1.5" transform="rotate(-210.0 70.35 38.25)"/><rect class="bl-lyuk" x="71.99" y="45.78" width="3" height="6.8" rx="1.5" transform="rotate(-182.0 73.49 49.18)"/><rect class="bl-lyuk" x="69.62" y="56.90" width="3" height="6.8" rx="1.5" transform="rotate(-154.0 71.12 60.30)"/><path class="bl-vonal" d="M35 55H42L45.5 46L50.5 64L54.5 51L57 55H65"/></svg><b class="brand-szo">End<svg class="kotojel-puls" viewBox="0 0 40 24" aria-hidden="true"><path d="M1 12H11L15 4L20 20L25 8L28 12H39"/></svg>Ride</b></button>
+                <nav class="lablec-linkek" aria-label="Információ">
+                    <button type="button" onclick="impresszumMegnyit()">Impresszum</button>
+                    <button type="button" onclick="adatvedelemMegnyit()">Adatvédelmi tájékoztató</button>
+                    <button type="button" onclick="hibaJelentoNyit()">Hibát találtam / ötletem van</button>
+                    <button type="button" onclick="appUtmutato()">App a telefonodra</button>
+                    <button type="button" id="lablec-nyelv" translate="no" onclick="nyelvValt()">English (EN)</button>
+                </nav>
+            </div>
+            <div class="lablec-sor">
+                <span id="lablec-kapcsolat" hidden></span>
+                <span><span translate="no">© <span id="lablec-ev">2026</span> End-Ride</span><span id="lablec-uzemelteto"></span><span id="lablec-verzio" translate="no"></span></span>
+            </div>
+        </div>
+    </footer>
 </div>
 
 <div id="raceModal" class="modal" onclick="if(event.target==this) closeRaceModal()">
@@ -1176,7 +1201,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=129"></script>
+<script src="rps.js?v=130"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
