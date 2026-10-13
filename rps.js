@@ -2124,6 +2124,7 @@
     // TELEPÍTHETŐ ALKALMAZÁS (PWA): a telefon kezdőképernyőjére tehető, saját ikonnal
     // ============================================================================
     let telepitesKeres = null;
+    let appEppTelepitve = false;   // ebben a böngészőben épp most telepítették (az "appinstalled" után)
     if (typeof window.addEventListener === 'function') {
         // A böngésző (Chrome / Edge / Samsung) akkor ad telepítési lehetőséget, ha az oldalt már egy ideje
         // használják - ha közben nyitva van az útmutató, a Telepítés gomb azonnal megjelenik benne.
@@ -2132,11 +2133,18 @@
             telepitesKeres = e;
             if (document.querySelector('#infoModal .app-utmutato') && document.getElementById('infoModal').style.display === 'flex') appUtmutato(true);
         });
-        window.addEventListener('appinstalled', () => { telepitesKeres = null; appTelepitesRogzit('telepites'); showToast('Az End-Ride felkerült a kezdőképernyőre.'); });
+        window.addEventListener('appinstalled', () => {
+            telepitesKeres = null;
+            appEppTelepitve = true;
+            appTelepitesRogzit('telepites');
+            appMenuFrissit();
+            document.querySelectorAll('.app-reklam').forEach(el => el.remove());
+            showToast('Az End-Ride felkerült a kezdőképernyőre.');
+        });
     }
     function appTelepitve() { return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
     function appTelepithetoHtml() {
-        if (appTelepitve()) return '';
+        if (appTelepitve() || appEppTelepitve) return '';
         return `<div class="fiok-blokk">
             <h4>${bongeszoTipus().gep ? '💻 End-Ride a gépeden' : '📲 End-Ride a telefonodon'}</h4>
             ${telepitesKeres ? `<button class="calc-btn" onclick="appTelepites()">📲 Telepítés erre a ${bongeszoTipus().gep ? 'gépre' : 'telefonra'}</button>`
@@ -2156,7 +2164,7 @@
     // képernyőn nyílik, és értesítést tud küldeni a követett lovasokról. Áruházból nem kell letölteni.
     const APP_REKLAM_KULCS = 'rps-app-reklam-elrejtve';
     function appReklamLathato() {
-        if (appTelepitve()) return false;
+        if (appTelepitve() || appEppTelepitve) return false;
         try { const t = Number(localStorage.getItem(APP_REKLAM_KULCS)) || 0; return Date.now() - t > 30 * 86400000; } catch (e) { return true; }
     }
     function appReklamHtml() {
@@ -2172,11 +2180,15 @@
             </div>
         </section>`;
     }
-    // Az oldalmenü pontja gépen "App a gépedre" (a HTML-ben a telefonos szöveg van)
-    (function appMenuSzoveg() {
+    // Az oldalmenü "App a telefonodra" pontja: gépen "App a gépedre"; a telepített appban (és közvetlenül
+    // a telepítés után) nem látszik - aki már az appot használja, annak nem ajánljuk
+    function appMenuFrissit() {
         const g = document.getElementById('btn-menu-app');
-        if (g && bongeszoTipus().gep) g.textContent = '💻 App a gépedre';
-    })();
+        if (!g) return;
+        if (bongeszoTipus().gep) g.textContent = '💻 App a gépedre';
+        g.style.display = (appTelepitve() || appEppTelepitve) ? 'none' : '';
+    }
+    appMenuFrissit();
     function appReklamElrejt() {
         try { localStorage.setItem(APP_REKLAM_KULCS, String(Date.now())); } catch (e) {}
         appAjanloJelzes('elrejtve');
