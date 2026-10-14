@@ -938,7 +938,7 @@
         { kulcs: 'export', csoport: 'Kimutatások és eszközök', cimke: 'Verseny exportálás (Excel)' },
         { kulcs: 'nezok', csoport: 'Kimutatások és eszközök', cimke: 'Nézők', reszlet: 'látogatottság, napi csúcsok' },
         { kulcs: 'app-letoltesek', csoport: 'Kimutatások és eszközök', cimke: 'App-letöltések', reszlet: 'telepítések, appként megnyitások' },
-        { kulcs: 'hibajelentesek', csoport: 'Kimutatások és eszközök', cimke: 'Hibajelentések', reszlet: 'a beküldött hibák és ötletek olvasása, állapotuk' },
+        { kulcs: 'hibajelentesek', csoport: 'Kimutatások és eszközök', cimke: 'Hibák és ötletek', reszlet: 'a beküldött hibák és ötletek olvasása, állapotuk' },
         { kulcs: 'adatminoseg', csoport: 'Kimutatások és eszközök', cimke: 'Adatminőség-ellenőrző', reszlet: 'duplikátumok, elgépelések, hiányzó adatok' },
         { kulcs: 'kozos-tema', csoport: 'Kimutatások és eszközök', cimke: 'Közös (alapértelmezett) téma' }
     ];
@@ -2288,9 +2288,9 @@
     // kijelzőn kitágul alattuk a hasáb. Mindenhol máshol az űrlapokhoz szabott keskeny hasáb
     // marad - egy input nem lesz szebb attól, ha 1300px széles (l. .szeles-nezet a CSS-ben).
     const SZELES_NEZETEK = ['bajnoksag-egyeni', 'bajnoksag-lo', 'bajnoksag-csapat', 'attekinto-mod', 'bajnoksag-teny'];
-    // Az élő verseny nézeteiben (nézőké és a stáb munkafelületei) nincs lábléc - ott csak az élő adat számít.
-    const LABLEC_NELKUL = ['elo-rajtok', 'adatlapok', 'kovetesek', 'hirfolyam', 'palyaterkep', 'fo-mod', 'beerkeztetes-mod',
-        'orvosi-mod', 'orvosi-ido-mod', 'nyomtatas-mod', 'rfid-mod', 'iranyitopult-mod', 'attekinto-mod'];
+    // Lábléc nincs az élő verseny nézőknek szóló nézeteiben (ott csak az élő adat számít), és a stáb egyetlen
+    // oldalán sem (minden NEZET_JOG-os nézet: Kezelés menü) - ott a lebegő „Hiba / ötlet” gomb sincs.
+    const LABLEC_NELKUL = ['elo-rajtok', 'adatlapok', 'kovetesek', 'hirfolyam', 'palyaterkep'];
 
     function switchSidebarMode(targetId, btn) {
         // Jog nélkül (vagy kijelentkezve) belső nézetre nem lehet menni - pl. egy régi könyvjelzőből
@@ -2305,7 +2305,9 @@
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(targetId).classList.add('active');
         document.body.classList.toggle('szeles-nezet', SZELES_NEZETEK.includes(targetId));
-        document.body.classList.toggle('lablec-nelkul', LABLEC_NELKUL.includes(targetId));
+        const stabNezet = !!NEZET_JOG[targetId];
+        document.body.classList.toggle('stab-nezet', stabNezet);
+        document.body.classList.toggle('lablec-nelkul', stabNezet || LABLEC_NELKUL.includes(targetId));
         if(btn) btn.classList.add('active');
         // Csak ebben a fülben él (újratöltéskor - F5, automatikus frissítés - itt marad); aki később újra
         // megnyitja az oldalt, a kezdőlapon kezd, nem ott, ahol legutóbb abbahagyta.
@@ -12598,48 +12600,130 @@
         renderMentesek();
     }
 
-    // --- 32) HIBAJELENTŐ ------------------------------------------------------------------------
-    // Bárki küldhet, belépés nélkül is: hibajelentesek/{id} = { t, szoveg, allapot: 'uj', [kapcsolat, oldal,
-    // verzio, ua, kepernyo, uid] }. A szabály csak új bejegyzést enged (hosszkorlátokkal); olvasni és az
-    // állapotot váltani az admin és a 'hibajelentesek' jogú felhasználó tud.
+    // --- 32) HIBA VAGY ÖTLET: BEKÜLDÉS ÉS FOGADÁS ------------------------------------------------------
+    // Bárki küldhet, belépés nélkül is: hibajelentesek/{id} = { t, szoveg, allapot: 'uj', tipus: 'hiba' | 'otlet',
+    // [kapcsolat, kuldo, oldal, verzio, ua, kepernyo, uid] }. A szabály csak új bejegyzést enged (hosszkorlátokkal);
+    // olvasni és az állapotot váltani az admin és a 'hibajelentesek' jogú felhasználó tud.
+    // A koli rádió mintájára: hiba / ötlet választó, belépve a neved megy (nem kell elérhetőséget írni), köszönő
+    // ablak; a fogadó oldalon állapot- és típusszűrő, egygombos lezárás, „Küldte”, oldal, összecsukott eszközadatok.
+    // Ha a Firebase-szabályok még a régiek (nincs tipus / kuldo mező), a küldés ezek nélkül megy újra, és az ötletet
+    // a szöveg elején „[Ötlet]” jelöli - így a beküldés nem akad el azon, hogy a szabályok még nincsenek közzétéve.
     const HIBA_ALLAPOT = { uj: 'Új', folyamatban: 'Folyamatban', kesz: 'Megoldva', elvetve: 'Elvetve' };
-    function hibaJelentoNyit() {
+    const HIBA_TIPUS = {
+        hiba: { cim: 'Hibát találtam', jel: 'Hiba', tipp: 'Mi nem működik? Mit csináltál előtte, és mi történt helyette?',
+            pelda: 'Pl.: a 80 km-es eredménylistán a 3. helyezett lova rossz névvel szerepel…' },
+        otlet: { cim: 'Ötletem van', jel: 'Ötlet', tipp: 'Mit tudna még az oldal? Mitől lenne jobb?',
+            pelda: 'Pl.: jó lenne, ha a lovas profilján látszana…' }
+    };
+    const HIBA_IKON = {
+        hiba: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10a4 4 0 0 1 8 0v4a4 4 0 0 1-8 0z"/><path d="M12 10v8M8 13H4M20 13h-4M5 8l3 2M19 8l-3 2M5 19l3-2M19 19l-3-2M10 6 9 4M14 6l1-2"/></svg>',
+        otlet: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>'
+    };
+    const HIBA_KORLAT = { db: 5, ido: 60 * 60 * 1000, koz: 15000 };   // óránként legfeljebb 5, köztük 15 mp
+    let hibaTipusValasztott = 'hiba';
+    function hibaKuldo() {
         const fu = auth.currentUser;
+        if (!fu) return null;
+        const email = fu.email && !/@verseny\.hu$/.test(fu.email) ? fu.email : '';
+        const nev = String(fu.displayName || (fiokAdat && fiokAdat.profil && fiokAdat.profil.nev) || (fu.email || '').split('@')[0] || '').trim() || 'belépett felhasználó';
+        return { nev, email };
+    }
+    function hibaJelentoNyit(tipus) {
+        hibaTipusValasztott = HIBA_TIPUS[tipus] ? tipus : 'hiba';
         const aktiv = (document.querySelector('.mode-content.active') || {}).id || '';
-        document.getElementById('infoModalTitle').innerText = 'Hibát találtál? Ötleted van?';
+        const kuldo = hibaKuldo();
+        document.getElementById('infoModalTitle').innerText = 'Hiba vagy ötlet';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek hiba-urlap">
-            <p class="field-hint" style="margin-top:0;">Írd le röviden, mit csináltál, mit vártál és mi történt helyette – vagy mi hiányzik. Ha megadsz elérhetőséget, visszajelzünk.</p>
-            <label for="hiba-szoveg">Mi a hiba / mi az ötleted?</label>
-            <textarea id="hiba-szoveg" rows="6" maxlength="2000" placeholder="Pl.: a 80 km-es eredménylistán a 3. helyezett lova rossz névvel szerepel..."></textarea>
-            <label for="hiba-kapcsolat">Elérhetőség <small>(nem kötelező – e-mail vagy telefon)</small></label>
-            <input type="text" id="hiba-kapcsolat" maxlength="200" value="${esc(fu && fu.email && !/@verseny\.hu$/.test(fu.email) ? fu.email : '')}">
-            <label class="hiba-pipa"><input type="checkbox" id="hiba-technikai" checked> <span>Technikai adatok csatolása <small>(melyik oldalon vagy, verzió, böngésző, képernyőméret – segít megtalálni a hibát)</small></span></label>
-            <div class="reszlet-gombok"><button class="calc-btn" onclick="hibaJelentesKuld('${esc(aktiv)}')">Küldés</button></div>
+            <p class="field-hint" style="margin-top:0;">Valami nem működik, vagy van egy jó ötleted? Írd meg nekünk – csak az oldal kezelői látják.</p>
+            <div class="hiba-tipusok" role="radiogroup" aria-label="Miről szól?">${Object.entries(HIBA_TIPUS).map(([k, t]) =>
+                `<button type="button" class="hiba-tipus-gomb" role="radio" data-tipus="${k}" onclick="hibaTipusValt('${k}')">${HIBA_IKON[k]}<span>${esc(t.cim)}</span></button>`).join('')}</div>
+            <label for="hiba-szoveg">Üzenet</label>
+            <textarea id="hiba-szoveg" rows="6" maxlength="2000" oninput="hibaSzamlalo()"></textarea>
+            <small class="hiba-tipp"><span id="hiba-tipp"></span> <span id="hiba-szamlalo" translate="no"></span></small>
+            ${kuldo ? `<p class="hiba-belepve">Belépve küldöd mint <b translate="no">${esc(kuldo.nev)}</b>${kuldo.email ? ` <span translate="no">(${esc(kuldo.email)})</span>` : ''} – ha kérdésünk van, tudjuk, kit keressünk.</p>`
+                : `<label for="hiba-kapcsolat">Neved vagy elérhetőséged <small>(nem kötelező – e-mail vagy telefon, ha válaszolhatunk)</small></label>
+            <input type="text" id="hiba-kapcsolat" maxlength="200" autocomplete="email">`}
+            <label class="hiba-pipa"><input type="checkbox" id="hiba-technikai" checked> <span>Eszköz adatainak csatolása <small>(verzió, böngésző, képernyőméret – segít megtalálni a hibát)</small></span></label>
+            <div class="reszlet-gombok"><button class="calc-btn" id="hiba-kuld-gomb" onclick="hibaJelentesKuld('${esc(aktiv)}')">Küldés</button></div>
         </div>`;
+        hibaTipusValt(hibaTipusValasztott);
         document.getElementById('infoModal').style.display = 'flex';
         setTimeout(() => document.getElementById('hiba-szoveg')?.focus(), 50);
     }
+    function hibaTipusValt(tipus) {
+        hibaTipusValasztott = HIBA_TIPUS[tipus] ? tipus : 'hiba';
+        document.querySelectorAll('.hiba-tipus-gomb').forEach(b => {
+            const a = b.dataset.tipus === hibaTipusValasztott;
+            b.classList.toggle('aktiv', a);
+            b.setAttribute('aria-checked', String(a));
+        });
+        const sz = document.getElementById('hiba-szoveg');
+        if (sz) sz.placeholder = HIBA_TIPUS[hibaTipusValasztott].pelda;
+        const tipp = document.getElementById('hiba-tipp');
+        if (tipp) tipp.textContent = HIBA_TIPUS[hibaTipusValasztott].tipp;
+        hibaSzamlalo();
+    }
+    function hibaSzamlalo() {
+        const sz = document.getElementById('hiba-szoveg'), n = document.getElementById('hiba-szamlalo');
+        if (sz && n) n.textContent = `(${sz.value.trim().length}/2000)`;
+    }
+    // A gyakori, egymás utáni küldés ellen (a böngészőben): óránként legfeljebb 5, köztük legalább 15 mp
+    function hibaKorlatIdok() {
+        let idok = [];
+        try { idok = JSON.parse(localStorage.getItem('rps-hibajelentes-idok') || '[]'); } catch (e) {}
+        return (Array.isArray(idok) ? idok : []).filter(t => typeof t === 'number' && Date.now() - t < HIBA_KORLAT.ido);
+    }
     function hibaJelentesKuld(oldal) {
         const szoveg = (document.getElementById('hiba-szoveg')?.value || '').trim().slice(0, 2000);
-        if (szoveg.length < 5) { showToast('Írj pár szót a hibáról.', true); return; }
-        try { if (Date.now() - parseInt(localStorage.getItem('rps-hibajelentes') || '0', 10) < 60000) { showToast('Egy perc múlva küldhetsz újabbat.', true); return; } } catch (e) {}
-        const adat = { t: Date.now(), szoveg, allapot: 'uj' };
-        const kapcsolat = (document.getElementById('hiba-kapcsolat')?.value || '').trim().slice(0, 200);
-        if (kapcsolat) adat.kapcsolat = kapcsolat;
+        if (szoveg.length < 5) { showToast('Írj legalább pár szót, hogy tudjuk, miről van szó.', true); return; }
+        const idok = hibaKorlatIdok();
+        if (idok.length >= HIBA_KORLAT.db) { showToast('Túl sok üzenet rövid idő alatt. Próbáld újra később.', true); return; }
+        if (idok.length && Date.now() - Math.max(...idok) < HIBA_KORLAT.koz) { showToast('Várj pár másodpercet a következő üzenettel.', true); return; }
+        const tipus = hibaTipusValasztott;
+        const adat = { t: Date.now(), szoveg, allapot: 'uj', tipus };
+        const kuldo = hibaKuldo();
+        if (kuldo) {
+            adat.uid = auth.currentUser.uid;
+            adat.kuldo = kuldo.nev.slice(0, 120);
+            if (kuldo.email) adat.kapcsolat = kuldo.email.slice(0, 200);
+        } else {
+            const kapcsolat = (document.getElementById('hiba-kapcsolat')?.value || '').trim().slice(0, 200);
+            if (kapcsolat) adat.kapcsolat = kapcsolat;
+        }
+        if (oldal) adat.oldal = String(oldal).slice(0, 80);
         if (document.getElementById('hiba-technikai')?.checked) {
-            adat.oldal = String(oldal || '').slice(0, 80);
             adat.verzio = String(APP_VERZIO || '').slice(0, 20);
             adat.ua = String(navigator.userAgent || '').slice(0, 400);
             adat.kepernyo = `${window.innerWidth}x${window.innerHeight}${window.matchMedia && matchMedia('(display-mode: standalone)').matches ? ' app' : ''}`.slice(0, 40);
         }
-        if (auth.currentUser) adat.uid = auth.currentUser.uid;
-        db.ref('hibajelentesek').push().set(adat).then(() => {
-            try { localStorage.setItem('rps-hibajelentes', String(Date.now())); } catch (e) {}
-            document.getElementById('infoModalBody').innerHTML = '<p>Köszönjük! A jelentés megérkezett.</p>';
-        }).catch(e => showToast('Nem sikerült elküldeni: ' + (e && e.message), true));
+        const gomb = document.getElementById('hiba-kuld-gomb');
+        if (gomb) { gomb.disabled = true; gomb.textContent = 'Küldés…'; }
+        const ref = db.ref('hibajelentesek').push();
+        ref.set(adat).catch(e => {
+            // még a régi szabályok vannak fent (nincs tipus / kuldo mező): nélkülük, az ötletet a szöveg jelöli
+            if (!/permission|denied/i.test(String(e && (e.code || e.message)))) throw e;
+            const regi = Object.assign({}, adat);
+            delete regi.tipus; delete regi.kuldo;
+            if (tipus === 'otlet') regi.szoveg = ('[Ötlet] ' + szoveg).slice(0, 2000);
+            return ref.set(regi);
+        }).then(() => {
+            try { localStorage.setItem('rps-hibajelentes-idok', JSON.stringify(idok.concat(Date.now()))); } catch (e) {}
+            hibaKoszono(tipus);
+        }).catch(e => {
+            if (gomb) { gomb.disabled = false; gomb.textContent = 'Küldés'; }
+            showToast('Nem sikerült elküldeni: ' + (e && e.message), true);
+        });
+    }
+    function hibaKoszono(tipus) {
+        document.getElementById('infoModalTitle').innerText = 'Köszönjük!';
+        document.getElementById('infoModalBody').innerHTML = `<div class="hiba-koszono">
+            <span class="hiba-koszono-jel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+            <p>${tipus === 'otlet' ? 'Megkaptuk az ötleted. Az oldal kezelői elolvassák.' : 'Megkaptuk a hibajelzésed. Az oldal kezelői elolvassák.'}</p>
+            <div class="reszlet-gombok"><button class="calc-btn masodlagos" onclick="hibaJelentoNyit('${tipus === 'otlet' ? 'otlet' : 'hiba'}')">Még egyet küldök</button></div>
+        </div>`;
     }
 
-    let hibaLista = null, hibaSzuro = 'nyitott', hibaFigyelve = false;
+    let hibaLista = null, hibaSzuro = 'nyitott', hibaTipusSzuro = 'mind', hibaFigyelve = false;
     function hibaFigyel() {
         if (hibaFigyelve || !jogVan('hibajelentesek')) return;
         hibaFigyelve = true;
@@ -12650,34 +12734,69 @@
         const uj = Object.values(hibaLista || {}).filter(h => h && h.allapot === 'uj').length;
         const gomb = document.getElementById('btn-menu-hibajelentesek');
         if (!gomb) return;
-        const szoveg = 'Hibajelentések' + (uj ? ` (${uj} új)` : '');
+        const szoveg = 'Hibák és ötletek' + (uj ? ` (${uj} új)` : '');
         if (gomb.textContent !== szoveg) { gomb.textContent = szoveg; ujNavFrissit(); }
     }
+    // a régi szabályokkal küldött ötletet a szöveg eleji „[Ötlet]” jelöli
+    function hibaTipusa(h) { return h.tipus === 'otlet' || (!h.tipus && /^\[Ötlet\]/.test(h.szoveg || '')) ? 'otlet' : 'hiba'; }
+    function hibaSzovege(h) { return String(h.szoveg || '').replace(/^\[Ötlet\]\s*/, ''); }
+    // melyik oldalról küldték: a nézet neve a menüből (pl. 'versenyek' -> Versenyek)
+    function hibaOldalNev(id) {
+        if (!id) return '';
+        if (id === 'kezdolap') return 'Kezdőlap';
+        const b = document.getElementById('btn-menu-' + id) || document.getElementById('btn-menu-' + id.replace(/-mod$/, ''));
+        return b ? emojiNelkul(b.textContent).replace(/\s*\(\d+ új\)$/, '') : id;
+    }
     function hibaSzurValt(s) { hibaSzuro = s; renderHibajelentesek(); }
+    function hibaTipusSzurValt(s) { hibaTipusSzuro = s; renderHibajelentesek(); }
     function renderHibajelentesek() {
         const cont = document.getElementById('hibajelentesek-tartalom');
         if (!cont || !document.getElementById('hibajelentesek-mod')?.classList.contains('active')) return;
         if (hibaLista === null) { hibaFigyel(); cont.innerHTML = '<p class="uj-ures">Betöltés...</p>'; return; }
         const mind = Object.entries(hibaLista).filter(([, h]) => h && h.szoveg).map(([id, h]) => Object.assign({ id }, h)).sort((a, b) => (b.t || 0) - (a.t || 0));
-        const szur = { nyitott: h => h.allapot === 'uj' || h.allapot === 'folyamatban', kesz: h => h.allapot === 'kesz', elvetve: h => h.allapot === 'elvetve', mind: () => true };
-        const lista = mind.filter(szur[hibaSzuro] || szur.nyitott);
-        const gomb = (k, c) => `<button class="tab-btn ${hibaSzuro === k ? 'active' : ''}" onclick="hibaSzurValt('${k}')">${c} <small>${mind.filter(szur[k]).length}</small></button>`;
-        const kapcs = k => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(k) ? `<a href="mailto:${esc(k)}">${esc(k)}</a>` : esc(k);
-        cont.innerHTML = `<div class="hir-szurok">${gomb('nyitott', 'Nyitott')}${gomb('kesz', 'Megoldva')}${gomb('elvetve', 'Elvetve')}${gomb('mind', 'Mind')}</div>
-            ${lista.length ? lista.map(h => `<article class="hiba-kartya allapot-${esc(h.allapot)}">
-                <div class="hiba-fej"><b>${new Date(h.t || 0).toLocaleString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</b>
-                    <span class="szankcio-jel">${esc(HIBA_ALLAPOT[h.allapot] || h.allapot)}</span></div>
-                <p class="hiba-szoveg">${esc(h.szoveg)}</p>
-                <small class="hiba-meta">${h.kapcsolat ? 'Elérhetőség: ' + kapcs(h.kapcsolat) + ' · ' : ''}${h.oldal ? 'oldal: ' + esc(h.oldal) + ' · ' : ''}${h.verzio ? 'v' + esc(h.verzio) + ' · ' : ''}${h.kepernyo ? esc(h.kepernyo) + ' · ' : ''}${h.uid ? 'belépett felhasználó' : 'vendég'}${h.ua ? `<br>${esc(h.ua)}` : ''}</small>
+        const allapotSz = { nyitott: h => h.allapot === 'uj' || h.allapot === 'folyamatban', lezart: h => h.allapot === 'kesz' || h.allapot === 'elvetve', mind: () => true };
+        const tipusSz = { mind: () => true, hiba: h => hibaTipusa(h) === 'hiba', otlet: h => hibaTipusa(h) === 'otlet' };
+        const aSz = allapotSz[hibaSzuro] || allapotSz.nyitott, tSz = tipusSz[hibaTipusSzuro] || tipusSz.mind;
+        const lista = mind.filter(aSz).filter(tSz);
+        const gomb = (k, c) => `<button class="tab-btn ${hibaSzuro === k ? 'active' : ''}" onclick="hibaSzurValt('${k}')">${c} <small>${mind.filter(tSz).filter(allapotSz[k]).length}</small></button>`;
+        const tgomb = (k, c) => `<button class="tab-btn ${hibaTipusSzuro === k ? 'active' : ''}" onclick="hibaTipusSzurValt('${k}')">${c} <small>${mind.filter(aSz).filter(tipusSz[k]).length}</small></button>`;
+        const kapcs = k => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(k) ? `<a href="mailto:${esc(k)}">${esc(k)}</a>`
+            : /^\+?[\d\s/()-]{6,}$/.test(k) ? `<a href="tel:${esc(k.replace(/[^\d+]/g, ''))}">${esc(k)}</a>` : esc(k);
+        const kuldte = h => {
+            const nev = h.kuldo ? `<b>${esc(h.kuldo)}</b>` : h.uid ? '<b>belépett felhasználó</b>' : h.kapcsolat ? '' : 'névtelen vendég';
+            const k = h.kapcsolat ? kapcs(h.kapcsolat) : '';
+            return nev && k ? `${nev} (${k})` : nev || k;
+        };
+        const ido = t => new Date(t || 0).toLocaleString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const kartya = h => {
+            const tip = hibaTipusa(h), nyitott = h.allapot === 'uj' || h.allapot === 'folyamatban', id = esc(h.id);
+            const eszkoz = [h.verzio ? 'v' + esc(h.verzio) : '', h.kepernyo ? esc(h.kepernyo) : ''].filter(Boolean).join(' · ');
+            return `<article class="hiba-kartya tipus-${tip} allapot-${esc(h.allapot)}">
+                <div class="hiba-fej">
+                    <span class="hiba-jel ${tip}">${HIBA_IKON[tip]}${HIBA_TIPUS[tip].jel}</span>
+                    <span class="hiba-allapot-jel allapot-${esc(h.allapot)}">${esc((HIBA_ALLAPOT[h.allapot] || h.allapot || '').toLowerCase())}</span>
+                    <span class="hiba-ido">${ido(h.t)}</span>
+                </div>
+                <p class="hiba-szoveg">${esc(hibaSzovege(h))}</p>
+                <p class="hiba-kuldo"><span>Küldte: ${kuldte(h)}</span>${h.oldal ? `<span>Oldal: ${esc(hibaOldalNev(h.oldal))}</span>` : ''}</p>
+                ${eszkoz || h.ua ? `<details class="hiba-eszkoz"><summary>Eszköz adatai</summary><p>${eszkoz}${h.ua ? `${eszkoz ? '<br>' : ''}${esc(h.ua)}` : ''}</p></details>` : ''}
                 <div class="hiba-kezeles">
-                    <select onchange="hibaAllapot('${esc(h.id)}', this.value)">${Object.entries(HIBA_ALLAPOT).map(([k, c]) => `<option value="${k}" ${h.allapot === k ? 'selected' : ''}>${c}</option>`).join('')}</select>
-                    <input type="text" maxlength="1000" placeholder="Megjegyzés (pl. mit javítottunk)" value="${esc(h.megjegyzes || '')}" onchange="hibaMegjegyzes('${esc(h.id)}', this.value)">
-                    <button class="edit-btn" onclick="hibaTorol('${esc(h.id)}')">Törlés</button>
-                </div></article>`).join('') : '<p class="uj-ures">Nincs ilyen jelentés.</p>'}`;
+                    ${nyitott ? `<button class="calc-btn kicsi" onclick="hibaAllapot('${id}', 'kesz')">Megoldva</button>
+                        ${h.allapot === 'uj' ? `<button class="edit-btn" onclick="hibaAllapot('${id}', 'folyamatban')">Folyamatban</button>` : ''}
+                        <button class="edit-btn" onclick="hibaAllapot('${id}', 'elvetve')">Elvetés</button>`
+                        : `<button class="edit-btn" onclick="hibaAllapot('${id}', 'uj')">Újranyitás</button>`}
+                    <input type="text" maxlength="1000" placeholder="Megjegyzés (pl. mit javítottunk)" value="${esc(h.megjegyzes || '')}" onchange="hibaMegjegyzes('${id}', this.value)">
+                    <button class="edit-btn is-danger" onclick="hibaTorol('${id}')">Törlés</button>
+                </div></article>`;
+        };
+        const ures = hibaSzuro === 'nyitott' ? 'Nincs nyitott hiba vagy ötlet.' : hibaSzuro === 'lezart' ? 'Még nincs lezárt.' : 'Még senki nem küldött hibát vagy ötletet.';
+        cont.innerHTML = `<div class="hir-szurok">${gomb('nyitott', 'Nyitott')}${gomb('lezart', 'Lezárt')}${gomb('mind', 'Mind')}</div>
+            <div class="hir-szurok hiba-tipus-szurok">${tgomb('mind', 'Minden')}${tgomb('hiba', 'Hibák')}${tgomb('otlet', 'Ötletek')}</div>
+            ${lista.length ? lista.map(kartya).join('') : `<p class="uj-ures">${ures}</p>`}`;
     }
     function hibaAllapot(id, allapot) { db.ref('hibajelentesek/' + id).update({ allapot }).catch(e => showToast('Nem sikerült: ' + (e && e.message), true)); }
     function hibaMegjegyzes(id, szoveg) { db.ref('hibajelentesek/' + id).update({ megjegyzes: String(szoveg || '').slice(0, 1000) }).then(() => showToast('Megjegyzés mentve.')).catch(e => showToast('Nem sikerült: ' + (e && e.message), true)); }
-    function hibaTorol(id) { showConfirm('Törlöd a jelentést?', 'Végleg törlődik. (Ha csak lezárnád, állítsd „Megoldva” vagy „Elvetve” állapotra.)', () => db.ref('hibajelentesek/' + id).remove()); }
+    function hibaTorol(id) { showConfirm('Törlöd?', 'Végleg törlődik. (Ha csak lezárnád, nyomd meg a „Megoldva” vagy az „Elvetés” gombot.)', () => db.ref('hibajelentesek/' + id).remove()); }
 
     // --- 33) ADATMINŐSÉG-ELLENŐRZŐ --------------------------------------------------------------
     // A böngészőben, a már betöltött adatokon fut, semmit nem módosít - csak listáz, és mindenhol
@@ -13429,7 +13548,19 @@
         'Hibát találtál? Ötleted van?': 'Found a problem? Have an idea?', 'Mi a hiba / mi az ötleted?': 'What is the problem / your idea?', 'Küldés': 'Send',
         'Elérhetőség': 'Contact', 'Eredménykártya (kép) a megosztáshoz': 'Result card (image) to share', 'Frissítés elérhető': 'Update available', 'Mentsd el a munkádat, mielőtt frissítesz.': 'Save your work before you refresh.',
         'Frissítés': 'Refresh', 'Később': 'Later', 'Impresszum': 'Legal notice', 'Adatvédelmi tájékoztató': 'Privacy notice', 'Kapcsolat': 'Contact', 'Üzemeltető': 'Operator',
-        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Mi lesz?': 'What is on?', '(több is bejelölhető)': '(tick all that apply)',
+        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Hiba vagy ötlet': 'Problem or idea',
+        'Valami nem működik, vagy van egy jó ötleted? Írd meg nekünk – csak az oldal kezelői látják.': 'Something not working, or got a good idea? Tell us – only the site managers see it.',
+        'Hibát találtam': 'I found a problem', 'Ötletem van': 'I have an idea', 'Üzenet': 'Message',
+        'Mi nem működik? Mit csináltál előtte, és mi történt helyette?': 'What is not working? What did you do before, and what happened instead?',
+        'Mit tudna még az oldal? Mitől lenne jobb?': 'What else could the site do? What would make it better?',
+        'Pl.: a 80 km-es eredménylistán a 3. helyezett lova rossz névvel szerepel…': 'E.g.: in the 80 km results the 3rd placed horse has the wrong name…',
+        'Pl.: jó lenne, ha a lovas profilján látszana…': 'E.g.: it would be good if the rider profile showed…',
+        'Belépve küldöd mint': 'Sending as', 'ha kérdésünk van, tudjuk, kit keressünk': 'so we know whom to ask if we have a question',
+        'Neved vagy elérhetőséged': 'Your name or contact', '(nem kötelező – e-mail vagy telefon, ha válaszolhatunk)': '(optional – e-mail or phone, so we can reply)',
+        'Eszköz adatainak csatolása': 'Attach device details', '(verzió, böngésző, képernyőméret – segít megtalálni a hibát)': '(version, browser, screen size – helps us find the problem)',
+        'Köszönjük!': 'Thank you!', 'Megkaptuk a hibajelzésed. Az oldal kezelői elolvassák.': 'We have received your report. The site managers will read it.',
+        'Megkaptuk az ötleted. Az oldal kezelői elolvassák.': 'We have received your idea. The site managers will read it.', 'Még egyet küldök': 'Send another', 'Hiba / ötlet': 'Problem / idea', 'Hibát találtál vagy ötleted van? Írd meg!': 'Found a problem or have an idea? Tell us!',
+        'Hiba vagy ötlet beküldése': 'Send a problem or an idea', 'Hibák és ötletek': 'Problems & ideas', 'Mi lesz?': 'What is on?', '(több is bejelölhető)': '(tick all that apply)',
         'Szezonzáró': 'Season closing', 'Bajnokavató': 'Championship awards', 'Közgyűlés': 'General assembly', 'Képzés / tanfolyam': 'Training / course',
         'Bírói képzés': 'Judge training', 'Bírói továbbképzés': 'Judge refresher training', 'Rajtengedély-vizsga': 'Licence exam', 'Edzőtábor': 'Training camp', 'Nyílt nap': 'Open day', '(nem kötelező – e-mail vagy telefon)': '(optional – e-mail or phone)', 'Technikai adatok csatolása': 'Attach technical details',
         'Köszönjük! A jelentés megérkezett.': 'Thank you! Your report has arrived.',

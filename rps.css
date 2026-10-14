@@ -2531,7 +2531,7 @@ button.calc-btn {
 .hiba-kartya.allapot-folyamatban { border-left-color: var(--primary); }
 .hiba-kartya.allapot-kesz { border-left-color: var(--success); opacity: .85; }
 .hiba-kartya.allapot-elvetve { border-left-color: var(--border); opacity: .7; }
-.hiba-fej { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.hiba-fej { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
 .hiba-szoveg { white-space: pre-wrap; margin: 8px 0; line-height: 1.5; overflow-wrap: anywhere; }
 .hiba-meta { display: block; color: var(--text-dim); font-size: 0.78rem; overflow-wrap: anywhere; }
 .hiba-kezeles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
@@ -2700,3 +2700,54 @@ body.lablec-nelkul .main-wrapper > .container { margin-bottom: 0; }
 .es-datumok > div { min-width: 0; }
 .es-datumok input { width: 100%; min-width: 0; }
 .es-tipus:has(input:checked) { border-color: var(--primary); color: var(--text); background: var(--primary-dim); }
+/* hiba vagy ötlet – beküldés és fogadás (a koli rádió mintájára) */
+.hiba-tipusok { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
+.hiba-tipus-gomb { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-2);
+    color: var(--text-dim); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.hiba-tipus-gomb svg { width: 24px; height: 24px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hiba-tipus-gomb:hover { color: var(--text); }
+.hiba-tipus-gomb.aktiv { border-color: var(--primary); color: var(--text); background: var(--primary-dim); box-shadow: inset 0 0 0 1px var(--primary); }
+.hiba-tipp { display: block; color: var(--text-dim); margin: 2px 0 6px; line-height: 1.45; }
+.hiba-belepve { color: var(--text-dim); font-size: 0.88rem; margin: 10px 0 0; line-height: 1.5; }
+.hiba-belepve b { color: var(--text); }
+.hiba-koszono { text-align: center; }
+.hiba-koszono p { margin: 0 0 14px; }
+.hiba-koszono-jel { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; margin: 2px 0 12px; border-radius: 50%;
+    background: var(--primary); color: var(--on-primary, #fff); }
+.hiba-koszono-jel svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.hiba-koszono .reszlet-gombok { justify-content: center; }
+.hiba-tipus-szurok { margin-top: -4px; }
+.hiba-tipus-szurok .tab-btn { font-size: 0.8rem; padding: 5px 11px; }
+.hiba-jel, .hiba-allapot-jel { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); font-size: 0.74rem; font-weight: 800; }
+.hiba-jel svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hiba-jel.hiba { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+.hiba-jel.otlet { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 50%, transparent); }
+.hiba-allapot-jel { color: var(--text-dim); }
+.hiba-allapot-jel.allapot-uj { background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff); }
+.hiba-ido { color: var(--text-dim); font-size: 0.82rem; }
+.hiba-kartya.allapot-uj { border-color: color-mix(in srgb, var(--text) 30%, var(--border)); }
+.hiba-kuldo { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; color: var(--text-dim); font-size: 0.84rem; overflow-wrap: anywhere; }
+.hiba-kuldo b { color: var(--text); }
+.hiba-eszkoz { margin-top: 4px; color: var(--text-dim); font-size: 0.76rem; }
+.hiba-eszkoz summary { cursor: pointer; user-select: none; }
+.hiba-eszkoz p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.hiba-kezeles button.calc-btn.kicsi { padding: 7px 14px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border-color: var(--primary); color: var(--primary); }
+/* lebegő „Hiba / ötlet” gomb (a koli rádió mintájára): jobb alul, visszafogottan; telefonon kisebb, az alsó
+   fülsáv fölött. A stáb oldalain, TV módban és amíg a nyelvajánló sáv látszik, nincs. */
+#hiba-lebego {
+    position: fixed; right: 16px; bottom: calc(16px + var(--biztonsag-lent)); z-index: 940;
+    display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 15px 0 12px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--card); background: color-mix(in srgb, var(--card) 92%, transparent);
+    color: var(--text-dim); font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .25); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+#hiba-lebego svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+#hiba-lebego:hover { color: var(--text); border-color: var(--primary); }
+#lablec { padding-bottom: 64px; }   /* a lebegő gomb ne takarja a lábléc utolsó sorát */
+@media (max-width: 900px) {
+    #hiba-lebego { right: 12px; bottom: calc(66px + var(--biztonsag-lent)); height: 34px; padding: 0 12px 0 10px; gap: 6px; font-size: 0.76rem; }
+    #hiba-lebego svg { width: 16px; height: 16px; }
+    #lablec { padding-bottom: calc(120px + var(--biztonsag-lent)); }
+}
+body.stab-nezet #hiba-lebego, body.fullscreen-active #hiba-lebego, body:has(#nyelv-ajanlo) #hiba-lebego { display: none; }
+@media print { #hiba-lebego { display: none !important; } }
