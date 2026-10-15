@@ -11285,13 +11285,16 @@
     setInterval(eloSzamlalokFrissit, 1000);
 
     // --- 18) KAPCSOLAT-JELZŐ ------------------------------------------------------------------
-    // Ha megszakad a net (a helyszínen telefonos internet van), jól látható sáv: mióta nincs kapcsolat,
-    // és hány mentés vár feltöltésre. A Firebase a kapcsolat visszatérésekor magától feltölti őket -
-    // addig az oldalt nem szabad bezárni. A függő mentéseket a Firebase írási műveletei számolják.
-    const kapcsolat = { online: true, ota: 0, fuggo: 0, volt: false, indult: Date.now() };
+    // Hálózatról szóló szöveget (nincs net, visszajött a net) senkinek nem mutatunk: a helyszíni telefonos net
+    // gyakran akad, és ez csak zavart (felhasználói kérés, 2026-10-15). Egyetlen kivétel: ha a STÁB egy tagjánál
+    // mentés vár feltöltésre (pl. beérkezési idő) és nincs kapcsolat, egy sáv kéri, hogy ne zárja be az oldalt -
+    // a Firebase a kapcsolat visszatérésekor magától feltölti, de a bezárt oldallal elveszne. A statisztika
+    // írásai (nézettség, látogatók, jelenlét) nem számítanak mentésnek.
+    const kapcsolat = { online: true, fuggo: 0 };
+    const KAPCSOLAT_NEM_MENTES = /\/(nezettseg|latogatok|jelenlet)(\/|$)/;
     function kapcsolatJelzoRajzol() {
         let sav = document.getElementById('kapcsolat-jelzo');
-        const mutat = !kapcsolat.online && (kapcsolat.volt || Date.now() - kapcsolat.indult > 8000);
+        const mutat = !kapcsolat.online && kapcsolat.fuggo > 0 && stabTagE();
         if (!mutat) { if (sav) sav.remove(); return; }
         if (!sav) {
             sav = document.createElement('div');
@@ -11299,19 +11302,12 @@
             sav.setAttribute('role', 'alert');
             document.body.appendChild(sav);
         }
-        const perc = kapcsolat.ota ? Math.floor((Date.now() - kapcsolat.ota) / 60000) : 0;
-        sav.innerHTML = `<b>Nincs internetkapcsolat</b>${perc ? ` · ${perc} perce` : ''}${kapcsolat.fuggo
-            ? ` · <b>${kapcsolat.fuggo} mentés vár feltöltésre</b> – ne zárd be az oldalt, a kapcsolat visszatérésekor magától feltöltődik.`
-            : ' · az adatok nem frissülnek, amíg vissza nem jön.'}`;
+        sav.innerHTML = `<b>${kapcsolat.fuggo} mentés vár feltöltésre</b> – ne zárd be az oldalt, a kapcsolat visszatérésekor magától feltöltődik.`;
     }
     (function kapcsolatFigyeles() {
         try {
             db.ref('.info/connected').on('value', s => {
-                const be = s.val() === true;
-                if (be && !kapcsolat.online && kapcsolat.volt) showToast(kapcsolat.fuggo ? 'Visszajött a kapcsolat – a mentések feltöltése folyamatban.' : 'Visszajött az internetkapcsolat.');
-                if (be) kapcsolat.volt = true;
-                if (!be && kapcsolat.online) kapcsolat.ota = Date.now();
-                kapcsolat.online = be;
+                kapcsolat.online = s.val() === true;
                 kapcsolatJelzoRajzol();
             });
         } catch (e) {}
@@ -11323,7 +11319,7 @@
                 if (typeof eredeti !== 'function') return;
                 R[m] = function () {
                     const p = eredeti.apply(this, arguments);
-                    if (p && typeof p.then === 'function') {
+                    if (p && typeof p.then === 'function' && !KAPCSOLAT_NEM_MENTES.test(String(this))) {
                         kapcsolat.fuggo++;
                         const kesz = () => { kapcsolat.fuggo = Math.max(0, kapcsolat.fuggo - 1); kapcsolatJelzoRajzol(); };
                         p.then(kesz, kesz);
@@ -11332,7 +11328,6 @@
                 };
             });
         }
-        setInterval(kapcsolatJelzoRajzol, 30000);
     })();
 
     // --- 1) KÖVETÉSEIM ------------------------------------------------------------------------
