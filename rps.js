@@ -1095,6 +1095,26 @@
     document.addEventListener('visibilitychange', nezoPercJelzes);
     nezoPercJelzes();
 
+    // NAPI FELKERESÉSEK: nezettseg/felkeresesek/{nap} - minden megnyitás egy felkeresés, és az is, ha valaki
+    // 30 percnél hosszabb szünet után (vagy másnap) tér vissza egy nyitva hagyott oldalra / appra. Az
+    // újratöltés (F5, automatikus frissítés) nem számít újnak - a fül a sessionStorage-ban jegyzi, mikor
+    // látszott utoljára. (A látogató ezzel szemben böngészőnként naponta egyszer számít.)
+    const FELKERESES_SZUNET = 30 * 60 * 1000;
+    function felkeresesJelzes() {
+        if (document.visibilityState === 'hidden') return;
+        const sv = firebase.database && firebase.database.ServerValue;
+        if (!sv || typeof sv.increment !== 'function') return;
+        const most = Date.now(), nap = napIso(new Date());
+        let utolso = null;
+        try { utolso = JSON.parse(sessionStorage.getItem('rps-felkereses') || 'null'); } catch (e) {}
+        const uj = !utolso || utolso.nap !== nap || most - (utolso.t || 0) > FELKERESES_SZUNET;
+        try { sessionStorage.setItem('rps-felkereses', JSON.stringify({ nap, t: most })); } catch (e) {}
+        if (uj) db.ref('nezettseg/felkeresesek/' + nap).set(sv.increment(1)).catch(() => {});
+    }
+    setInterval(felkeresesJelzes, 15000);
+    document.addEventListener('visibilitychange', felkeresesJelzes);
+    felkeresesJelzes();
+
     // APP-LETÖLTÉSEK: az End-Ride nem áruházból jön, a "letöltés" = telepítés a kezdőképernyőre.
     //  - nezettseg/app/telepites/{nap}/{azon} = { t, p, m }: eszközönként egyszer. Androidon és gépen a
     //    böngésző "appinstalled" eseményekor (m: 'telepites'); iPhone-on nincs ilyen esemény, ott - és a
@@ -1183,14 +1203,14 @@
     // Az admin a háttérben figyeli a mai számokat (a mai nap adatát, nem az egész fát), a
     // "Nézők" fül ebből rajzol; a korábbi napokat kérésre tölti be (napválasztó, 30 napos lista).
     let nezoLeallit = null;
-    const nezo = { most: null, belepve: 0, hiba: false, figyeltNap: '', maLatogato: null, maPercek: null,
+    const nezo = { most: null, belepve: 0, hiba: false, figyeltNap: '', maLatogato: null, maPercek: null, maFelk: null,
         valasztottNap: '', napAdat: null, napTolt: false, honap: null, honapTolt: false, app: null, appTolt: false };
     function nezoSzamlaloFigyeles(be) {
         if (!be) { if (nezoLeallit) { nezoLeallit(); nezoLeallit = null; } return; }
         if (nezoLeallit) return;
         const ma = napIso(new Date());
         nezo.figyeltNap = ma;
-        const jRef = db.ref('jelenlet'), lRef = db.ref('latogatok/' + ma), pRef = db.ref('nezettseg/percek/' + ma);
+        const jRef = db.ref('jelenlet'), lRef = db.ref('latogatok/' + ma), pRef = db.ref('nezettseg/percek/' + ma), fRef = db.ref('nezettseg/felkeresesek/' + ma);
         const hiba = () => { nezo.hiba = true; renderNezok(); };
         const jCb = jRef.on('value', s => {
             const lista = Object.values(s.val() || {});
@@ -1199,11 +1219,12 @@
         }, hiba);
         const lCb = lRef.on('value', s => { nezo.maLatogato = Object.keys(s.val() || {}).length; renderNezok(); }, hiba);
         const pCb = pRef.on('value', s => { nezo.maPercek = s.val() || {}; renderNezok(); }, hiba);
+        const fCb = fRef.on('value', s => { nezo.maFelk = s.val() || 0; renderNezok(); }, () => { nezo.maFelk = 0; });
         // Éjfélkor az új nap adatára kell átállni
         const napOra = setInterval(() => {
             if (napIso(new Date()) !== nezo.figyeltNap) { nezoSzamlaloFigyeles(false); nezoSzamlaloFigyeles(true); }
         }, 60000);
-        nezoLeallit = () => { jRef.off('value', jCb); lRef.off('value', lCb); pRef.off('value', pCb); clearInterval(napOra); };
+        nezoLeallit = () => { jRef.off('value', jCb); lRef.off('value', lCb); pRef.off('value', pCb); fRef.off('value', fCb); clearInterval(napOra); };
     }
 
     function nezoNapValt(nap) {
@@ -1213,10 +1234,11 @@
         if (nap === napIso(new Date())) { renderNezok(); return; }
         nezo.napTolt = true;
         renderNezok();
-        Promise.all([db.ref('latogatok/' + nap).once('value'), db.ref('nezettseg/percek/' + nap).once('value')])
-            .then(([l, p]) => {
+        Promise.all([db.ref('latogatok/' + nap).once('value'), db.ref('nezettseg/percek/' + nap).once('value'),
+            db.ref('nezettseg/felkeresesek/' + nap).once('value').catch(() => null)])
+            .then(([l, p, f]) => {
                 if (nezo.valasztottNap !== nap) return;
-                nezo.napAdat = { nap, latogato: Object.keys(l.val() || {}).length, percek: p.val() || {} };
+                nezo.napAdat = { nap, latogato: Object.keys(l.val() || {}).length, percek: p.val() || {}, felk: (f && f.val()) || 0 };
             })
             .catch(() => { nezo.hiba = true; })
             .finally(() => { nezo.napTolt = false; renderNezok(); });
@@ -1234,13 +1256,14 @@
         nezo.honapTolt = true;
         Promise.all([
             db.ref('latogatok').orderByKey().startAt(tol).once('value'),
-            db.ref('nezettseg/percek').orderByKey().startAt(tol).once('value')
-        ]).then(([l, p]) => {
-            const lv = l.val() || {}, pv = p.val() || {};
+            db.ref('nezettseg/percek').orderByKey().startAt(tol).once('value'),
+            db.ref('nezettseg/felkeresesek').orderByKey().startAt(tol).once('value').catch(() => null)
+        ]).then(([l, p, f]) => {
+            const lv = l.val() || {}, pv = p.val() || {}, fv = (f && f.val()) || {};
             nezo.honap = {};
             for (let i = 0; i < 30; i++) {
                 const nap = datumPlusz(tol, i);
-                nezo.honap[nap] = { latogato: Object.keys(lv[nap] || {}).length, ...nezoNapOsszegzes(pv[nap]) };
+                nezo.honap[nap] = { latogato: Object.keys(lv[nap] || {}).length, felk: fv[nap] || 0, ...nezoNapOsszegzes(pv[nap]) };
             }
         }).catch(() => { nezo.hiba = true; })
           .finally(() => { nezo.honapTolt = false; renderNezok(); });
@@ -1262,14 +1285,15 @@
         const maOssz = nezoNapOsszegzes(nezo.maPercek);
         const valasztott = nezo.valasztottNap || ma;
         const napOssz = valasztott === ma
-            ? { nap: ma, latogato: nezo.maLatogato, ...maOssz }
-            : (nezo.napAdat ? { nap: valasztott, latogato: nezo.napAdat.latogato, ...nezoNapOsszegzes(nezo.napAdat.percek) } : null);
+            ? { nap: ma, latogato: nezo.maLatogato, felk: nezo.maFelk, ...maOssz }
+            : (nezo.napAdat ? { nap: valasztott, latogato: nezo.napAdat.latogato, felk: nezo.napAdat.felk, ...nezoNapOsszegzes(nezo.napAdat.percek) } : null);
+        const felkSor = f => `<small class="nezo-felk">${f === null || f === undefined ? '…' : f} felkeresés</small>`;
         const napCim = n => `${ujDatumSzoveg(n)}${n === ma ? ' (ma)' : ''}`;
 
         let napHtml;
         if (nezo.napTolt || !napOssz) napHtml = betoltoSor('A nap adatainak betöltése…');
         else napHtml = `<div class="rfid-osszesito">
-                <div><b>${szam(napOssz.latogato)}</b><span>látogató</span></div>
+                <div><b>${szam(napOssz.latogato)}</b><span>látogató</span>${felkSor(napOssz.felk)}</div>
                 <div><b>${napOssz.van ? napOssz.csucs : '–'}</b><span>csúcs egyszerre${napOssz.csucsIdo ? ' · ' + napOssz.csucsIdo : ''}</span></div>
             </div>
             ${napOssz.van ? nezoOraGrafikon(napOssz.orak, napOssz.csucsIdo ? parseInt(napOssz.csucsIdo, 10) : -1)
@@ -1279,17 +1303,17 @@
         const napok = honap ? Object.keys(honap).sort().reverse() : [];
         const maxL = Math.max(1, ...napok.map(n => (n === ma ? nezo.maLatogato : honap[n].latogato) || 0));
         const honapHtml = !honap ? betoltoSor('Az utolsó 30 nap betöltése…') : `<div class="nezo-napok">${napok.map(n => {
-            const d = n === ma ? { latogato: nezo.maLatogato || 0, ...maOssz } : honap[n];
+            const d = n === ma ? { latogato: nezo.maLatogato || 0, felk: nezo.maFelk || 0, ...maOssz } : honap[n];
             return `<button type="button" class="nezo-nap ${n === ma ? 'ma' : ''} ${n === valasztott ? 'valasztott' : ''}" onclick="nezoNapValt('${n}')">
                 <span>${escapeHtml(n.slice(5).replace('-', '.'))}.${n === ma ? ' ma' : ''}</span>
                 <div><div class="sav" style="width:${Math.round((d.latogato || 0) / maxL * 100)}%"></div></div>
                 <span class="db">${d.latogato || 0}</span>
-                <span class="csucs">${d.van ? `csúcs ${d.csucs}${d.csucsIdo ? ' · ' + d.csucsIdo : ''}` : '–'}</span></button>`;
+                <span class="csucs">${d.felk ? `${d.felk} felk. · ` : ''}${d.van ? `csúcs ${d.csucs}${d.csucsIdo ? ' · ' + d.csucsIdo : ''}` : (d.felk ? '' : '–')}</span></button>`;
         }).join('')}</div>`;
 
         cont.innerHTML = `<div class="rfid-osszesito">
                 <div><b>${szam(nezo.most)}</b><span>most nézik${typeof nezo.most === 'number' ? ` (bejelentkezve: ${nezo.belepve})` : ''}</span></div>
-                <div><b>${szam(nezo.maLatogato)}</b><span>látogató ma</span></div>
+                <div><b>${szam(nezo.maLatogato)}</b><span>látogató ma</span>${felkSor(nezo.maFelk)}</div>
                 <div><b>${maOssz.van ? maOssz.csucs : (nezo.maPercek ? 0 : '…')}</b><span>mai csúcs egyszerre${maOssz.csucsIdo ? ' · ' + maOssz.csucsIdo : ''} (a nap elejétől)</span></div>
             </div>
             <div class="nezo-napvalaszto">
@@ -1301,7 +1325,7 @@
             <h4 style="margin:10px 0 4px 0;">${napCim(valasztott)}</h4>
             ${napHtml}
             <h4 style="margin:16px 0 4px 0;">Utolsó 30 nap <button type="button" class="uj-link" onclick="nezo.honap = null; renderNezok()">frissítés</button></h4>
-            <p class="field-hint" style="margin-top:0;">Látogató: egy böngésző naponta egyszer. Csúcs: a legtöbb egyszerre (ugyanabban a percben) nyitott és látható oldal, a nap elejétől. Egy napra kattintva megnyílik a részletes bontása. Az adatok nem törlődnek.</p>
+            <p class="field-hint" style="margin-top:0;">Látogató: egy böngésző naponta egyszer. Felkeresés: minden megnyitás, és az is, ha valaki fél óránál hosszabb szünet után visszatér (az újratöltés nem számít; a számlálás 2026. október 19-től megy). Csúcs: a legtöbb egyszerre (ugyanabban a percben) nyitott és látható oldal, a nap elejétől. Egy napra kattintva megnyílik a részletes bontása. Az adatok nem törlődnek.</p>
             ${honapHtml}`;
     }
 

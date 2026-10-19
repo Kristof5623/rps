@@ -2751,3 +2751,7 @@ body.lablec-nelkul .main-wrapper > .container { margin-bottom: 0; }
 }
 body.stab-nezet #hiba-lebego, body.fullscreen-active #hiba-lebego, body:has(#nyelv-ajanlo) #hiba-lebego { display: none; }
 @media print { #hiba-lebego { display: none !important; } }
+/* napi felkeresések a Nézők oldalon (a látogatók száma alatt) */
+.rfid-osszesito .nezo-felk { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.78rem; font-weight: 600; }
+.nezo-nap { grid-template-columns: 70px 1fr 40px 170px; }
+@media (max-width: 480px) { .nezo-nap { grid-template-columns: 54px 1fr 32px; } }
