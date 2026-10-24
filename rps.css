@@ -2473,7 +2473,8 @@ button.calc-btn {
 .profil-jel.gomb:hover { border-color: var(--primary); }
 .profil-jel.merfold { background: var(--warning-dim); color: var(--warning); border-color: transparent; }
 .rekord-tabla td { vertical-align: top; }
-.rekord-ki small { display: block; color: var(--text-dim); font-size: 0.78rem; margin-top: 2px; }
+.rekord-ki small, .rekord-tabla td small { display: block; color: var(--text-dim); font-size: 0.78rem; margin-top: 2px; }
+.rekord-magyarazat { margin-top: 6px; font-size: 0.78rem; }
 .rekord-mind { margin-top: 18px; }
 .rekord-mind > summary { cursor: pointer; font-weight: 700; color: var(--primary); }
 .merfold-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

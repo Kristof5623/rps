@@ -2653,15 +2653,22 @@
         return eredmeny;
     }
 
+    // Elindult-e egyáltalán? Aki rajt előtt visszalépett (WD, DNS - kör nélkül), vagy az előzetes vizsgálaton nem
+    // felelt meg, az nem indult el: nincs pihenőnapja, és nem számít rajtnak (statisztika, karrier, mérföldkő,
+    // összehasonlítás). A nevezők között (Adatminőség, mezőny mérete) persze ott van.
+    function elindultE(c) {
+        const st = c.status || (c.isEliminated ? 'FTQ-ME' : 'Active');
+        const lovagolt = (c.laps || []).filter(Boolean).some(l => l.h || l.isComplete);
+        const preVetBukott = !lovagolt && c.preVet && c.preVet.vetDecision && !/Továbbengedve|Passed|Active/i.test(c.preVet.vetDecision);
+        return c.manualEntry
+            ? !['WD', 'DNS'].includes(st)
+            : (lovagolt || st === 'RET' || (c.isEliminated && !['WD', 'DNS'].includes(st) && !preVetBukott));
+    }
+
     function pihenonapok(c, config, elozmeny) {
         const st = c.status || (c.isEliminated ? 'FTQ-ME' : 'Active');
         const laps = (c.laps || []).filter(Boolean);
-        const lovagolt = laps.some(l => l.h || l.isComplete);
-        const preVetBukott = !lovagolt && c.preVet && c.preVet.vetDecision && !/Továbbengedve|Passed|Active/i.test(c.preVet.vetDecision);
-        const elindult = c.manualEntry
-            ? !['WD', 'DNS'].includes(st)
-            : (lovagolt || st === 'RET' || (c.isEliminated && !['WD', 'DNS'].includes(st) && !preVetBukott));
-        if (!elindult) return 0;
+        if (!elindultE(c)) return 0;
 
         const nevleges = parseInt(String(c.dist || '').replace('j', ''), 10) || 0;
         // Gyors eredménynél nincs kör-adat: kiesettnél a megtett táv nem ismert, ilyenkor a legkisebb sáv.
@@ -3460,7 +3467,7 @@
         const versenyek = localRaces.mult.filter(r => String(r.date || '').startsWith(ev));
         if (!versenyek.length) { cont.innerHTML = '<p class="uj-ures">Ebben a szezonban még nincs lezárt verseny a rendszerben.</p>'; return; }
 
-        let rajt = 0, teljesitett = 0, kiesett = 0, km = 0;
+        let rajt = 0, teljesitett = 0, kiesett = 0, km = 0, nemIndult = 0;
         const lovasok = {}, lovak = {}, tavok = {}, okok = {}, mezony = [];
         let leggyorsabb = null, legjobbPulzus = null;
         versenyek.forEach(r => {
@@ -3468,6 +3475,7 @@
             const comps = szamolatlanIdokPotlasa(parseCompetitors(r.competitors), cfg);
             mezony.push({ r, db: comps.length });
             comps.forEach(c => {
+                if (!elindultE(c)) { nemIndult++; return; }   // rajt előtt visszalépett / DNS / előzetes vizsgálaton kiesett
                 rajt++;
                 const kesz = teljesitetteE(c, cfg);
                 if (kesz) teljesitett++;
@@ -3483,11 +3491,9 @@
                 if (nev) { const l = lovasok[c.license || nev] = lovasok[c.license || nev] || { nev, license: c.license, db: 0, km: 0 }; l.db++; l.km += ckm; }
                 if (lo) { const h = lovak[c.startNum || lo] = lovak[c.startNum || lo] || { nev: lo, startNum: c.startNum, db: 0, km: 0 }; h.db++; h.km += ckm; }
                 tavok[c.dist] = (tavok[c.dist] || 0) + 1;
-                // Átlagsebesség a köridőkből (139. §), és a pulzusidők átlaga - csak a teljesítőknél
+                // A pulzusidők átlaga - csak a teljesítőknél (a leggyorsabb teljesítés lent, a versenyzői sorokból)
                 const korok = (c.laps || []).filter(l => l && l.isComplete && l.loopSec > 0);
                 if (kesz && korok.length) {
-                    const seb = korok.reduce((s, l) => s + (parseFloat(l.d) || 0), 0) / (korok.reduce((s, l) => s + l.loopSec, 0) / 3600);
-                    if (isFinite(seb) && (!leggyorsabb || seb > leggyorsabb.seb)) leggyorsabb = { seb, c, r };
                     const pul = (c.laps || []).filter(l => l && l.pulzusSec > 0);
                     if (pul.length >= 2) {
                         const atl = pul.reduce((s, l) => s + l.pulzusSec, 0) / pul.length;
@@ -3496,6 +3502,9 @@
                 }
             });
         });
+        // Leggyorsabb teljesítés: a legnagyobb átlagsebesség a HIVATALOS menetidőből (mint a helyezésnél), 40 km-től
+        leggyorsabb = osszesVersenySor().filter(s => s.ev === ev && s.kesz && s.tav >= 40 && s.seb > 0)
+            .sort((a, b) => (b.seb - a.seb) || ((a.hely || 999) - (b.hely || 999)))[0] || null;
         const top = (obj, mezo) => Object.values(obj).sort((a, b) => b[mezo] - a[mezo])[0];
         const aktivLovas = top(lovasok, 'db'), kmLo = top(lovak, 'km');
         const nepszeruTav = Object.keys(tavok).sort((a, b) => tavok[b] - tavok[a])[0];
@@ -3507,11 +3516,11 @@
         cont.innerHTML = `<div class="stat-racs">
                 ${kartya(versenyek.length, 'verseny')}
                 ${kartya(rajt, 'rajt', Object.keys(lovasok).length + ' lovas · ' + Object.keys(lovak).length + ' ló')}
-                ${kartya(rajt ? Math.round(teljesitett / rajt * 100) + '%' : '–', 'teljesítési arány', teljesitett + ' teljesítette · ' + kiesett + ' kiesett')}
+                ${kartya(rajt ? Math.round(teljesitett / rajt * 100) + '%' : '–', 'teljesítési arány', teljesitett + ' teljesítette · ' + kiesett + ' kiesett' + (nemIndult ? ' · ' + nemIndult + ' nem indult' : ''))}
                 ${kartya(String(Math.round(km)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' km', 'eredményesen megtett táv', 'az összes ló együtt')}
             </div>
             <div class="stat-racs ketto">
-                ${leggyorsabb ? kartya(kmh(leggyorsabb.seb, 1) + ' km/h', 'leggyorsabb teljesítés', `${riderLink(escapeHtml(leggyorsabb.c.name), leggyorsabb.c.license)} · ${escapeHtml(leggyorsabb.c.internal || '')} · ${escapeHtml(catNames[leggyorsabb.c.dist] || leggyorsabb.c.dist)}, ${escapeHtml(leggyorsabb.r.name || '')}`) : ''}
+                ${leggyorsabb ? kartya(kmh(leggyorsabb.seb, 1) + ' km/h', 'leggyorsabb teljesítés', `${riderLink(escapeHtml(leggyorsabb.c.name), leggyorsabb.c.license)} · ${escapeHtml(leggyorsabb.c.internal || '')} · ${escapeHtml(catNames[leggyorsabb.c.dist] || leggyorsabb.c.dist)}, ${escapeHtml(leggyorsabb.r.name || '')} · menetidő ${toTimeStr(Math.round(leggyorsabb.menetido))}`) : ''}
                 ${legjobbPulzus ? kartya(Math.floor(legjobbPulzus.atl / 60) + ':' + String(Math.round(legjobbPulzus.atl % 60)).padStart(2, '0') + ' perc', 'legjobb átlagos pulzusidő', `${escapeHtml(legjobbPulzus.c.internal || '')} (${riderLink(escapeHtml(legjobbPulzus.c.name), legjobbPulzus.c.license)}), ${escapeHtml(legjobbPulzus.r.name || '')}`) : ''}
                 ${aktivLovas ? kartya(aktivLovas.db + ' rajt', 'legaktívabb lovas', riderLink(escapeHtml(aktivLovas.nev), aktivLovas.license)) : ''}
                 ${kmLo && kmLo.km ? kartya(String(Math.round(kmLo.km)) + ' km', 'legtöbb km egy ló', horseLink(escapeHtml(kmLo.nev), kmLo.startNum)) : ''}
@@ -8349,7 +8358,7 @@
                     startNum: String(c.startNum || '').trim(), horseName: String(c.internal || '').trim(),
                     dist: c.dist, km: parseInt(baseDist, 10),
                     completedKm: getCompletedKm(c, cfg), place: place, isEliminated: !!c.isEliminated,
-                    status: c.status || (c.isEliminated ? 'FTQ-ME' : 'Active'), extraCodes: c.extraCodes || [],
+                    status: c.status || (c.isEliminated ? 'FTQ-ME' : 'Active'), extraCodes: c.extraCodes || [], elindult: elindultE(c),
                     obPont: c.obPont !== false,
                     buntetoPont: buntetoPontok(c).pont, lapok: szankcioLapok(c)
                 });
@@ -8490,7 +8499,7 @@
             return {
                 ev: (r.raceDate || '').slice(0, 4),
                 datum: r.raceDate, verseny: r.raceName, alcim: catNames[r.dist] || r.dist, szint: '',
-                hely: r.place, indulok: null, kiesett: r.isEliminated,
+                hely: r.place, indulok: null, kiesett: r.isEliminated, nemIndult: r.elindult === false,
                 statuszSzoveg: getElimText({ isEliminated: true, status: r.status, extraCodes: r.extraCodes }),
                 partnerNev: tipus === 'lovas' ? r.horseName : r.name,
                 partnerId: tipus === 'lovas' ? r.startNum : r.license,
@@ -8756,6 +8765,8 @@
 
     // Összesítő a kiválasztott forrás + év eredményeiről
     function profilOsszegzo(sorok) {
+        // aki el sem indult (DNS, rajt előtti WD), az nem rajt - a listában tájékoztatásként ott marad
+        sorok = sorok.filter(r => !r.nemIndult);
         if (!sorok.length) return '';
         const telj = sorok.filter(r => !r.kiesett);
         const gyoz = telj.filter(r => r.hely === 1).length;
@@ -11862,7 +11873,11 @@
     V129_FRISSITOK.push(renderIranyitopult);
 
     // --- Versenyzői sorok a lezárt versenyekből (rekordok, mérföldkövek, összehasonlítás, összefoglaló) ---
-    // Sebesség: a teljesített körök köridőiből (139. § (1)); pulzusidő: a vizsgálatok átlaga.
+    // Sebesség (seb): a HIVATALOS menetidőből - a körök ideje a pulzusidővel együtt, a kötelező pihenő nélkül;
+    // ez dönti el a helyezést, és ezt mutatja az adatlap is („Össz. átlagsebesség”). (2026-10-24-ig itt csak a
+    // pályán töltött köridők számítottak, pulzusidő nélkül - ezért a statisztika olykor a 2. helyezettet mutatta
+    // leggyorsabbnak.) A „gyors eredménnyel” felvitt versenyeknél a megadott teljes menetidőből. legjobbKor: a
+    // leggyorsabb egyetlen kör (a rajttól / kiindulástól a beérkezésig). Pulzusidő: a vizsgálatok átlaga.
     // km: csak a teljesített versenyeké ("eredményesen megtett táv"), mint a statisztikában.
     let versenySorCache = { forras: null, sorok: [] };
     function osszesVersenySor() {
@@ -11881,25 +11896,32 @@
                 const rr = rangok[c.bib];
                 const kesz = teljesitetteE(c, cfg);
                 const ut = korok[korok.length - 1];
-                sorok.push({ r, c, datum: r.date || '', ev: String(r.date || '').slice(0, 4), dist: c.dist, tav: parseInt(String(c.dist || '').replace('j', ''), 10) || 0,
+                const km = kesz ? getCompletedKm(c, cfg) : 0;
+                const menetido = !kesz ? 0 : c.manualEntry ? (parseFloat(c.totalTimeSec) > 0 ? parseFloat(c.totalTimeSec) : 0) : (ut ? ut.rideTime : 0);
+                let legjobbKor = null;
+                if (kesz) korok.forEach(l => { if (l.loopSpd > 0 && (!legjobbKor || l.loopSpd > legjobbKor.seb)) legjobbKor = { seb: l.loopSpd, kor: c.laps.indexOf(l) + 1, d: parseFloat(l.d) || 0, mp: l.loopSec }; });
+                const hely = kesz && c.status !== 'FNR' ? (c.manualEntry ? (parseInt(c.manualPlace, 10) || (rr && typeof rr.rank === 'number' ? rr.rank : null)) : (rr && typeof rr.rank === 'number' ? rr.rank : null)) : null;
+                sorok.push({ r, c, datum: r.date || '', ev: String(r.date || '').slice(0, 4), dist: c.dist, tav: parseInt(String(c.dist || '').replace('j', ''), 10) || 0, elindult: elindultE(c),
                     license: String(c.license || '').trim(), startNum: String(c.startNum || '').trim(), nev: String(c.name || '').trim(), lo: String(c.internal || '').trim(),
-                    km: kesz ? getCompletedKm(c, cfg) : 0, kesz, kiesett: !!c.isEliminated, hely: kesz && c.status !== 'FNR' && rr && typeof rr.rank === 'number' ? rr.rank : null,
-                    seb: kesz && korMp > 0 ? korKm / (korMp / 3600) : 0, pulzus: pul.length ? pul.reduce((s, l) => s + l.pulzusSec, 0) / pul.length : 0, pulzusDb: pul.length,
-                    pulzusLegjobb: pul.length ? Math.min(...pul.map(l => l.pulzusSec)) : 0, menetido: kesz && ut ? ut.rideTime : 0 });
+                    km, kesz, kiesett: !!c.isEliminated, hely,
+                    seb: menetido > 0 && km > 0 ? km / (menetido / 3600) : 0, korSeb: kesz && korMp > 0 ? korKm / (korMp / 3600) : 0, legjobbKor,
+                    pulzus: pul.length ? pul.reduce((s, l) => s + l.pulzusSec, 0) / pul.length : 0, pulzusDb: pul.length,
+                    pulzusLegjobb: pul.length ? Math.min(...pul.map(l => l.pulzusSec)) : 0, menetido });
             });
         });
         sorok.sort((a, b) => a.datum.localeCompare(b.datum));
         versenySorCache = { forras: localRaces.mult, sorok };
         return sorok;
     }
-    function sajatSorok(tipus, id) {
+    // Egy lovas / ló sorai a saját versenyeinkből - alapból csak ahol el is indult (mindet: a nevezések is)
+    function sajatSorok(tipus, id, mindet) {
         const k = String(id || '').trim();
-        return osszesVersenySor().filter(s => (tipus === 'lovas' ? s.license : s.startNum) === k);
+        return osszesVersenySor().filter(s => (tipus === 'lovas' ? s.license : s.startNum) === k && (mindet || s.elindult));
     }
     function entitasNev(tipus, id) {
         const torzs = tipus === 'lovas' ? ridersCache[sanitizeKey(id)] : horsesCache[sanitizeKey(id)];
         if (torzs && torzs.name) return torzs.name;
-        const s = sajatSorok(tipus, id)[0];
+        const s = sajatSorok(tipus, id, true)[0];
         return s ? (tipus === 'lovas' ? s.nev : s.lo) : String(id);
     }
 
@@ -11924,7 +11946,8 @@
         id = String(id || '').trim();
         const ki = sajatSorok(tipus, id).map(s => ({ datum: s.datum, ev: s.ev, verseny: s.r.name || '', tav: s.tav, kesz: s.kesz, kiesett: s.kiesett,
             hely: s.hely, km: s.km, tars: tipus === 'lovas' ? s.lo : s.nev, kulcs: 'r:' + s.r.id + '|' + s.dist, sajat: s }));
-        const van = new Set(ki.map(x => x.datum + '|' + x.tav));
+        // a szövetségi lista azon a napon nem kell akkor sem, ha nálunk nem indult el (pl. WD) - a saját adat a mérvadó
+        const van = new Set(sajatSorok(tipus, id, true).map(x => x.datum + '|' + x.tav));
         (profilHivatalosCache[tipus + ':' + id] || []).forEach(e => {
             const datum = String(e.date || '').replace(/\//g, '-').replace(/\.$/, '').replace(/\./g, '-');
             const tav = Math.round(parseFloat(e.distanceKm) || 0);
@@ -11981,14 +12004,17 @@
     }
     function rekordokHtml(ev, merfoldIs) {
         const sorok = osszesVersenySor().filter(s => ev === 'osszes' || s.ev === ev);
-        const tavRek = {}, pulRek = {};
+        const tavRek = {}, korRek = {}, pulRek = {};
+        // holtversenynél a jobb helyezés, aztán a korábbi verseny
+        const jobb = (a, b) => a.seb > b.seb + 1e-9 || (Math.abs(a.seb - b.seb) <= 1e-9 && (a.hely || 999) < (b.hely || 999));
         // a 20 km felkészítő verseny (21/A. §), ott nem a sebesség a cél - nem rekord
-        sorok.filter(s => s.kesz && s.seb > 0 && s.tav >= 40).forEach(s => {
+        sorok.filter(s => s.kesz && s.tav >= 40).forEach(s => {
             const k = String(s.dist).replace('j', '');
-            if (!tavRek[k] || s.seb > tavRek[k].seb) tavRek[k] = s;
+            if (s.seb > 0 && (!tavRek[k] || jobb(s, tavRek[k]))) tavRek[k] = s;
+            if (s.legjobbKor && (!korRek[k] || s.legjobbKor.seb > korRek[k].legjobbKor.seb + 1e-9)) korRek[k] = s;
             if (s.pulzus > 0 && s.pulzusDb >= 2 && (!pulRek[k] || s.pulzus < pulRek[k].pulzus)) pulRek[k] = s;
         });
-        const tavok = DIST_ORDER.filter(d => tavRek[d]);
+        const tavok = DIST_ORDER.filter(d => tavRek[d] || korRek[d]);
         const kiir = s => `${riderLink(esc(s.nev), s.license)} · ${horseLink(esc(s.lo), s.startNum)}<small>${esc(s.r.name || '')}, ${esc(s.datum)}</small>`;
         let mfHtml = '';
         if (merfoldIs !== false) {
@@ -12001,10 +12027,13 @@
                 <small>${esc(m.verseny)}, ${esc(m.datum)}</small></li>`).join('')}</ul>` : '<p class="uj-ures">Ebben az időszakban nem volt mérföldkő.</p>'}`;
         }
         return `<h4 style="margin:18px 0 6px;">Rekordok ${ev === 'osszes' ? '(minden idők)' : `(${esc(ev)})`} <small>– az End-Ride-ban lebonyolított versenyekből</small></h4>
-            ${tavok.length ? `<div class="table-responsive"><table class="ttrack-table rekord-tabla"><thead><tr><th class="col-header">Táv</th><th class="col-header">Leggyorsabb teljesítés</th><th class="col-header">km/h</th><th class="col-header">Legjobb átlagos pulzusidő</th></tr></thead><tbody>
-                ${tavok.map(d => `<tr><td><b>${esc(catNames[d] || d)}</b></td><td class="rekord-ki">${kiir(tavRek[d])}</td><td><b>${kmh(tavRek[d].seb, 2)}</b></td>
-                    <td class="rekord-ki">${pulRek[d] ? `<b>${Math.floor(pulRek[d].pulzus / 60)}:${String(Math.round(pulRek[d].pulzus % 60)).padStart(2, '0')}</b> ${kiir(pulRek[d])}` : '–'}</td></tr>`).join('')}
-            </tbody></table></div>` : '<p class="uj-ures">Még nincs teljesített eredmény köridőkkel.</p>'}
+            ${tavok.length ? `<div class="table-responsive"><table class="ttrack-table rekord-tabla"><thead><tr><th class="col-header">Táv</th><th class="col-header">Leggyorsabb teljesítés</th><th class="col-header">Menetidő · km/h</th><th class="col-header">Leggyorsabb kör</th><th class="col-header">Legjobb átlagos pulzusidő</th></tr></thead><tbody>
+                ${tavok.map(d => { const t = tavRek[d], k = korRek[d]; return `<tr><td><b>${esc(catNames[d] || d)}</b></td>
+                    <td class="rekord-ki">${t ? kiir(t) : '–'}</td><td>${t ? `<b>${toTimeStr(Math.round(t.menetido))}</b><small>${kmh(t.seb, 2)} km/h</small>` : '–'}</td>
+                    <td class="rekord-ki">${k ? `<b>${kmh(k.legjobbKor.seb, 2)} km/h</b> ${kiir(k)}<small>${k.legjobbKor.kor}. kör · ${String(k.legjobbKor.d).replace('.', ',')} km · ${toTimeStr(Math.round(k.legjobbKor.mp))}</small>` : '–'}</td>
+                    <td class="rekord-ki">${pulRek[d] ? `<b>${Math.floor(pulRek[d].pulzus / 60)}:${String(Math.round(pulRek[d].pulzus % 60)).padStart(2, '0')}</b> ${kiir(pulRek[d])}` : '–'}</td></tr>`; }).join('')}
+            </tbody></table></div>
+            <p class="field-hint rekord-magyarazat">Leggyorsabb teljesítés: a legrövidebb hivatalos menetidő a távon – a körök ideje a pulzusidővel együtt, a kötelező pihenő nélkül; ez alapján dől el a helyezés is. Leggyorsabb kör: egyetlen kör a kiindulástól a beérkezésig (pulzusidő nélkül). Legjobb átlagos pulzusidő: a vizsgálatok átlaga, legalább két vizsgálattal. A 20 km felkészítő táv nem számít.</p>` : '<p class="uj-ures">Még nincs teljesített eredmény köridőkkel.</p>'}
             ${mfHtml}`;
     }
     // Élő versenyen: a hírfolyamba, amikor egy ló vagy lovas ezen a versenyen lépi át a km-határt
@@ -12291,7 +12320,7 @@
         const c = c0.manualEntry ? c0 : szamolatlanIdokPotlasa([c0], cfg)[0];
         const rr = calculateCurrentRanks(comps, cfg)[c.bib];
         const km = getCompletedKm(c, cfg);
-        const indulok = comps.filter(x => x.dist === c.dist).length;
+        const indulok = comps.filter(x => x.dist === c.dist && elindultE(x)).length;   // aki el sem indult (DNS, rajt előtti WD), nem induló
         let seb = 0, menetido = 0, kesz, hely, legjobbPul = 0;
         if (c.manualEntry) {
             // "gyors eredmény": nincsenek körök, csak a helyezés és (ha van) a teljes menetidő
@@ -12301,13 +12330,14 @@
             hely = kesz && c.status !== 'FNR' ? (parseInt(c.manualPlace, 10) || (rr && typeof rr.rank === 'number' ? rr.rank : null)) : null;
         } else {
             const korok = (c.laps || []).filter(l => l && l.isComplete && l.loopSec > 0);
-            seb = korok.length ? korok.reduce((s, l) => s + (parseFloat(l.d) || 0), 0) / (korok.reduce((s, l) => s + l.loopSec, 0) / 3600) : 0;
             kesz = teljesitetteE(c, cfg);
             hely = kesz && c.status !== 'FNR' && rr && typeof rr.rank === 'number' ? rr.rank : null;
             const pul = (c.laps || []).filter(l => l && l.pulzusSec > 0);
             legjobbPul = pul.length ? Math.min(...pul.map(l => l.pulzusSec)) : 0;
             const ut = korok[korok.length - 1];
             menetido = kesz && ut ? ut.rideTime : 0;
+            // az átlag a hivatalos menetidőből - ugyanaz, mint az adatlapon („Össz. átlagsebesség”)
+            seb = menetido && km ? km / (menetido / 3600) : (ut ? ut.rideSpd || 0 : 0);
         }
         const dobozok = [seb ? [kmh(seb, 1), 'km/h átlag'] : null, menetido ? [toTimeStr(menetido), 'menetidő'] : [km ? km + ' km' : '', 'teljesítve'],
             legjobbPul ? [percMp(legjobbPul), 'legjobb pulzusidő'] : null, indulok > 1 ? [String(indulok), 'induló a távon'] : null].filter(d => d && d[0]);
@@ -13567,7 +13597,7 @@
         'Hibát találtál? Ötleted van?': 'Found a problem? Have an idea?', 'Mi a hiba / mi az ötleted?': 'What is the problem / your idea?', 'Küldés': 'Send',
         'Elérhetőség': 'Contact', 'Eredménykártya (kép) a megosztáshoz': 'Result card (image) to share', 'Frissítés elérhető': 'Update available', 'Mentsd el a munkádat, mielőtt frissítesz.': 'Save your work before you refresh.',
         'Frissítés': 'Refresh', 'Később': 'Later', 'Impresszum': 'Legal notice', 'Adatvédelmi tájékoztató': 'Privacy notice', 'Kapcsolat': 'Contact', 'Üzemeltető': 'Operator',
-        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Hiba vagy ötlet': 'Problem or idea',
+        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Leggyorsabb kör': 'Fastest loop', 'Menetidő · km/h': 'Ride time · km/h', 'Hiba vagy ötlet': 'Problem or idea',
         'Valami nem működik, vagy van egy jó ötleted? Írd meg nekünk – csak az oldal kezelői látják.': 'Something not working, or got a good idea? Tell us – only the site managers see it.',
         'Hibát találtam': 'I found a problem', 'Ötletem van': 'I have an idea', 'Üzenet': 'Message',
         'Mi nem működik? Mit csináltál előtte, és mi történt helyette?': 'What is not working? What did you do before, and what happened instead?',
