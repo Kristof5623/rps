@@ -9894,6 +9894,7 @@
         if (tabId === 'beallitasok-pontkereso') renderAdminPontkereso();
         if (tabId === 'beallitasok-kulfoldi') renderKulfoldiKezelo();
         if (tabId === 'beallitasok-vetek') renderVetTorzs();
+        if (tabId === 'beallitasok-tema') unnepValasztoRajzol();
     }
 
     // ============================================================================
@@ -13903,10 +13904,158 @@
         else db.ref('settings/adatkezelo').once('value').then(s => kiir(s.val())).catch(() => kiir(null));
     }
 
+    // --- v137: ÜNNEPI DÍSZÍTÉS (minden témában, mindenkinél, dátum szerint magától) ---------------------
+    // A 2026-10-13-i ötlet: „minden design-ban megjelenő, speciális alkalmakkor megjelenő plusz díszítőelem,
+    // pl. mikulássapka az ikonra”. A díszítés a színtémától független (saját színei vannak), ezért minden
+    // témában ugyanúgy látszik: a logón egy jel (világító tök / mikulássapka), a kezdőlap nagy képén dísz
+    // (pókháló és tökök / hópelyhek), a böngészőfülön a kis ikon is, Halloweenkor pedig a díszítő réteg
+    // (unnepReteg: pókhálók, pók, denevérek, szellem). Kikapcsolni a Beállítások > Design
+    // téma oldalon lehet (settings/unnepiDisz: 'auto' | 'ki'); ott ezen az eszközön előnézet is van.
+    const UNNEPEK = [
+        { kulcs: 'halloween', nev: 'Halloween', tol: '10-24', ig: '11-01', leiras: 'világító tök a logón és a kezdőlap képén, pókhálók a fejlécen és a kártyákon, ereszkedő pók, átrepülő denevérek, kukucskáló szellem (rákattintva „Bú!”)' },
+        { kulcs: 'karacsony', nev: 'Karácsony', tol: '12-01', ig: '12-26', leiras: 'mikulássapka a logón, hópelyhek a kezdőlap képén' }
+    ];
+    const UNNEP_JEL = {
+        halloween: '<svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="ut-tok" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffc067"/><stop offset=".55" stop-color="#f27d16"/><stop offset="1" stop-color="#a8440a"/></radialGradient><radialGradient id="ut-feny" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fffbd1"/><stop offset=".5" stop-color="#ffd84a"/><stop offset="1" stop-color="#ff9a1f"/></radialGradient></defs><path d="M30.5 16c-.8-4.4.4-8.6 4.3-11.6l3.3 2.3c-3 2.2-4.1 5.4-3.3 9.3z" fill="#4c7d2b"/><path d="M36.5 9.5c3.5-3.2 8.6-3.7 12.2-1.2-4 .4-7.2 1.9-9.3 4.6z" fill="#6aa43a"/><ellipse cx="19" cy="38" rx="14.5" ry="19" fill="url(#ut-tok)"/><ellipse cx="45" cy="38" rx="14.5" ry="19" fill="url(#ut-tok)"/><ellipse cx="32" cy="38.5" rx="15.5" ry="21" fill="url(#ut-tok)" stroke="#a9480a" stroke-width=".8"/><path d="M19 19.5c-6 6-6 31 0 37M45 19.5c6 6 6 31 0 37" fill="none" stroke="#b9530c" stroke-width="1" opacity=".7"/><g fill="url(#ut-feny)"><path d="M18 31l7.5-5.5 2 8.5z"/><path d="M46 31l-7.5-5.5-2 8.5z"/><path d="M32 36l-3 5h6z"/><path d="M16.5 43.5c4.5 6.5 10 9.5 15.5 9.5s11-3 15.5-9.5l-4.6 1.4-2.5 3.4-3-2.6-2.9 3-2.5-3-2.5 3-2.9-3-3 2.6-2.5-3.4z"/></g></svg>',
+        karacsony: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.5C5 10 9.5 5 15.5 5c2.6 0 4.3 1.8 4.8 4l-3.1.8c-.5-1.2-1.4-1.8-2.5-1.6C11.5 9 9.6 13 9.3 17.5z" fill="#d6312f" stroke="#7a1414" stroke-width=".6"/>'
+            + '<rect x="2" y="16.2" width="14" height="4.4" rx="2.2" fill="#fff" stroke="#c9d3dc" stroke-width=".5"/>'
+            + '<circle cx="20" cy="10.3" r="2.6" fill="#fff" stroke="#c9d3dc" stroke-width=".5"/></svg>'
+    };
+    // a böngészőfül ikonján (100x100-as logóra): hol és mekkora a jel
+    const UNNEP_FAVICON_HELY = { halloween: 'translate(40 38) scale(.95)', karacsony: 'translate(-8 -14) rotate(-22 12 12) scale(2.6)' };
+    let unnepBeallitas = 'auto', unnepFigyelve = false, unnepFaviconEredeti = null, unnepFaviconKulcs = null;
+
+    function unnepElonezet() { try { return sessionStorage.getItem('rps-unnep-elonezet') || ''; } catch (e) { return ''; } }
+    function aktualisUnnep() {
+        const elo = unnepElonezet();
+        if (elo) return elo === 'nincs' ? null : (UNNEPEK.find(u => u.kulcs === elo) || null);
+        if (unnepBeallitas === 'ki') return null;
+        const n = new Date();
+        const nap = String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+        return UNNEPEK.find(u => nap >= u.tol && nap <= u.ig) || null;
+    }
+    // A logók (fejléc, menü, lábléc, fiók) mellé a jel: a logót egy keretbe tesszük, abban ül a jel
+    function unnepLogok(gyoker, u) {
+        (gyoker.querySelectorAll ? gyoker.querySelectorAll('svg.brand-logo') : []).forEach(svg => {
+            let keret = svg.parentElement;
+            if (!keret || !keret.classList.contains('logo-keret')) {
+                if (!u) return;
+                keret = document.createElement('span');
+                keret.className = 'logo-keret';
+                svg.parentNode.insertBefore(keret, svg);
+                keret.appendChild(svg);
+            }
+            let jel = keret.querySelector('.unnep-jel');
+            if (!u) { if (jel) jel.remove(); return; }
+            if (!jel) { jel = document.createElement('span'); keret.appendChild(jel); }
+            if (jel.dataset.unnep !== u.kulcs) { jel.className = 'unnep-jel ' + u.kulcs; jel.dataset.unnep = u.kulcs; jel.innerHTML = UNNEP_JEL[u.kulcs]; }
+        });
+    }
+    function unnepFavicon(u) {
+        const linkek = [...document.querySelectorAll('link[rel="icon"]')];
+        if (!linkek.length) return;
+        if (!unnepFaviconEredeti) unnepFaviconEredeti = linkek.map(l => ({ l, href: l.getAttribute('href'), type: l.getAttribute('type') }));
+        const kulcs = u ? u.kulcs : null;
+        if (kulcs === unnepFaviconKulcs) return;
+        unnepFaviconKulcs = kulcs;
+        if (!u) { unnepFaviconEredeti.forEach(x => { x.l.setAttribute('href', x.href); if (x.type) x.l.setAttribute('type', x.type); }); return; }
+        fetch('kepek/logo.svg').then(r => (r.ok ? r.text() : Promise.reject())).then(svg => {
+            if (unnepFaviconKulcs !== kulcs) return;
+            const jel = UNNEP_JEL[kulcs].replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+            const uj = svg.replace('</svg>', `<g transform="${UNNEP_FAVICON_HELY[kulcs]}">${jel}</g></svg>`);
+            const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(uj);
+            unnepFaviconEredeti.forEach(x => { x.l.setAttribute('href', url); x.l.setAttribute('type', 'image/svg+xml'); });
+        }).catch(() => {});
+    }
+    // Halloween: díszítő réteg - pókhálók a fejléc két sarkából, ereszkedő pók, átrepülő denevérek, kukucskáló
+    // szellem (rákattintva „Bú!”, és szétrebbennek a denevérek). Kattintani csak a szellemre lehet, minden más
+    // átengedi az egeret / ujjat. A stáb munkaoldalain, TV módban és „kevesebb animáció” beállításnál nincs mozgás.
+    const UT_DENEVER = '<svg viewBox="0 0 64 30" aria-hidden="true"><g class="ut-szarny"><path d="M30 13C25 5 15 2 2 6c5 1.6 7.4 4.6 7.4 8.6-3-1.8-6.4-1.6-9 .4 4.2.8 6.6 3.6 6.8 7 5.2-4.2 13.6-5.4 23.2-2.8z"/><path d="M34 13c5-8 15-11 28-7-5 1.6-7.4 4.6-7.4 8.6 3-1.8 6.4-1.6 9 .4-4.2.8-6.6 3.6-6.8 7-5.2-4.2-13.6-5.4-23.2-2.8z"/></g><ellipse cx="32" cy="16" rx="4.6" ry="7"/><path d="M28.6 10.4l.9-4.4 2.5 3.2 2.5-3.2.9 4.4z"/><circle cx="30.4" cy="13" r="1" fill="#ffd23f"/><circle cx="33.6" cy="13" r="1" fill="#ffd23f"/></svg>';
+    const UT_SZELLEM = '<svg viewBox="0 0 60 72" aria-hidden="true"><defs><linearGradient id="ut-szellem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dcd9f2"/></linearGradient></defs><path d="M6.5 34c-4 1-6 4-5.4 7 3-1 5-2.4 5.4-4zM53.5 34c4 1 6 4 5.4 7-3-1-5-2.4-5.4-4z" fill="url(#ut-szellem)" stroke="#bdb8dd" stroke-width="1"/><path d="M30 3C15.5 3 6 14.5 6 29v34c0 3.2 3.4 4.4 5.6 2.2l4.4-4.4 5.2 5.2c1.8 1.8 4.4 1.8 6.2 0l2.6-3.6 2.6 3.6c1.8 1.8 4.4 1.8 6.2 0l5.2-5.2 4.4 4.4c2.2 2.2 5.6 1 5.6-2.2V29C54 14.5 44.5 3 30 3z" fill="url(#ut-szellem)" stroke="#bdb8dd" stroke-width="1.2"/><ellipse cx="21.5" cy="27" rx="3.6" ry="5" fill="#231a30"/><ellipse cx="38.5" cy="27" rx="3.6" ry="5" fill="#231a30"/><circle cx="22.6" cy="25.2" r="1.2" fill="#fff"/><circle cx="39.6" cy="25.2" r="1.2" fill="#fff"/><ellipse cx="30" cy="39" rx="4" ry="5" fill="#231a30"/><ellipse cx="15" cy="35" rx="3.6" ry="2.2" fill="#ff9fbd" opacity=".55"/><ellipse cx="45" cy="35" rx="3.6" ry="2.2" fill="#ff9fbd" opacity=".55"/></svg>';
+    const UT_POK = '<svg viewBox="0 0 30 30" aria-hidden="true"><g stroke="#140f1c" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M11 14l-6-4-2-5M11 16H4l-3 3M11 18l-6 4-1 5M12 20l-3 6M19 14l6-4 2-5M19 16h7l3 3M19 18l6 4 1 5M18 20l3 6"/></g><ellipse cx="15" cy="18" rx="5" ry="6" fill="#140f1c"/><circle cx="15" cy="11" r="3.4" fill="#140f1c"/><circle cx="13.7" cy="10.6" r=".8" fill="#ff8a24"/><circle cx="16.3" cy="10.6" r=".8" fill="#ff8a24"/></svg>';
+    function unnepReteg(u) {
+        const van = u && u.kulcs === 'halloween';
+        const fej = document.getElementById('uj-fejlec');
+        document.querySelectorAll('.ut-fejlec-disz').forEach(e => { if (!van) e.remove(); });
+        let reteg = document.getElementById('unnep-reteg');
+        if (!van) { if (reteg) reteg.remove(); return; }
+        if (fej && !fej.querySelector('.ut-fejlec-disz')) {
+            fej.insertAdjacentHTML('beforeend', `<span class="ut-fejlec-disz ut-halo bal" aria-hidden="true"></span><span class="ut-fejlec-disz ut-halo jobb" aria-hidden="true"></span>
+                <span class="ut-fejlec-disz ut-pok" aria-hidden="true"><span class="ut-szal"></span>${UT_POK}</span>`);
+        }
+        if (reteg) return;
+        reteg = document.createElement('div');
+        reteg.id = 'unnep-reteg';
+        reteg.setAttribute('aria-hidden', 'true');
+        let szellemEl = false;
+        try { szellemEl = sessionStorage.getItem('rps-szellem-el') === '1'; } catch (e) {}
+        reteg.innerHTML = `<div class="ut-raj">${[0, 1, 2, 3, 4].map(i => `<span class="ut-denever d${i}"><span class="ut-hullam">${UT_DENEVER}</span></span>`).join('')}</div>
+            ${szellemEl ? '' : `<button type="button" class="ut-szellem" title="Bú!" onclick="unnepSzellem(this)">${UT_SZELLEM}<span class="ut-buborek">Bú! Boldog Halloweent!</span></button>`}`;
+        document.body.appendChild(reteg);
+    }
+    function unnepSzellem(gomb) {
+        gomb.classList.add('bu');
+        const r = gomb.getBoundingClientRect();
+        const kitores = document.createElement('div');
+        kitores.className = 'ut-kitores';
+        kitores.innerHTML = [[220, -260], [320, -140], [140, -330], [380, -300], [260, -60], [60, -220]].map(([dx, dy], i) =>
+            `<span class="ut-denever" style="left:${Math.round(r.left + r.width / 2)}px; top:${Math.round(r.top + r.height / 3)}px; --dx:${dx}px; --dy:${dy}px; animation-delay:${i * 90}ms"><span class="ut-hullam">${UT_DENEVER}</span></span>`).join('');
+        document.getElementById('unnep-reteg')?.appendChild(kitores);
+        setTimeout(() => kitores.remove(), 4000);
+        // a szellem ezután elúszik, és ebben a munkamenetben már nem jön vissza
+        setTimeout(() => { gomb.classList.add('el'); try { sessionStorage.setItem('rps-szellem-el', '1'); } catch (e) {} }, 2600);
+        setTimeout(() => gomb.remove(), 4200);
+    }
+    function unnepAlkalmaz() {
+        const u = aktualisUnnep();
+        UNNEPEK.forEach(x => document.documentElement.classList.toggle('unnep-' + x.kulcs, !!u && u.kulcs === x.kulcs));
+        unnepLogok(document, u);
+        unnepReteg(u);
+        unnepFavicon(u);
+        unnepValasztoRajzol();
+    }
+    function unnepInditas() {
+        unnepAlkalmaz();
+        // az utólag megjelenő logók (pl. a fiók ablak) is kapjanak jelet
+        new MutationObserver(lista => {
+            const u = aktualisUnnep();
+            if (!u) return;
+            lista.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1 && (n.matches('svg.brand-logo') || n.querySelector('svg.brand-logo'))) unnepLogok(n.matches('svg.brand-logo') ? n.parentNode : n, u); }));
+        }).observe(document.body, { childList: true, subtree: true });
+        if (!unnepFigyelve) {
+            unnepFigyelve = true;
+            db.ref('settings/unnepiDisz').on('value', s => { unnepBeallitas = s.val() === 'ki' ? 'ki' : 'auto'; unnepAlkalmaz(); }, () => {});
+        }
+        // éjfélkor (pl. november 2-án) magától eltűnik / megjelenik
+        setInterval(unnepAlkalmaz, 30 * 60 * 1000);
+    }
+    // Beállítások > Design téma: be / ki (mindenkinek), és előnézet ezen az eszközön
+    function unnepValasztoRajzol() {
+        const hely = document.getElementById('unnep-valaszto');
+        if (!hely) return;
+        const u = aktualisUnnep(), elo = unnepElonezet();
+        const gomb = (ertek, cimke) => `<button type="button" class="tab-btn ${unnepBeallitas === ertek ? 'active' : ''}" onclick="unnepBeallit('${ertek}')">${cimke}</button>`;
+        const egomb = (ertek, cimke) => `<button type="button" class="tab-btn ${elo === ertek ? 'active' : ''}" onclick="unnepElonezetValt('${ertek}')">${cimke}</button>`;
+        hely.innerHTML = `<div class="hir-szurok">${gomb('auto', 'Bekapcsolva (dátum szerint)')}${gomb('ki', 'Kikapcsolva')}</div>
+            <p class="field-hint" style="margin:4px 0 6px;">${UNNEPEK.map(x => `<b>${esc(x.nev)}</b> (${x.tol.replace('-', '.')}.–${x.ig.replace('-', '.')}.): ${esc(x.leiras)}`).join('<br>')}<br>
+                Most: <b>${u ? esc(u.nev) : 'nincs ünnepi díszítés'}</b>${elo ? ' (előnézet ezen az eszközön)' : ''}.</p>
+            <div class="hir-szurok">${egomb('', 'Valódi állapot')}${UNNEPEK.map(x => egomb(x.kulcs, 'Előnézet: ' + esc(x.nev))).join('')}${egomb('nincs', 'Előnézet: nincs')}</div>`;
+    }
+    function unnepBeallit(ertek) {
+        db.ref('settings/unnepiDisz').set(ertek === 'ki' ? 'ki' : 'auto')
+            .then(() => showToast(ertek === 'ki' ? 'Ünnepi díszítés kikapcsolva – mindenkinél.' : 'Ünnepi díszítés bekapcsolva (dátum szerint) – mindenkinél.'))
+            .catch(e => showToast('Nem sikerült: ' + (e && e.message), true));
+    }
+    function unnepElonezetValt(ertek) {
+        try { if (ertek) sessionStorage.setItem('rps-unnep-elonezet', ertek); else sessionStorage.removeItem('rps-unnep-elonezet'); } catch (e) {}
+        unnepAlkalmaz();
+    }
+
     window.onload = function() {
         verzioFigyelesInditas();
         ujDizajnInditas();
         lablecInditas();
+        unnepInditas();
         let savedMode = 'kezdolap';
         try { savedMode = sessionStorage.getItem('rps-nezet') || 'kezdolap'; localStorage.removeItem('currentMode'); } catch (e) {}
         if (savedMode === 'terv') savedMode = 'versenyek';
