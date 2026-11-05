@@ -10790,35 +10790,32 @@
     // kitölti a keretet (telefonon az álló képek), a lovasra/lóra igazítva.
     // csoport: széles csoportkép - gépen kitölti a keretet (az emberek a felső részen, az árnyék
     // halványabb, hogy a felirat ne takarja őket), telefonon EGÉSZBEN látszik, elmosott háttérrel.
-    // Elöl a legújabb képek (2026. októberi verseny, a szakág Facebook-csoportjából - minden képen más
-    // lovas), utánuk a tavlovasok.hu képei. A "forras" a jobb felső sarokban, a mostani képhez igazodva.
+    // A képek (2026. november) a szakág hivatalos oldaláról (Magyar Lovas Szövetség Távlovagló- és Távhajtó
+    // Szakág) és a szakág csoportjából: Hajós (október), Bükkösd, Somorja - versenyenként vegyesen, hogy ne
+    // egy verseny képei jöjjenek egymás után. (A régi, tavlovasok.hu-s 1-19-es adag 2026-11-05-én kikerült -
+    // a fájlok a kepek/ mappában maradtak.) A "forras" a jobb felső sarokban, a mostani képhez igazodva.
     const FORRAS_SZAKAG = 'Fotó: Magyar Távlovagló és Távhajtó Szakág';
     const UJ_KEPEK = [
+        { src: 'kepek/tavlovas-30.jpg', alak: 'fekvo', pos: '35% 55%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-33.jpg', alak: 'allo', pos: '55% 70%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-32.jpg', alak: 'fekvo', pos: '50% 55%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-31.jpg', alak: 'allo', pos: '40% 92%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-34.jpg', alak: 'fekvo', pos: '45% 50%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-35.jpg', alak: 'allo', pos: '60% 58%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-20.jpg', alak: 'fekvo', pos: '45% 55%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-28.jpg', alak: 'fekvo', pos: '45% 45%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-37.jpg', alak: 'allo', pos: '50% 45%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-36.jpg', alak: 'fekvo', pos: '50% 55%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-39.jpg', alak: 'allo', pos: '45% 55%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-22.jpg', alak: 'fekvo', pos: '68% 45%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-24.jpg', alak: 'fekvo', pos: '38% 60%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-21.jpg', alak: 'fekvo', pos: '50% 55%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-25.jpg', alak: 'fekvo', pos: '55% 55%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-38.jpg', alak: 'fekvo', pos: '55% 45%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-41.jpg', alak: 'allo', pos: '50% 60%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-40.jpg', alak: 'fekvo', pos: '55% 60%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-26.jpg', alak: 'allo', pos: '50% 35%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-29.jpg', alak: 'fekvo', pos: '60% 50%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-21.jpg', alak: 'fekvo', pos: '50% 55%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-23.jpg', alak: 'fekvo', pos: '40% 50%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-27.jpg', alak: 'fekvo', pos: '50% 45%', forras: FORRAS_SZAKAG },
-        { src: 'kepek/tavlovas-1.jpg', alak: 'fekvo', pos: '45% 50%' },
-        { src: 'kepek/tavlovas-13.jpg', alak: 'fekvo', pos: '58% 45%' },
-        { src: 'kepek/tavlovas-2.jpg', alak: 'allo', pos: '52% 40%' },
-        { src: 'kepek/tavlovas-14.jpg', alak: 'negyzet', pos: '40% 30%' },
-        { src: 'kepek/tavlovas-9.jpg', alak: 'allo', pos: '45% 30%' },
-        { src: 'kepek/tavlovas-18.jpg', alak: 'negyzet', pos: '50% 30%' },
-        { src: 'kepek/tavlovas-5.jpg', alak: 'allo', pos: '50% 55%' },
-        { src: 'kepek/tavlovas-10.jpg', alak: 'allo', pos: '55% 30%' },
-        { src: 'kepek/tavlovas-15.jpg', alak: 'allo', pos: '50% 60%' },
-        { src: 'kepek/tavlovas-3.jpg', alak: 'allo', pos: '45% 45%' },
-        { src: 'kepek/tavlovas-7.jpg', alak: 'csoport', pos: '50% 10%' },
-        { src: 'kepek/tavlovas-19.jpg', alak: 'negyzet', pos: '50% 35%' },
-        { src: 'kepek/tavlovas-6.jpg', alak: 'allo', pos: '50% 35%' },
-        { src: 'kepek/tavlovas-16.jpg', alak: 'allo', pos: '40% 45%' },
-        { src: 'kepek/tavlovas-8.jpg', alak: 'allo', pos: '38% 60%' }
+        { src: 'kepek/tavlovas-24.jpg', alak: 'fekvo', pos: '38% 60%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-25.jpg', alak: 'fekvo', pos: '55% 55%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-28.jpg', alak: 'fekvo', pos: '45% 45%', forras: FORRAS_SZAKAG }
     ];
     let ujSliderIndex = 0, ujSliderId = null;
 
