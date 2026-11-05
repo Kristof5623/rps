@@ -10796,7 +10796,7 @@
     // a fájlok a kepek/ mappában maradtak.) A "forras" a jobb felső sarokban, a mostani képhez igazodva.
     const FORRAS_SZAKAG = 'Fotó: Magyar Távlovagló és Távhajtó Szakág';
     const UJ_KEPEK = [
-        { src: 'kepek/tavlovas-30.jpg', alak: 'fekvo', pos: '35% 55%', forras: FORRAS_SZAKAG },
+        { src: 'kepek/tavlovas-30.jpg', alak: 'fekvo', pos: '35% 55%', forras: FORRAS_SZAKAG, azonos: ['10235558290886121'] },
         { src: 'kepek/tavlovas-33.jpg', alak: 'allo', pos: '55% 70%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-32.jpg', alak: 'fekvo', pos: '50% 55%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-31.jpg', alak: 'allo', pos: '40% 92%', forras: FORRAS_SZAKAG },
@@ -10817,7 +10817,27 @@
         { src: 'kepek/tavlovas-25.jpg', alak: 'fekvo', pos: '55% 55%', forras: FORRAS_SZAKAG },
         { src: 'kepek/tavlovas-28.jpg', alak: 'fekvo', pos: '45% 45%', forras: FORRAS_SZAKAG }
     ];
-    let ujSliderIndex = 0, ujSliderId = null;
+    let ujSliderIndex = 0, ujSliderId = null, ujHeroLista = UJ_KEPEK;
+    // A képváltóban ne legyen az a fotó, ami a kezdőlapon látszó (legutóbbi, legfeljebb 4) hír borítója - különben
+    // ugyanaz a kép kétszer jelenik meg. Helyi kép: a saját borító nélküli hírek tartalékképe (hatterKep), vagy amit a
+    // saját hírhez választottak; tavlovasok.hu-s borító: az UJ_KEPEK „azonos” mezője mondja meg (a fájlnév egy
+    // darabja), melyik saját képünk ugyanaz a fotó. Ha a hír lekerül a 4 közül, a kép magától visszajön.
+    function hirBoritok() {
+        const sajat = hirekRendezve().slice(0, 3);
+        const tav = (tavHirek || []).slice(0, Math.max(1, 4 - sajat.length));
+        const helyi = new Set(), tavoli = [];
+        sajat.forEach(h => { const k = sajatHirKep(h); if (/^https:/.test(k)) tavoli.push(k); else if (k) helyi.add(k); });
+        tav.forEach(p => {
+            if (p.kep) tavoli.push(p.kep, p.kepNagy || '');
+            else { const t = hatterKep('tav' + (p.id || p.cim)); if (t) helyi.add(t.src); }
+        });
+        return { helyi, tavoli };
+    }
+    function heroKepek() {
+        const b = hirBoritok();
+        const lista = UJ_KEPEK.filter(k => !b.helyi.has(k.src) && !(k.azonos || []).some(f => b.tavoli.some(u => u && u.includes(f))));
+        return lista.length >= 5 ? lista : UJ_KEPEK;
+    }
 
     function ujSliderMutat(i) {
         const kepek = document.querySelectorAll('#uj-hero .uj-hero-kep');
@@ -10834,7 +10854,7 @@
         document.getElementById('uj-hero')?.classList.toggle('csoport-aktiv', kepek[ujSliderIndex].classList.contains('alak-csoport'));
         document.querySelectorAll('#uj-hero .uj-pont').forEach((p, j) => p.classList.toggle('aktiv', j === ujSliderIndex));
         const forras = document.getElementById('uj-hero-forras');
-        if (forras) forras.textContent = (UJ_KEPEK[ujSliderIndex] && UJ_KEPEK[ujSliderIndex].forras) || 'Fotó: tavlovasok.hu';
+        if (forras) forras.textContent = (ujHeroLista[ujSliderIndex] && ujHeroLista[ujSliderIndex].forras) || 'Fotó: tavlovasok.hu';
     }
     function ujSliderLep(d) { ujSliderMutat(ujSliderIndex + d); ujSliderIdozit(); }
 
@@ -10909,17 +10929,22 @@
         }
 
         // A képváltót csak egyszer rakjuk ki (különben minden élő adatváltozás az első képre ugratná),
-        // utána csak a rajta lévő szöveget és az alatta lévő szekciókat frissítjük.
+        // utána csak a rajta lévő szöveget és az alatta lévő szekciókat frissítjük. Újra csak akkor, ha a
+        // hírek borítói miatt más képek kellenek bele (pl. a tavlovasok.hu hírei betöltődtek).
+        const heroLista = heroKepek(), heroKulcs = heroLista.map(k => k.src).join('|');
+        const regiHero = document.getElementById('uj-hero');
+        if (regiHero && regiHero.dataset.kulcs !== heroKulcs) { clearInterval(ujSliderId); cont.innerHTML = ''; }
         if (!document.getElementById('uj-hero')) {
-            cont.innerHTML = `<section id="uj-hero" class="uj-hero" onmouseenter="clearInterval(ujSliderId)" onmouseleave="ujSliderIdozit()">
-                ${UJ_KEPEK.map((k, i) => `<div class="uj-hero-kep alak-${k.alak} ${i === 0 ? 'aktiv' : ''}" data-src="${k.src}" ${i === 0 ? 'data-betoltve="1"' : ''} style="--pos:${k.pos};">
+            ujHeroLista = heroLista;
+            cont.innerHTML = `<section id="uj-hero" class="uj-hero" data-kulcs="${escapeHtml(heroKulcs)}" onmouseenter="clearInterval(ujSliderId)" onmouseleave="ujSliderIdozit()">
+                ${ujHeroLista.map((k, i) => `<div class="uj-hero-kep alak-${k.alak} ${i === 0 ? 'aktiv' : ''}" data-src="${k.src}" ${i === 0 ? 'data-betoltve="1"' : ''} style="--pos:${k.pos};">
                     <div class="uj-hero-hatter"${i === 0 ? ` style="background-image:url('${k.src}')"` : ''}></div><div class="uj-hero-elo"${i === 0 ? ` style="background-image:url('${k.src}')"` : ''}></div></div>`).join('')}
                 <div class="uj-hero-arnyek"></div>
                 <div class="uj-hero-szoveg" id="uj-hero-szoveg"></div>
                 <button class="uj-hero-nyil bal" onclick="ujSliderLep(-1)" aria-label="Előző kép">‹</button>
                 <button class="uj-hero-nyil jobb" onclick="ujSliderLep(1)" aria-label="Következő kép">›</button>
-                <div class="uj-hero-pontok">${UJ_KEPEK.map((_, i) => `<button class="uj-pont ${i === 0 ? 'aktiv' : ''}" onclick="ujSliderMutat(${i}); ujSliderIdozit()" aria-label="${i + 1}. kép"></button>`).join('')}</div>
-                <div class="uj-hero-forras" id="uj-hero-forras">${escapeHtml(UJ_KEPEK[0].forras || 'Fotó: tavlovasok.hu')}</div>
+                <div class="uj-hero-pontok">${ujHeroLista.map((_, i) => `<button class="uj-pont ${i === 0 ? 'aktiv' : ''}" onclick="ujSliderMutat(${i}); ujSliderIdozit()" aria-label="${i + 1}. kép"></button>`).join('')}</div>
+                <div class="uj-hero-forras" id="uj-hero-forras">${escapeHtml(ujHeroLista[0].forras || 'Fotó: tavlovasok.hu')}</div>
             </section><div id="kezdolap-szekciok"></div>`;
             ujSliderIndex = 0;
             ujSliderIdozit();
