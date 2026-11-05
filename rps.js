@@ -11231,6 +11231,10 @@
     }
 
     function verzioFigyelesInditas() {
+        // A frissítés a címhez ?v=… toldalékot tesz (hogy ne a gyorsítótárból jöjjön az oldal) - betöltés után
+        // kivesszük a címsorból, különben ezzel a címmel osztanák meg az oldalt, és a Facebook / Messenger új,
+        // még nem látott linknek venné (az első megosztásnál kép nélküli előnézettel).
+        try { const u = new URL(location.href); if (u.searchParams.has('v')) { u.searchParams.delete('v'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } } catch (e) {}
         const jel = document.getElementById('app-verzio-szam');
         if (jel) jel.textContent = APP_VERZIO ? 'v' + APP_VERZIO : 'helyi';
         if (!APP_VERZIO) return;
