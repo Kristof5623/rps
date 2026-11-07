@@ -13624,7 +13624,7 @@
         'Hibát találtál? Ötleted van?': 'Found a problem? Have an idea?', 'Mi a hiba / mi az ötleted?': 'What is the problem / your idea?', 'Küldés': 'Send',
         'Elérhetőség': 'Contact', 'Eredménykártya (kép) a megosztáshoz': 'Result card (image) to share', 'Frissítés elérhető': 'Update available', 'Mentsd el a munkádat, mielőtt frissítesz.': 'Save your work before you refresh.',
         'Frissítés': 'Refresh', 'Később': 'Later', 'Impresszum': 'Legal notice', 'Adatvédelmi tájékoztató': 'Privacy notice', 'Kapcsolat': 'Contact', 'Üzemeltető': 'Operator',
-        'Kapcsolat (versenyszervezés, bérlés)': 'Contact (race organising, hire)', 'Leggyorsabb kör': 'Fastest loop', 'Menetidő · km/h': 'Ride time · km/h', 'Hiba vagy ötlet': 'Problem or idea',
+        'Kapcsolat (bérlés)': 'Contact (hire)', 'Leggyorsabb kör': 'Fastest loop', 'Menetidő · km/h': 'Ride time · km/h', 'Hiba vagy ötlet': 'Problem or idea',
         'Valami nem működik, vagy van egy jó ötleted? Írd meg nekünk – csak az oldal kezelői látják.': 'Something not working, or got a good idea? Tell us – only the site managers see it.',
         'Hibát találtam': 'I found a problem', 'Ötletem van': 'I have an idea', 'Üzenet': 'Message',
         'Mi nem működik? Mit csináltál előtte, és mi történt helyette?': 'What is not working? What did you do before, and what happened instead?',
@@ -13897,7 +13897,7 @@
             const reszek = [];
             if (tel) reszek.push(`<a href="${esc(tel.link)}" translate="no">${esc(tel.kiir)}</a>`);
             if (email) reszek.push(`<a href="mailto:${esc(email)}" translate="no">${esc(email)}</a>`);
-            kap.innerHTML = reszek.length ? `<span>Kapcsolat (versenyszervezés, bérlés):</span> ${reszek.join(' · ')}` : '';
+            kap.innerHTML = reszek.length ? `<span>Kapcsolat (bérlés):</span> ${reszek.join(' · ')}` : '';
             kap.hidden = !reszek.length;
         }
     }
