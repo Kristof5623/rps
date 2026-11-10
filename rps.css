@@ -2731,7 +2731,8 @@ body.lablec-nelkul .main-wrapper > .container { margin-bottom: 0; }
 .hiba-kuldo b { color: var(--text); }
 .hiba-eszkoz { margin-top: 4px; color: var(--text-dim); font-size: 0.76rem; }
 .hiba-eszkoz summary { cursor: pointer; user-select: none; }
-.hiba-eszkoz p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.hiba-eszkoz p { margin: 4px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.55; }
+.hiba-eszkoz-rovid { font-weight: 400; opacity: .85; }
 .hiba-kezeles button.calc-btn.kicsi { padding: 7px 14px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border-color: var(--primary); color: var(--primary); }
 /* lebegő „Hiba / ötlet” gomb (a koli rádió mintájára): jobb alul, visszafogottan; telefonon kisebb, az alsó
    fülsáv fölött. A stáb oldalain, TV módban és amíg a nyelvajánló sáv látszik, nincs. */

@@ -1782,6 +1782,7 @@
                 <p><b>Hol tároljuk?</b> A Google Firebase szolgáltatásában (adatbázis és belépés). A versenyeredmények (lovas, ló, idők) a
                     versenyszabályzat szerint nyilvánosak - ezek nem a fiókodhoz tartoznak.</p>
                 <p><b>Látogatottság:</b> a Cloudflare Web Analytics sütik nélkül, személyes azonosítás nélkül számolja a látogatásokat.</p>
+                <p><b>Hiba vagy ötlet küldésekor</b> a hibakereséshez az eszköz technikai adatai is elmennek (rendszer, böngésző, ha a böngésző megadja, a készülék típusa, képernyő, nyelv, hálózat típusa, az app verziója, az oldal, ahol jártál, és az esetleges programhibák). Nevet, helyet, IP-címet nem gyűjtünk; ezeket csak az oldal kezelői látják.</p>
                 <p><b>Meddig?</b> Amíg a fiókod megvan. A <b>Fiók → Fiók törlése</b> gombbal bármikor törölheted - ekkor a profilod, a követéseid és
                     a szurkolásaid is törlődnek. Kérdés esetén ${email ? `írj a ${escapeHtml(email)} címre` : 'keresd az adatkezelőt'}.</p>
                 <p><b>Jogaid:</b> hozzáférés, helyesbítés, törlés, tiltakozás; panasszal a Nemzeti Adatvédelmi és Információszabadság Hatósághoz (NAIH) fordulhatsz.</p>`;
@@ -12719,7 +12720,6 @@
             ${kuldo ? `<p class="hiba-belepve">Belépve küldöd mint <b translate="no">${esc(kuldo.nev)}</b>${kuldo.email ? ` <span translate="no">(${esc(kuldo.email)})</span>` : ''} – ha kérdésünk van, tudjuk, kit keressünk.</p>`
                 : `<label for="hiba-kapcsolat">Neved vagy elérhetőséged <small>(nem kötelező – e-mail vagy telefon, ha válaszolhatunk)</small></label>
             <input type="text" id="hiba-kapcsolat" maxlength="200" autocomplete="email">`}
-            <label class="hiba-pipa"><input type="checkbox" id="hiba-technikai" checked> <span>Eszköz adatainak csatolása <small>(verzió, böngésző, képernyőméret – segít megtalálni a hibát)</small></span></label>
             <div class="reszlet-gombok"><button class="calc-btn" id="hiba-kuld-gomb" onclick="hibaJelentesKuld('${esc(aktiv)}')">Küldés</button></div>
         </div>`;
         hibaTipusValt(hibaTipusValasztott);
@@ -12749,7 +12749,64 @@
         try { idok = JSON.parse(localStorage.getItem('rps-hibajelentes-idok') || '[]'); } catch (e) {}
         return (Array.isArray(idok) ? idok : []).filter(t => typeof t === 'number' && Date.now() - t < HIBA_KORLAT.ido);
     }
-    function hibaJelentesKuld(oldal) {
+    // Az eszköz részletes technikai adatai a hibakereséshez - mindig mennek a hibával / ötlettel, de csak az oldal
+    // kezelői látják (Hibák és ötletek). Személyes adat nincs benne (név, hely, IP-cím nem). Az utolsó programhibák
+    // az oldalon (legfeljebb 5) is mennek - ez segít a legtöbbet megtalálni, mi romlott el.
+    const HIBA_JS_HIBAK = [];
+    function hibaJsHibaRogzit(szoveg) {
+        HIBA_JS_HIBAK.push(new Date().toLocaleTimeString('hu-HU') + ' ' + String(szoveg || '').replace(/\s+/g, ' ').slice(0, 160));
+        if (HIBA_JS_HIBAK.length > 5) HIBA_JS_HIBAK.shift();
+    }
+    if (typeof window.addEventListener === 'function') {
+    window.addEventListener('error', e => hibaJsHibaRogzit(`${e.message || 'hiba'} @${String(e.filename || '').split('/').pop().split('?')[0]}:${e.lineno || ''}`));
+    window.addEventListener('unhandledrejection', e => hibaJsHibaRogzit('(promise) ' + ((e.reason && (e.reason.message || e.reason.code)) || e.reason || '')));
+    }
+    function hibaRendszer(ua, ch) {
+        let m;
+        if ((m = /Android ([\d.]+)/.exec(ua))) return 'Android ' + m[1];
+        if (/iPhone|iPad|iPod/.test(ua) && (m = /OS (\d+)[_.](\d+)/.exec(ua))) return (/iPad/.test(ua) ? 'iPadOS ' : 'iOS ') + m[1] + '.' + m[2];
+        if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'iPadOS (asztali módban)';
+        if (/Windows NT 10/.test(ua)) return ch && parseInt(ch.platformVersion, 10) >= 13 ? 'Windows 11' : 'Windows 10/11';
+        if ((m = /Windows NT ([\d.]+)/.exec(ua))) return 'Windows NT ' + m[1];
+        if ((m = /Mac OS X ([\d_]+)/.exec(ua))) return 'macOS ' + m[1].replace(/_/g, '.');
+        if (/CrOS/.test(ua)) return 'ChromeOS';
+        if (/Linux/.test(ua)) return 'Linux';
+        return '?';
+    }
+    function hibaBongeszo(ua) {
+        const minta = [[/FBAN|FBAV/, 'Facebook app böngészője'], [/Instagram/, 'Instagram app böngészője'], [/EdgA?\/(\d+)/, 'Edge '], [/SamsungBrowser\/(\d+)/, 'Samsung Internet '],
+            [/OPR\/(\d+)/, 'Opera '], [/CriOS\/(\d+)/, 'Chrome (iOS) '], [/FxiOS\/(\d+)/, 'Firefox (iOS) '], [/Chrome\/(\d+)/, 'Chrome '], [/Firefox\/(\d+)/, 'Firefox '], [/Version\/(\d+[.\d]*).*Safari/, 'Safari ']];
+        for (const [re, nev] of minta) { const m = re.exec(ua); if (m) return nev + (m[1] || ''); }
+        return '?';
+    }
+    async function hibaEszkozAdat(oldal) {
+        const ua = String(navigator.userAgent || '');
+        let ch = null;
+        try {
+            if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+                ch = await Promise.race([navigator.userAgentData.getHighEntropyValues(['model', 'platformVersion']), new Promise(r => setTimeout(() => r(null), 800))]);
+            }
+        } catch (e) {}
+        const s = window.screen || {};
+        const app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+        const mobil = navigator.userAgentData ? navigator.userAgentData.mobile : /Mobi|Android|iPhone/.test(ua);
+        const tipus = mobil ? 'telefon' : (navigator.maxTouchPoints > 1 && Math.min(s.width || 0, s.height || 0) >= 600 ? 'tablet' : 'számítógép');
+        const kapcs = navigator.connection || {};
+        const sorok = [
+            `Rendszer: ${hibaRendszer(ua, ch)}${ch && ch.model ? ' · modell: ' + ch.model : ''} · ${tipus}`,
+            `Böngésző: ${hibaBongeszo(ua)} · ${app ? 'telepített app (főképernyőről)' : 'böngészőben'}`,
+            `Képernyő: ${s.width || '?'}×${s.height || '?'} (${window.devicePixelRatio || 1}x) · ablak ${window.innerWidth}×${window.innerHeight} · ${window.innerWidth > window.innerHeight ? 'fekvő' : 'álló'}${navigator.maxTouchPoints > 0 ? ' · érintőképernyő' : ''}`,
+            `Nyelv: ${navigator.language || '?'} · az oldal nyelve: ${typeof NYELV !== 'undefined' ? NYELV : '?'} · időzóna: ${Intl.DateTimeFormat().resolvedOptions().timeZone || '?'}`,
+            `Téma: ${document.documentElement.getAttribute('data-theme') || 'default'}${document.documentElement.className ? ' (' + document.documentElement.className + ')' : ''}`,
+            `Hálózat: ${navigator.onLine === false ? 'OFFLINE' : 'online'}${kapcs.effectiveType ? ' · ' + kapcs.effectiveType : ''}${kapcs.downlink ? ' · ~' + kapcs.downlink + ' Mbit/s' : ''}${kapcs.saveData ? ' · adatforgalom-kímélő' : ''} · adatbázis: ${typeof kapcsolat !== 'undefined' && kapcsolat.online === false ? 'NINCS KAPCSOLAT' : 'kapcsolódva'}`,
+            `Hardver: ${navigator.hardwareConcurrency || '?'} mag${navigator.deviceMemory ? ' · ' + navigator.deviceMemory + ' GB memória' : ''}`,
+            `Belépve: ${aktivSzerep ? (aktivSzerep === 'guest' ? 'igen (néző)' : aktivSzerep) : 'nem'} · nézet: ${oldal || '?'}${liveRaceMeta ? ' · élő verseny: ' + (liveRaceMeta.name || 'van') : ''}`,
+            `Idő: ${new Date().toLocaleString('hu-HU')} · app v${APP_VERZIO || 'helyi'}`,
+            `Utolsó programhibák: ${HIBA_JS_HIBAK.length ? '\n  ' + HIBA_JS_HIBAK.join('\n  ') : 'nincs'}`
+        ];
+        return sorok.join('\n').slice(0, 2000);
+    }
+    async function hibaJelentesKuld(oldal) {
         const szoveg = (document.getElementById('hiba-szoveg')?.value || '').trim().slice(0, 2000);
         if (szoveg.length < 5) { showToast('Írj legalább pár szót, hogy tudjuk, miről van szó.', true); return; }
         const idok = hibaKorlatIdok();
@@ -12767,19 +12824,25 @@
             if (kapcsolat) adat.kapcsolat = kapcsolat;
         }
         if (oldal) adat.oldal = String(oldal).slice(0, 80);
-        if (document.getElementById('hiba-technikai')?.checked) {
-            adat.verzio = String(APP_VERZIO || '').slice(0, 20);
-            adat.ua = String(navigator.userAgent || '').slice(0, 400);
-            adat.kepernyo = `${window.innerWidth}x${window.innerHeight}${window.matchMedia && matchMedia('(display-mode: standalone)').matches ? ' app' : ''}`.slice(0, 40);
-        }
+        // az eszköz adatai mindig mennek (csak a kezelők látják) - l. hibaEszkozAdat
+        adat.verzio = String(APP_VERZIO || '').slice(0, 20);
+        adat.ua = String(navigator.userAgent || '').slice(0, 400);
+        adat.kepernyo = `${window.innerWidth}x${window.innerHeight}${window.matchMedia && matchMedia('(display-mode: standalone)').matches ? ' app' : ''}`.slice(0, 40);
         const gomb = document.getElementById('hiba-kuld-gomb');
         if (gomb) { gomb.disabled = true; gomb.textContent = 'Küldés…'; }
+        try { adat.eszkoz = await hibaEszkozAdat(oldal); } catch (e) {}
         const ref = db.ref('hibajelentesek').push();
+        const tiltva = e => /permission|denied/i.test(String(e && (e.code || e.message)));
         ref.set(adat).catch(e => {
+            // még nincs közzétéve az új szabály (eszkoz mező): nélküle
+            if (!tiltva(e) || !adat.eszkoz) throw e;
+            const k = Object.assign({}, adat); delete k.eszkoz;
+            return ref.set(k);
+        }).catch(e => {
             // még a régi szabályok vannak fent (nincs tipus / kuldo mező): nélkülük, az ötletet a szöveg jelöli
-            if (!/permission|denied/i.test(String(e && (e.code || e.message)))) throw e;
+            if (!tiltva(e)) throw e;
             const regi = Object.assign({}, adat);
-            delete regi.tipus; delete regi.kuldo;
+            delete regi.tipus; delete regi.kuldo; delete regi.eszkoz;
             if (tipus === 'otlet') regi.szoveg = ('[Ötlet] ' + szoveg).slice(0, 2000);
             return ref.set(regi);
         }).then(() => {
@@ -12846,7 +12909,8 @@
         const ido = t => new Date(t || 0).toLocaleString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         const kartya = h => {
             const tip = hibaTipusa(h), nyitott = h.allapot === 'uj' || h.allapot === 'folyamatban', id = esc(h.id);
-            const eszkoz = [h.verzio ? 'v' + esc(h.verzio) : '', h.kepernyo ? esc(h.kepernyo) : ''].filter(Boolean).join(' · ');
+            const eszkoz = h.eszkoz ? esc(h.eszkoz) : [h.verzio ? 'v' + esc(h.verzio) : '', h.kepernyo ? esc(h.kepernyo) : ''].filter(Boolean).join(' · ');
+            const eszkozRovid = h.eszkoz ? esc(String(h.eszkoz).split('\n').slice(0, 2).map(s => s.replace(/^[^:]+:\s*/, '')).join(' · ').slice(0, 110)) : '';
             return `<article class="hiba-kartya tipus-${tip} allapot-${esc(h.allapot)}">
                 <div class="hiba-fej">
                     <span class="hiba-jel ${tip}">${HIBA_IKON[tip]}${HIBA_TIPUS[tip].jel}</span>
@@ -12855,7 +12919,7 @@
                 </div>
                 <p class="hiba-szoveg">${esc(hibaSzovege(h))}</p>
                 <p class="hiba-kuldo"><span>Küldte: ${kuldte(h)}</span>${h.oldal ? `<span>Oldal: ${esc(hibaOldalNev(h.oldal))}</span>` : ''}</p>
-                ${eszkoz || h.ua ? `<details class="hiba-eszkoz"><summary>Eszköz adatai</summary><p>${eszkoz}${h.ua ? `${eszkoz ? '<br>' : ''}${esc(h.ua)}` : ''}</p></details>` : ''}
+                ${eszkoz || h.ua ? `<details class="hiba-eszkoz"><summary>Eszköz adatai${eszkozRovid ? ` <span class="hiba-eszkoz-rovid">– ${eszkozRovid}</span>` : ''}</summary><p>${eszkoz}${h.ua ? `${eszkoz ? '<br>' : ''}${esc(h.ua)}` : ''}</p></details>` : ''}
                 <div class="hiba-kezeles">
                     ${nyitott ? `<button class="calc-btn kicsi" onclick="hibaAllapot('${id}', 'kesz')">Megoldva</button>
                         ${h.allapot === 'uj' ? `<button class="edit-btn" onclick="hibaAllapot('${id}', 'folyamatban')">Folyamatban</button>` : ''}
