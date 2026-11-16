@@ -31,7 +31,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="142">
+    <meta name="app-verzio" content="143">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,7 +41,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=142">
+    <link rel="stylesheet" href="rps.css?v=143">
 </head>
 <body>
 
@@ -318,12 +318,10 @@
                 </select>
             </div>
             <div class="nyom-nyelv">
-                <label for="nyom-nyelv">Matrica nyelve:</label>
-                <select id="nyom-nyelv" onchange="matricaNyelvValt(this.value)">
-                    <option value="auto">Automatikus – külföldi versenyzőnél angol</option>
-                    <option value="hu">Mindig magyar</option>
-                    <option value="en">Always English</option>
-                </select>
+                <span>Matrica nyelve:</span>
+                <button type="button" id="nyom-nyelv" class="nyelv-kapcsolo" role="switch" aria-checked="false" aria-label="Matrica nyelve: angol" onclick="matricaNyelvValt()">
+                    <span class="nk-hu">Magyar</span><span class="nk-en">English</span>
+                </button>
                 <small id="nyom-nyelv-jel"></small>
             </div>
 
@@ -338,7 +336,7 @@
             <h3 style="color:var(--primary); margin-bottom: 15px;">Versenyek</h3>
             <div class="tabs">
                 <button id="btn-v-mult" class="tab-btn" onclick="switchVersenyekTab('v-mult', this)">Múltbéli verseny</button>
-                <button id="btn-v-jovo" class="tab-btn active" onclick="switchVersenyekTab('v-jovo', this)">Jövőbeli verseny</button>
+                <button id="btn-v-jovo" class="tab-btn active" onclick="switchVersenyekTab('v-jovo', this)">Jövőbeli verseny és esemény</button>
                 <button id="btn-v-jelen" class="tab-btn" onclick="switchVersenyekTab('v-jelen', this)">Jelenlegi verseny</button>
                 <button id="btn-v-terkep" class="tab-btn" onclick="switchVersenyekTab('v-terkep', this)">Térkép</button>
                 <button id="btn-v-stat" class="tab-btn" onclick="switchVersenyekTab('v-stat', this)">Statisztika</button>
@@ -1218,7 +1216,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=142"></script>
+<script src="rps.js?v=143"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

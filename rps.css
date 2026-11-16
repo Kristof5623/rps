@@ -2578,6 +2578,20 @@ button.calc-btn {
 .hir-kartya.nagy .uj-link { color: #fff; margin-top: 4px; }
 .hir-kartya.nagy .hir-cim-link:hover { color: #7ee2b3; }
 .hir-kartya.nagy .hir-lab small { color: rgba(255,255,255,.7); }
+/* kezdőlap: gépen a nagy kártya alatt egy sorban 4, keskenyebb képernyőn 2+2, telefonon csak a nagy + 2 (kevesebb görgetés) */
+.hir-kartyak.kezdo { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .hir-kartyak.kezdo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+    .hir-kartyak.kezdo { grid-template-columns: 1fr; gap: 10px; }
+    .hir-kartyak.kezdo > .hir-kartya:nth-child(n+4) { display: none; }
+    /* a nagy alatti két hír tömör sor: kép balra, cím jobbra (kivonat nélkül) */
+    .hir-kartyak.kezdo > .hir-kartya:not(.nagy) { flex-direction: row; min-height: 92px; }
+    .hir-kartyak.kezdo > .hir-kartya:not(.nagy) .hir-kep { width: 108px; aspect-ratio: auto; align-self: stretch; }
+    .hir-kartyak.kezdo > .hir-kartya:not(.nagy) .hir-cimke, .hir-kartyak.kezdo > .hir-kartya:not(.nagy) p { display: none; }
+    .hir-kartyak.kezdo > .hir-kartya:not(.nagy) .hir-tartalom { padding: 9px 12px; gap: 3px; }
+    .hir-kartyak.kezdo > .hir-kartya:not(.nagy) h4 { font-size: 0.93rem; }
+    .hir-kartyak.kezdo > .hir-kartya:not(.nagy) .uj-link { font-size: 0.8rem; }
+}
 /* telefonon a nagy kártya is sima kártya: kép felül, szöveg alatta - a képre írt szöveg ott nehezen olvasható,
    és hosszabb címnél a dátum felcsúszott a kép bal felső sarkában lévő címkére (tavlovasok.hu) */
 @media (max-width: 600px) {
@@ -2635,10 +2649,19 @@ button.calc-btn {
     padding: 10px 14px; box-shadow: var(--shadow-lg, 0 10px 30px rgba(0,0,0,.35)); font-size: 0.88rem; text-align: center; }
 #nyelv-ajanlo span { flex: 1 1 100%; }
 #nyelv-ajanlo .calc-btn { width: auto; margin: 0; }
-.nyom-nyelv { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: -4px 0 12px; }
-.nyom-nyelv label { margin: 0; }
-.nyom-nyelv select { width: auto; max-width: 100%; min-width: 0; flex: 0 1 auto; margin: 0; }
-.nyom-nyelv small { color: var(--primary); font-weight: 700; }
+.nyom-nyelv { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: -4px 0 12px; color: var(--text); }
+.nyom-nyelv small { color: var(--text-dim); font-size: 0.8rem; }
+/* Magyar | English kapcsoló: a kék csúszka a kiválasztott nyelv alatt áll */
+.nyelv-kapcsolo { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 3px; margin: 0; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--card); color: var(--text-dim); font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.nyelv-kapcsolo::before { content: ''; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: var(--primary);
+    transition: transform .2s var(--ease); }
+.nyelv-kapcsolo[aria-checked="true"]::before { transform: translateX(100%); }
+.nyelv-kapcsolo span { position: relative; padding: 5px 14px; text-align: center; transition: color .2s; }
+.nyelv-kapcsolo[aria-checked="false"] .nk-hu, .nyelv-kapcsolo[aria-checked="true"] .nk-en { color: #fff; }
+.nyelv-kapcsolo:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* telefonon a matrica előnézete szélesebb a képernyőnél: oldalra görgethető legyen, ne lógjon le (nyomtatáskor nem számít) */
+@media screen { #print-sticker { overflow-x: auto; -webkit-overflow-scrolling: touch; } }
 
 /* v129: megosztás gomb a profil versenyeredményein */
 .eredmeny-megoszt { align-self: flex-end; margin-top: 6px; background: var(--primary-dim); color: var(--primary); border: 1px solid transparent; border-radius: 999px;
