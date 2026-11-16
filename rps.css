@@ -2493,6 +2493,18 @@ button.calc-btn {
 .osszen-tabla td small { color: var(--text-dim); font-weight: 600; }
 @media (max-width: 480px) { .osszen-tabla th, .osszen-tabla td { padding: 9px 5px; font-size: 0.8rem; } .osszen-tabla tbody th { width: 34%; } .osszen-tabla thead th:first-child { width: 34%; } }
 .osszen-tabla td.jobb { color: var(--success); font-weight: 800; }
+.osszen-tabla tbody th small { font-weight: 500; }
+.osszen-evek { align-items: center; }
+.osszen-evek > span { color: var(--text-dim); font-size: 0.82rem; font-weight: 600; margin-right: 2px; }
+.osszen-tabla thead th.osszen-idoszak { text-align: left; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.osszen-tabla .osszen-szakasz th { width: auto; padding-top: 18px; color: var(--text); font-weight: 800; background: none; border-bottom: 1px solid var(--border); }
+.osszen-tabla .osszen-szakasz th small { color: var(--text-dim); font-weight: 500; }
+/* utolsó 5 verseny: kis jelek (helyezés / ✓ teljesítette / ✕ kiesett) */
+.forma { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+.forma-jel { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 5px; border-radius: 6px; font-size: 0.74rem; font-weight: 800;
+    background: var(--card-2); border: 1px solid var(--border); color: var(--text); cursor: default; }
+.forma-jel.dobogo { background: var(--success-dim); border-color: transparent; color: var(--success); }
+.forma-jel.ki { background: var(--danger-dim); border-color: transparent; color: var(--danger); }
 .szezon-osszefoglalo .stat-racs { margin: 10px 0; }
 
 /* v129: RFID-állapot, mentések, hibajelentő, adatminőség, hírek */
@@ -2724,6 +2736,24 @@ body.lablec-nelkul .main-wrapper > .container { margin-bottom: 0; }
 .es-datumok > div { min-width: 0; }
 .es-datumok input { width: 100%; min-width: 0; }
 .es-tipus:has(input:checked) { border-color: var(--primary); color: var(--text); background: var(--primary-dim); }
+/* esemény: a programok külön kezdése (űrlap) és a részleteknél az időrendi program */
+.es-sugo { display: block; color: var(--text-dim); font-size: 0.78rem; margin: 2px 0 4px; }
+.es-program-sorok { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
+.es-program-sor { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; padding: 6px 6px 6px 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--card-2); }
+.es-program-sor.tobbnapos { grid-template-columns: minmax(0, 1fr) auto auto; }
+.es-program-sor span { font-size: 0.88rem; font-weight: 600; color: var(--text); min-width: 0; }
+.es-program-sor input { margin: 0; width: auto; min-width: 0; }
+@media (max-width: 440px) {
+    .es-program-sor.tobbnapos { grid-template-columns: 1fr 1fr; }
+    .es-program-sor.tobbnapos span { grid-column: 1 / -1; }
+}
+.es-prog { align-items: flex-start; }
+.es-prog-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; text-align: right; }
+.es-prog-lista li { display: flex; justify-content: flex-end; align-items: baseline; gap: 8px; }
+.es-prog-lista time { color: var(--primary); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.es-prog-lista time small { color: var(--text-dim); font-weight: 600; }
+.race-status .es-chip-ido { font-size: inherit; font-weight: 800; opacity: .8; font-variant-numeric: tabular-nums; }
 /* hiba vagy ötlet – beküldés és fogadás (a koli rádió mintájára) */
 .hiba-tipusok { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
 .hiba-tipus-gomb { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-2);

@@ -31,7 +31,7 @@
     <link rel="apple-touch-icon" href="kepek/ikon-180.png">
     <!-- APP-VERZIÓ: minden feltöltésnél emeld eggyel (itt ÉS a három ?v= -nél lent) - a nyitva hagyott
          oldalak ebből veszik észre, hogy új verzió van fent. A szám az oldalsó menü alján is látszik. -->
-    <meta name="app-verzio" content="143">
+    <meta name="app-verzio" content="144">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,7 +41,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 
-    <link rel="stylesheet" href="rps.css?v=143">
+    <link rel="stylesheet" href="rps.css?v=144">
 </head>
 <body>
 
@@ -411,7 +411,7 @@
 
         <div id="osszehasonlitas" class="mode-content">
             <h3>Összehasonlítás</h3>
-            <p class="field-hint" style="margin-top:0;">Két lovas vagy két ló egymás mellett: versenyek, teljesítési arány, km, helyezések, leggyorsabb idő, pulzusidő – és hogyan szerepeltek, amikor ugyanazon a versenyen, ugyanazon a távon indultak.</p>
+            <p class="field-hint" style="margin-top:0;">Két lovas vagy két ló egymás mellett: versenyek, teljesítési arány, km, helyezések, távonként a legjobb idő – és hogyan szerepeltek, amikor ugyanazon a versenyen, ugyanazon a távon indultak.</p>
             <div id="osszehasonlitas-tartalom"></div>
         </div>
 
@@ -1189,13 +1189,17 @@
         <label>Megnevezés:</label>
         <input type="text" id="es-cim" maxlength="120" placeholder="pl. Szezonzáró és bajnokavató 2026">
         <label>Mi lesz? <small>(több is bejelölhető)</small></label>
-        <div id="es-tipusok" class="es-tipusok"></div>
+        <div id="es-tipusok" class="es-tipusok" onchange="esemenyProgramRajzol()"></div>
         <div class="es-datumok">
-            <div><label>Dátum:</label><input type="date" id="es-datum"></div>
-            <div><label>Utolsó nap (ha többnapos):</label><input type="date" id="es-vegDatum"></div>
+            <div><label>Dátum:</label><input type="date" id="es-datum" onchange="esemenyProgramRajzol()"></div>
+            <div><label>Utolsó nap (ha többnapos):</label><input type="date" id="es-vegDatum" onchange="esemenyProgramRajzol()"></div>
         </div>
-        <label>Kezdés (óra:perc, opcionális):</label>
-        <input type="time" id="es-ido">
+        <div class="es-datumok">
+            <div><label>Kezdés (óra:perc):</label><input type="time" id="es-ido"></div>
+            <div><label>Vége (óra:perc):</label><input type="time" id="es-vegIdo"></div>
+        </div>
+        <small class="es-sugo">Mindkettő opcionális; többnapos eseménynél a vége az utolsó napra szól.</small>
+        <div id="es-program" class="es-program"></div>
         <label>Helyszín:</label>
         <input type="text" id="es-helyszin" maxlength="150" placeholder="pl. Budapest, Lovas Szövetség">
         <label>Leírás:</label>
@@ -1216,7 +1220,7 @@
     </div>
 </div>
 
-<script src="rps.js?v=143"></script>
+<script src="rps.js?v=144"></script>
 <!-- Cloudflare Web Analytics (látogatottság - süti nélkül; a helyi tesztoldalból a teszt-oldal-keszit.js kiveszi) --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3ffb1a41d0fd484ab1ee2ed8a5967be8"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

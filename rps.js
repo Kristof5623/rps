@@ -3063,7 +3063,8 @@
     }
 
     // --- KÖZELGŐ ESEMÉNYEK (szezonzáró, közgyűlés, bajnokavató...) -------------------
-    // esemenyek/{id} = { cim, tipus, datum, vegDatum, ido, helyszin, leiras, link } - nyilvános,
+    // esemenyek/{id} = { cim, tipus, tipusok, datum, vegDatum, ido, vegIdo, program, helyszin, leiras, link } - nyilvános,
+    // program = { <típus>: { ido: 'HH:MM', nap: 'ÉÉÉÉ-HH-NN' (csak többnaposnál) } } - a bejelölt programok külön kezdése;
     // csak admin írja (tests/firebase-szabalyok.json). A Versenyek > Jövőbeli verseny és esemény fülön,
     // a térképen és a kezdőlap külön „Közelgő események” sávjában jelennek meg (a Versenynaptárban nem);
     // a lejárt esemény magától eltűnik a listákból.
@@ -3083,10 +3084,39 @@
     function kozelgoEsemenyek(ma) {
         return (localEsemenyek || []).filter(e => e && e.datum && esemenyVege(e) >= ma).sort((a, b) => a.datum.localeCompare(b.datum));
     }
+    const ORA_PERC = /^\d\d:\d\d$/, NAP_MINTA = /^\d{4}-\d\d-\d\d$/;
+    function esemenyTobbnapos(e) { return !!(e && e.vegDatum && e.datum && e.vegDatum > e.datum); }
+    // a bejelölt programok külön kezdése (csak a még bejelölt típusoké, csak érvényes érték)
+    function esemenyProgram(e) {
+        const p = e && e.program && typeof e.program === 'object' ? e.program : {};
+        const ki = {};
+        esemenyTipusok(e).forEach(k => {
+            const x = p[k] || {};
+            const ido = ORA_PERC.test(x.ido || '') ? x.ido : '';
+            const nap = esemenyTobbnapos(e) && NAP_MINTA.test(x.nap || '') ? x.nap : '';
+            if (ido || nap) ki[k] = { ido, nap };
+        });
+        return ki;
+    }
+    // a programok időrendben (aminek nincs ideje, az a nap végére, a bejelölés sorrendjében)
+    function esemenyProgramLista(e) {
+        const p = esemenyProgram(e);
+        // kulcs: nap + idő; idő nélkül 99:99 (sima karakter-összehasonlítás - a localeCompare a jeleket a számok elé tenné)
+        const kulcs = x => (x.nap || e.datum || '') + ' ' + (x.ido || '99:99');
+        return esemenyTipusok(e).map((k, i) => ({ k, i, nev: ESEMENY_TIPUSOK[k], ido: (p[k] || {}).ido || '', nap: (p[k] || {}).nap || '' }))
+            .sort((a, b) => { const ka = kulcs(a), kb = kulcs(b); return ka < kb ? -1 : ka > kb ? 1 : a.i - b.i; });
+    }
     function esemenyDatumSzoveg(e) {
-        const d = ujDatumSzoveg(e.datum);
-        if (e.vegDatum && e.vegDatum > e.datum) return `${d} – ${ujDatumSzoveg(e.vegDatum)}`;
-        return d + (e.ido ? ', ' + escapeHtml(e.ido) : '');
+        const d = `<time>${ujDatumSzoveg(e.datum)}</time>`;
+        const ido = ORA_PERC.test(e.ido || '') ? e.ido : '', veg = ORA_PERC.test(e.vegIdo || '') ? e.vegIdo : '';
+        if (esemenyTobbnapos(e)) return `${d}${ido ? ', ' + ido : ''} – <time>${ujDatumSzoveg(e.vegDatum)}</time>${veg ? ', ' + veg : ''}`;
+        return d + (ido && veg ? `, ${ido}–${veg}` : ido ? ', ' + ido : veg ? `, <span class="es-vege">vége ${veg}</span>` : '');
+    }
+    // a kártyán: „10:00–18:00” / „10:00” / „vége 18:00” (többnaposnál csak a kezdés)
+    function esemenyIdoSav(e) {
+        const ido = ORA_PERC.test(e.ido || '') ? e.ido : '', veg = ORA_PERC.test(e.vegIdo || '') ? e.vegIdo : '';
+        if (esemenyTobbnapos(e)) return ido;
+        return ido && veg ? `${ido}–${veg}` : ido || (veg ? 'vége ' + veg : '');
     }
 
     function esemenyKartyaHTML(e, ma) {
@@ -3099,9 +3129,9 @@
             <div class="rc-fo">
                 <div class="rc-datum">${ervenyes ? `<span class="rc-nap">${d.getDate()}</span><span class="rc-ho">${HONAP_ROVID[d.getMonth()]}</span><span class="rc-ev">${d.getFullYear()}</span>` : '<span class="rc-ho">?</span>'}</div>
                 <div class="rc-info">
-                    <div class="rc-felso">${esemenyTipusok(e).map(k => `<span class="race-status">${escapeHtml(ESEMENY_TIPUSOK[k])}</span>`).join('')}${hatraSz ? `<span class="rc-hatra">${hatraSz}</span>` : ''}</div>
+                    <div class="rc-felso">${esemenyProgramLista(e).map(x => `<span class="race-status">${escapeHtml(x.nev)}${x.ido ? `<small class="es-chip-ido">${x.ido}</small>` : ''}</span>`).join('')}${hatraSz ? `<span class="rc-hatra">${hatraSz}</span>` : ''}</div>
                     <h4 class="rc-cim">${escapeHtml(e.cim || 'Esemény')}</h4>
-                    <div class="rc-hely">${[e.helyszin ? '📍 ' + escapeHtml(e.helyszin) : '', e.ido ? '🕘 ' + escapeHtml(e.ido) : '', ervenyes ? HET_NAPJA[d.getDay()] : ''].filter(Boolean).join(' · ')}</div>
+                    <div class="rc-hely">${[e.helyszin ? '📍 ' + escapeHtml(e.helyszin) : '', esemenyIdoSav(e) ? '🕘 ' + escapeHtml(esemenyIdoSav(e)) : '', ervenyes ? HET_NAPJA[d.getDay()] : ''].filter(Boolean).join(' · ')}</div>
                     ${biztonsagosUrl(e.link) ? `<div class="rc-linkek"><a class="rc-link" href="${escapeHtml(e.link.trim())}" target="_blank" rel="noopener">Részletek a szervezőnél ↗</a></div>` : ''}
                 </div>
             </div>
@@ -3119,7 +3149,7 @@
         document.getElementById('infoModalTitle').innerText = e.cim || 'Esemény';
         const sor = (cimke, ertek) => ertek ? `<div class="reszlet-sor"><span>${cimke}</span><b>${ertek}</b></div>` : '';
         document.getElementById('infoModalBody').innerHTML = `<div class="reszletek">
-            ${sor(esemenyTipusok(e).length > 1 ? 'Program' : 'Típus', escapeHtml(esemenyTipusSzoveg(e)))}
+            ${esemenyProgramReszletHtml(e) || sor(esemenyTipusok(e).length > 1 ? 'Program' : 'Típus', escapeHtml(esemenyTipusSzoveg(e)))}
             ${sor('Időpont', esemenyDatumSzoveg(e))}
             ${sor('Helyszín', escapeHtml(e.helyszin || ''))}
             ${e.leiras ? `<p class="reszlet-leiras">${escapeHtml(e.leiras).replace(/\n/g, '<br>')}</p>` : ''}
@@ -3128,6 +3158,39 @@
             ${terkepHtml({ terkep: '', loc: e.helyszin })}
         </div>`;
         document.getElementById('infoModal').style.display = 'flex';
+    }
+
+    function esemenyProgramReszletHtml(e) {
+        const lista = esemenyProgramLista(e);
+        if (!lista.some(x => x.ido || x.nap)) return '';
+        const tobb = esemenyTobbnapos(e);
+        return `<div class="reszlet-sor es-prog"><span>Program</span><ul class="es-prog-lista">${lista.map(x => {
+            const nap = tobb && x.nap ? `<small>${HET_NAPJA[new Date(x.nap + 'T00:00:00').getDay()]}</small>` : '';
+            return `<li>${nap || x.ido ? `<time>${nap}${nap && x.ido ? ' ' : ''}${x.ido}</time>` : ''}<b>${escapeHtml(x.nev)}</b></li>`;
+        }).join('')}</ul></div>`;
+    }
+
+    // Űrlap: ha több program van bejelölve, mindegyiknek külön kezdés adható (többnaposnál a nap is).
+    // A beírt értékek megmaradnak, ha közben a bejelölés vagy a dátum változik (esemenyProgramMemo).
+    let esemenyProgramMemo = {};
+    function esemenyProgramRajzol() {
+        const hely = document.getElementById('es-program');
+        if (!hely) return;
+        hely.querySelectorAll('.es-program-sor').forEach(s => {
+            const nap = s.querySelector('input[type="date"]');
+            esemenyProgramMemo[s.dataset.k] = { ido: s.querySelector('input[type="time"]').value, nap: nap ? nap.value : (esemenyProgramMemo[s.dataset.k] || {}).nap || '' };
+        });
+        const tipusok = [...document.querySelectorAll('#es-tipusok input:checked')].map(c => c.value).filter(k => ESEMENY_TIPUSOK[k]);
+        if (tipusok.length < 2) { hely.innerHTML = ''; return; }
+        const d1 = document.getElementById('es-datum').value, d2 = document.getElementById('es-vegDatum').value;
+        const tobb = !!(d1 && d2 && d2 > d1);
+        hely.innerHTML = `<label>Az egyes programok kezdése <small>(ha külön időben lesznek – nem kötelező)</small></label>
+            <div class="es-program-sorok">${tipusok.map(k => {
+                const p = esemenyProgramMemo[k] || {}, nev = escapeHtml(ESEMENY_TIPUSOK[k]);
+                return `<div class="es-program-sor${tobb ? ' tobbnapos' : ''}" data-k="${k}"><span>${nev}</span>
+                    ${tobb ? `<input type="date" min="${escapeHtml(d1)}" max="${escapeHtml(d2)}" value="${escapeHtml(p.nap || '')}" aria-label="${nev} – melyik napon">` : ''}
+                    <input type="time" value="${escapeHtml(p.ido || '')}" aria-label="${nev} – kezdés"></div>`;
+            }).join('')}</div>`;
     }
 
     function esemenyUrlap(id) {
@@ -3142,6 +3205,10 @@
         ertek('es-datum', e && e.datum);
         ertek('es-vegDatum', e && e.vegDatum);
         ertek('es-ido', e && e.ido);
+        ertek('es-vegIdo', e && e.vegIdo);
+        esemenyProgramMemo = e ? JSON.parse(JSON.stringify(esemenyProgram(e))) : {};
+        document.getElementById('es-program').innerHTML = '';
+        esemenyProgramRajzol();
         ertek('es-helyszin', e && e.helyszin);
         ertek('es-leiras', e && e.leiras);
         ertek('es-link', e && e.link);
@@ -3154,11 +3221,34 @@
         const v = mezo => String(document.getElementById(mezo).value || '').trim();
         const tipusok = [...document.querySelectorAll('#es-tipusok input:checked')].map(c => c.value).filter(k => ESEMENY_TIPUSOK[k]);
         const adat = { cim: v('es-cim'), tipus: tipusok[0] || 'egyeb', tipusok: tipusok.length ? tipusok : ['egyeb'], datum: v('es-datum'), vegDatum: v('es-vegDatum'),
-            ido: v('es-ido'), helyszin: v('es-helyszin'), leiras: v('es-leiras'), link: v('es-link') };
+            ido: v('es-ido'), vegIdo: v('es-vegIdo'), helyszin: v('es-helyszin'), leiras: v('es-leiras'), link: v('es-link') };
         if (!adat.cim) { showToast('Add meg az esemény nevét!', true); return; }
         if (!tipusok.length) { showToast('Jelöld be, mi lesz az eseményen (több is lehet)!', true); return; }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(adat.datum)) { showToast('Add meg a dátumot!', true); return; }
         if (adat.vegDatum && adat.vegDatum < adat.datum) { showToast('Az utolsó nap nem lehet a kezdés előtt.', true); return; }
+        const tobb = !!(adat.vegDatum && adat.vegDatum > adat.datum);
+        if (!tobb && adat.ido && adat.vegIdo && adat.vegIdo <= adat.ido) { showToast('Az esemény vége nem lehet a kezdés előtt.', true); return; }
+        // a programok külön kezdése (csak ha több program van bejelölve)
+        const program = {};
+        let rosszNap = '';
+        if (tipusok.length > 1) document.querySelectorAll('#es-program .es-program-sor').forEach(s => {
+            const k = s.dataset.k;
+            if (!tipusok.includes(k)) return;
+            const ido = s.querySelector('input[type="time"]').value;
+            const napMezo = s.querySelector('input[type="date"]');
+            const nap = tobb && napMezo ? napMezo.value : '';
+            if (nap && (nap < adat.datum || nap > adat.vegDatum)) rosszNap = ESEMENY_TIPUSOK[k];
+            const p = {};
+            if (ORA_PERC.test(ido)) p.ido = ido;
+            if (NAP_MINTA.test(nap)) p.nap = nap;
+            if (p.ido || p.nap) program[k] = p;
+        });
+        if (rosszNap) { showToast(`A(z) „${rosszNap}” napja az esemény napjai közé essen.`, true); return; }
+        if (Object.keys(program).length) {
+            adat.program = program;
+            // ha a kezdés nincs megadva: az első napi legkorábbi program (a naptárba mentéshez és a régebbi app-változatoknak)
+            if (!adat.ido) adat.ido = Object.values(program).filter(p => p.ido && (!p.nap || p.nap === adat.datum)).map(p => p.ido).sort()[0] || '';
+        }
         if (adat.link && !biztonsagosUrl(adat.link)) { showToast('A linknek http:// vagy https:// címmel kell kezdődnie.', true); return; }
         const id = v('es-id') || (generateSlug(adat.cim, adat.datum) + '-' + Date.now().toString(36).slice(-4));
         db.ref('esemenyek/' + id).set(adat).then(() => {
@@ -3195,8 +3285,11 @@
         if (tipus === 'esemeny') {
             const e = (localEsemenyek || []).find(x => x.id === id);
             if (!e) return null;
-            return { cim: e.cim || 'Esemény', datum: e.datum, vegDatum: e.vegDatum && e.vegDatum > e.datum ? e.vegDatum : e.datum,
-                ido: e.ido || '', hely: e.helyszin || '', leiras: [e.leiras, biztonsagosUrl(e.link) ? e.link : ''].filter(Boolean).join('\n') };
+            const prog = esemenyProgramLista(e);
+            const progSzoveg = prog.some(x => x.ido || x.nap) ? 'Program:\n' + prog.map(x => [x.nap && esemenyTobbnapos(e) ? x.nap : '', x.ido, x.nev].filter(Boolean).join(' ')).join('\n') : '';
+            return { cim: e.cim || 'Esemény', datum: e.datum, vegDatum: esemenyTobbnapos(e) ? e.vegDatum : e.datum,
+                ido: ORA_PERC.test(e.ido || '') ? e.ido : '', vegIdo: ORA_PERC.test(e.vegIdo || '') ? e.vegIdo : '', hely: e.helyszin || '',
+                leiras: [progSzoveg, e.leiras, biztonsagosUrl(e.link) ? e.link : ''].filter(Boolean).join('\n') };
         }
         const r = localRaces.jovo.find(x => x.id === id) || localRaces.mult.find(x => x.id === id) || (liveRaceMeta && liveRaceMeta.id === id ? liveRaceMeta : null);
         if (!r) return null;
@@ -3214,6 +3307,12 @@
     }
     function naptarIdopontok(a) {
         const nap = s => s.replace(/-/g, '');
+        const vegNap = a.vegDatum || a.datum;
+        // kezdés és vége is megvan (az eseményeknél): pontosan addig
+        if (a.ido && a.vegIdo && (vegNap > a.datum || a.vegIdo > a.ido)) {
+            const ora = (dt, ido) => `${nap(dt)}T${ido.replace(':', '')}00`;
+            return { kezd: ora(a.datum, a.ido), veg: ora(vegNap, a.vegIdo), egesz: false };
+        }
         if (a.ido && a.vegDatum === a.datum) {
             const [h, m] = a.ido.split(':').map(Number);
             const kezd = `${nap(a.datum)}T${String(h).padStart(2, '0')}${String(m).padStart(2, '0')}00`;
@@ -11969,10 +12068,20 @@
                 .then(() => karrierFolyamatban.delete(k));
         })).then(() => { karrierVerzio++; return true; });
     }
+    // A kiesés három csoportja - a saját státuszból (FTQ-GA, WD, RET...) és a szövetségi lista szövegéből
+    function kiesesCsoport(statusz) {
+        const s = String(statusz || '').trim();
+        if (/^(WD|Visszalépett)$/i.test(s)) return 'visszalepett';
+        if (/^(RET|Feladta)$/i.test(s)) return 'feladta';
+        if (/^(FTQ|DSQ|Kizárva|Kiesett|Eliminated)/i.test(s)) return 'kizarva';
+        return 'egyeb';
+    }
+    function idoMasodperc(s) { const m = /^(\d{1,3}):(\d\d):(\d\d)$/.exec(String(s || '').trim()); return m ? m[1] * 3600 + m[2] * 60 + +m[3] : 0; }
     function karrierSorok(tipus, id, kiveveDatum) {
         id = String(id || '').trim();
         const ki = sajatSorok(tipus, id).map(s => ({ datum: s.datum, ev: s.ev, verseny: s.r.name || '', tav: s.tav, kesz: s.kesz, kiesett: s.kiesett,
-            hely: s.hely, km: s.km, tars: tipus === 'lovas' ? s.lo : s.nev, kulcs: 'r:' + s.r.id + '|' + s.dist, sajat: s }));
+            hely: s.hely, km: s.km, menetido: s.menetido, seb: s.seb, ok: s.kesz ? '' : kiesesCsoport(s.c.status || (s.c.isEliminated ? 'FTQ-ME' : '')),
+            tars: tipus === 'lovas' ? s.lo : s.nev, kulcs: 'r:' + s.r.id + '|' + s.dist, sajat: s }));
         // a szövetségi lista azon a napon nem kell akkor sem, ha nálunk nem indult el (pl. WD) - a saját adat a mérvadó
         const van = new Set(sajatSorok(tipus, id, true).map(x => x.datum + '|' + x.tav));
         (profilHivatalosCache[tipus + ':' + id] || []).forEach(e => {
@@ -11981,7 +12090,9 @@
             if (!datum || van.has(datum + '|' + tav) || datum === kiveveDatum) return;
             const kesz = !e.status;
             const hely = /^\d+$/.test(String(e.place || '').trim()) ? parseInt(e.place, 10) : null;
+            const menetido = kesz ? idoMasodperc(e.time) : 0, pontosKm = parseFloat(e.distanceKm) || 0;
             ki.push({ datum, ev: String(e.year || datum.slice(0, 4)), verseny: e.event || '', tav, kesz, kiesett: !kesz, hely: kesz ? hely : null,
+                menetido, seb: menetido > 0 && pontosKm > 0 ? pontosKm / (menetido / 3600) : 0, ok: kesz ? '' : kiesesCsoport(e.status),
                 km: kesz ? tav : 0, tars: profilPartnerNev(e.partnerName || (tipus === 'lovas' ? e.horseName : e.riderName) || ''), kulcs: 'h:' + datum + '|' + (e.event || '') + '|' + tav });
         });
         return ki.sort((a, b) => a.datum.localeCompare(b.datum));
@@ -12088,29 +12199,41 @@
     }
 
     // --- 27) ÖSSZEHASONLÍTÁS: két lovas vagy két ló egymás mellett -----------------------------------
-    // Versenyszám, km, helyezések: a hivatalos listával együtt; sebesség, pulzusidő: a saját mérésből.
-    let osszeAllapot = { tipus: 'lovas', a: null, b: null };
-    function osszeStat(tipus, id) {
-        const s = karrierSorok(tipus, id);
-        const sajat = sajatSorok(tipus, id);
+    // MINDEN sor ugyanabból a sorhalmazból számol: karrierSorok = a saját lezárt versenyek + a szövetség hivatalos
+    // listája (2023-tól), a kiválasztott időszakra (osszeAllapot.ev: 'osszes' vagy egy év) szűrve. Ezért nincs benne
+    // pulzusidő (az csak a saját mérésű versenyekből lenne), „idei szezon” sor (az időszak-választó adja) és „első
+    // verseny” (az csak az adatbázis első sora volna, nem a pálya kezdete).
+    // Sebességet csak AZONOS TÁVON vetünk össze (tavok[táv].legjobb = a legrövidebb hivatalos menetidő) - a régi
+    // „leggyorsabb teljesítés / átlagsebesség” sor minden távot összemosott (a 40 km-es mindig gyorsabb a 120-asnál).
+    let osszeAllapot = { tipus: 'lovas', a: null, b: null, ev: 'osszes' };
+    function osszeStat(tipus, id, ev) {
+        const mind = karrierSorok(tipus, id);
+        const s = !ev || ev === 'osszes' ? mind : mind.filter(x => x.ev === ev);
         const kesz = s.filter(x => x.kesz);
-        const sebek = sajat.filter(x => x.kesz && x.seb > 0);
-        const pul = sajat.filter(x => x.pulzus > 0);
         const tars = {};
         s.forEach(x => { if (x.tars) tars[x.tars] = (tars[x.tars] || 0) + 1; });
-        return { sorok: s, rajt: s.length, kesz: kesz.length, km: s.reduce((t, x) => t + x.km, 0),
+        const okok = { kizarva: 0, visszalepett: 0, feladta: 0, egyeb: 0 };
+        s.forEach(x => { if (!x.kesz) okok[okok[x.ok] !== undefined ? x.ok : 'egyeb']++; });
+        const tavok = {};
+        kesz.forEach(x => {
+            if (!x.tav) return;
+            const t = tavok[x.tav] || (tavok[x.tav] = { db: 0, legjobb: null });
+            t.db++;
+            if (x.menetido > 0 && (!t.legjobb || x.menetido < t.legjobb.menetido)) t.legjobb = x;
+        });
+        return { evek: [...new Set(mind.map(x => x.ev).filter(e => /^\d{4}$/.test(e)))], sorok: s, rajt: s.length, kesz: kesz.length, km: s.reduce((t, x) => t + x.km, 0),
+            kiesett: s.length - kesz.length, okok, tavok, forma: s.slice(-5).reverse(),
             gyozelem: kesz.filter(x => x.hely === 1).length, dobogo: kesz.filter(x => x.hely && x.hely <= 3).length,
             legjobbHely: kesz.filter(x => x.hely).reduce((m, x) => Math.min(m, x.hely), Infinity),
-            legjobbSeb: sebek.reduce((m, x) => Math.max(m, x.seb), 0), atlagSeb: sebek.length ? sebek.reduce((t, x) => t + x.seb, 0) / sebek.length : 0,
-            atlagPulzus: pul.length ? pul.reduce((t, x) => t + x.pulzus, 0) / pul.length : 0,
-            leghosszabb: kesz.reduce((m, x) => Math.max(m, x.tav), 0), elso: s.length ? s[0].datum : '', utolso: s.length ? s[s.length - 1].datum : '',
+            leghosszabb: kesz.reduce((m, x) => Math.max(m, x.tav), 0), utolso: s.length ? s[s.length - 1] : null,
             tars: Object.keys(tars).sort((a, b) => tars[b] - tars[a])[0] || '' };
     }
     function osszeValaszt(melyik, id, nev) { osszeAllapot[melyik] = { id: String(id), nev }; renderOsszehasonlitas(); }
-    function osszeTipus(t) { if (osszeAllapot.tipus !== t) osszeAllapot = { tipus: t, a: null, b: null }; renderOsszehasonlitas(); }
-    function osszeCsere() { const o = osszeAllapot; osszeAllapot = { tipus: o.tipus, a: o.b, b: o.a }; renderOsszehasonlitas(); }
+    function osszeTipus(t) { if (osszeAllapot.tipus !== t) osszeAllapot = { tipus: t, a: null, b: null, ev: 'osszes' }; renderOsszehasonlitas(); }
+    function osszeCsere() { const o = osszeAllapot; osszeAllapot = { tipus: o.tipus, a: o.b, b: o.a, ev: o.ev }; renderOsszehasonlitas(); }
+    function osszeEv(ev) { osszeAllapot.ev = ev; renderOsszehasonlitas(); }
     function osszehasonlitasNyit(tipus, id, nev) {
-        osszeAllapot = { tipus, a: { id: String(id), nev }, b: null };
+        osszeAllapot = { tipus, a: { id: String(id), nev }, b: null, ev: 'osszes' };
         if (typeof closeAdatlap === 'function') closeAdatlap();
         switchSidebarMode('osszehasonlitas', document.getElementById('btn-menu-osszehasonlitas'));
         setTimeout(() => document.getElementById('osszen-b')?.focus(), 50);
@@ -12127,28 +12250,46 @@
             <div class="osszen-valasztok">${valaszto('a')}${valaszto('b')}</div>`;
         if (o.a && o.b) {
             karrierBetolt([[o.tipus, o.a.id], [o.tipus, o.b.id]]).then(uj => { if (uj) renderOsszehasonlitas(); });
-            const A = osszeStat(o.tipus, o.a.id), B = osszeStat(o.tipus, o.b.id);
+            // időszak: minden év, vagy egy-egy év, amiben legalább az egyiknek van versenye
+            const evek = [...new Set(osszeStat(o.tipus, o.a.id).evek.concat(osszeStat(o.tipus, o.b.id).evek))].sort().reverse();
+            if (o.ev !== 'osszes' && !evek.includes(o.ev)) o.ev = 'osszes';
+            const idoszak = evek.length ? (evek.length > 1 ? `${evek[evek.length - 1]}–${evek[0]}` : evek[0]) : '';
+            const A = osszeStat(o.tipus, o.a.id, o.ev), B = osszeStat(o.tipus, o.b.id, o.ev);
+            if (evek.length > 1) html += `<div class="hir-szurok osszen-evek"><span>Időszak:</span><button class="tab-btn ${o.ev === 'osszes' ? 'active' : ''}" onclick="osszeEv('osszes')">Minden év (${idoszak})</button>
+                ${evek.map(e => `<button class="tab-btn ${o.ev === e ? 'active' : ''}" onclick="osszeEv('${e}')">${e}</button>`).join('')}</div>`;
             const sor = (cim, f, jobb) => {
                 const nyer = jobb ? jobb(A, B) : 0;
                 return `<tr><th>${cim}</th><td class="${nyer > 0 ? 'jobb' : ''}">${f(A)}</td><td class="${nyer < 0 ? 'jobb' : ''}">${f(B)}</td></tr>`;
             };
             const nagyobb = f => (x, y) => Math.sign(f(x) - f(y));
             const kisebb = f => (x, y) => { const a = f(x), b = f(y); if (!a && !b) return 0; if (!a) return -1; if (!b) return 1; return Math.sign(b - a); };
-            const ido = s => s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '–';
-            html += `<div class="table-responsive"><table class="ttrack-table osszen-tabla"><thead><tr><th class="col-header"></th><th class="col-header">${esc(o.a.nev)}</th><th class="col-header">${esc(o.b.nev)}</th></tr></thead><tbody>
+            // rövidebb idő a jobb, de csak ha mindkettőnek van ideje azon a távon
+            const mindketto = f => (x, y) => { const a = f(x), b = f(y); return a > 0 && b > 0 ? Math.sign(b - a) : 0; };
+            const okSzoveg = k => [[k.kizarva, 'kizárva'], [k.visszalepett, 'visszalépett'], [k.feladta, 'feladta'], [k.egyeb, 'egyéb']].filter(p => p[0]).map(p => `${p[0]} ${p[1]}`).join(' · ');
+            const formaJel = s => `<span class="forma-jel ${s.kesz ? (s.hely && s.hely <= 3 ? 'dobogo' : 'kesz') : 'ki'}" title="${esc(s.verseny)} · ${esc(s.datum)} · ${s.tav} km – ${s.kesz ? (s.hely ? s.hely + '. hely' : 'teljesítette') : 'kiesett'}">${s.kesz ? (s.hely ? s.hely + '.' : '✓') : '✕'}</span>`;
+            const tavLista = [...new Set(Object.keys(A.tavok).concat(Object.keys(B.tavok)).map(Number))].sort((a, b) => a - b);
+            // a 20 km felkészítő táv: ott nincs „legjobb idő”, csak a teljesítések száma
+            const tavCella = (x, d) => {
+                const t = x.tavok[d];
+                if (!t) return '–';
+                const l = d > 20 ? t.legjobb : null;
+                return l ? `<span title="${esc(l.verseny)} · ${esc(l.datum)}">${toTimeStr(Math.round(l.menetido))}</span> <small>${kmh(l.seb, 1)} km/h · ${t.db}× teljesítve</small>` : `<small>${t.db}× teljesítve</small>`;
+            };
+            html += `<div class="table-responsive"><table class="ttrack-table osszen-tabla"><thead><tr><th class="col-header osszen-idoszak">${esc(o.ev === 'osszes' ? idoszak : o.ev)}</th><th class="col-header">${esc(o.a.nev)}</th><th class="col-header">${esc(o.b.nev)}</th></tr></thead><tbody>
                 ${sor('Versenyek', x => x.rajt, nagyobb(x => x.rajt))}
                 ${sor('Teljesített', x => `${x.kesz} <small>(${x.rajt ? Math.round(x.kesz / x.rajt * 100) : 0}%)</small>`, nagyobb(x => x.rajt ? x.kesz / x.rajt : 0))}
                 ${sor('Eredményes km', x => Math.round(x.km).toLocaleString('hu-HU'), nagyobb(x => x.km))}
                 ${sor('Győzelem / dobogó', x => `${x.gyozelem} / ${x.dobogo}`, nagyobb(x => x.gyozelem * 100 + x.dobogo))}
                 ${sor('Legjobb helyezés', x => isFinite(x.legjobbHely) ? x.legjobbHely + '.' : '–', kisebb(x => isFinite(x.legjobbHely) ? x.legjobbHely : 0))}
                 ${sor('Leghosszabb teljesített táv', x => x.leghosszabb ? x.leghosszabb + ' km' : '–', nagyobb(x => x.leghosszabb))}
-                ${sor('Leggyorsabb teljesítés*', x => x.legjobbSeb ? kmh(x.legjobbSeb, 1) + ' km/h' : '–', nagyobb(x => x.legjobbSeb))}
-                ${sor('Átlagsebesség*', x => x.atlagSeb ? kmh(x.atlagSeb, 1) + ' km/h' : '–', nagyobb(x => x.atlagSeb))}
-                ${sor('Átlagos pulzusidő*', x => ido(x.atlagPulzus), kisebb(x => x.atlagPulzus))}
+                ${sor('Kiesések', x => x.kiesett ? esc(okSzoveg(x.okok)) : (x.rajt ? '0' : '–'))}
+                ${sor('Utolsó 5 verseny <small>(a legutóbbi elöl)</small>', x => x.forma.length ? `<span class="forma">${x.forma.map(formaJel).join('')}</span>` : '–')}
                 ${sor(o.tipus === 'lovas' ? 'Leggyakoribb ló' : 'Leggyakoribb lovas', x => esc(x.tars) || '–')}
-                ${sor('Első / utolsó verseny', x => `${esc(x.elso) || '–'}<br>${esc(x.utolso) || '–'}`)}
+                ${sor('Legutóbbi verseny', x => x.utolso ? `${esc(x.utolso.datum)}<br><small>${esc(x.utolso.verseny)}${x.utolso.tav ? ' · ' + x.utolso.tav + ' km' : ''}</small>` : '–')}
+                ${tavLista.length ? `<tr class="osszen-szakasz"><th colspan="3">Legjobb idő távonként <small>– a legrövidebb hivatalos menetidő</small></th></tr>` : ''}
+                ${tavLista.map(d => sor(`${d} km`, x => tavCella(x, d), mindketto(x => d > 20 && x.tavok[d] && x.tavok[d].legjobb ? x.tavok[d].legjobb.menetido : 0))).join('')}
             </tbody></table></div>
-            <p class="field-hint">A versenyek, a km és a helyezések a szövetség hivatalos listájával együtt (2023-tól) számolódnak. *A sebesség és a pulzusidő csak az End-Ride-ban lebonyolított versenyekből, mert csak ott van köridő.</p>`;
+            <p class="field-hint">Minden sor ugyanabból számol: a hazai versenyek eredményei 2023-tól (az End-Ride-ban lebonyolított versenyek és a szövetség hivatalos listája), a fent kiválasztott időszakban. Korábbi évekről nincs adat; a nemzetközi (FEI) eredmények a profil FEI fülén láthatók. Legjobb idő: a legrövidebb hivatalos menetidő az adott távon; a 20 km felkészítő távnál csak a teljesítések száma látszik.</p>`;
             // egymás ellen: ugyanaz a verseny, ugyanaz a táv
             const fej = [];
             A.sorok.forEach(x => {
@@ -13653,7 +13794,7 @@
         'Élő eredmények': 'Live results', 'Kiindulások': 'Departures', 'Hogyan?': 'How?', 'pályán / vizsgálaton': 'on course / at the vet', 'célban': 'finished', 'kiesett': 'eliminated',
         'nevező': 'entries', 'Következő kiindulások': 'Next departures', 'Várható beérkezések': 'Expected arrivals', 'Élő állás': 'Live standings', 'Minden kategória →': 'All distances →',
         'Becslés az eddigi átlagsebességből (az 1. körben a mezőnyéből) – tájékoztató.': 'Estimated from the average speed so far (on loop 1 from the field) – for information only.',
-        'Teljes állás': 'Full standings', 'Teljes állás →': 'Full standings →', 'Összes hír →': 'All news →', 'Tovább →': 'More →', 'Versenynaptár': 'Race calendar', 'Összes verseny →': 'All races →', 'Közelgő események': 'Upcoming events', 'Mind →': 'All →',
+        'Teljes állás': 'Full standings', 'Teljes állás →': 'Full standings →', 'Összes hír →': 'All news →', 'Tovább →': 'More →', 'Versenynaptár': 'Race calendar', 'Összes verseny →': 'All races →', 'Közelgő események': 'Upcoming events', 'Mind →': 'All →', 'Időpont': 'Date & time', 'Típus': 'Type',
         'Még nincs kiírt jövőbeli verseny.': 'No upcoming race announced yet.',
         'Legutóbbi eredmények': 'Latest results', 'Archívum →': 'Archive →', 'Ló-ranglista →': 'Horse ranking →', 'Összes →': 'All →', 'Követett versenyzőid': 'Riders you follow',
         'Követések →': 'Following →', 'End-Ride app a gépedre': 'End-Ride app for your computer', 'End-Ride app a telefonodra': 'End-Ride app for your phone', 'Most nem': 'Not now',
@@ -13716,7 +13857,9 @@
         // összehasonlítás
         'Első lovas': 'First rider', 'Második lovas': 'Second rider', 'Első ló': 'First horse', 'Második ló': 'Second horse', 'Csere ⇄': 'Swap ⇄', 'Teljesített': 'Completed', 'Eredményes km': 'Km completed',
         'Győzelem / dobogó': 'Wins / podiums', 'Legjobb helyezés': 'Best position', 'Leghosszabb teljesített táv': 'Longest distance completed', 'Leggyorsabb teljesítés*': 'Fastest completion*',
-        'Átlagsebesség*': 'Average speed*', 'Átlagos pulzusidő*': 'Average recovery*', 'Leggyakoribb ló': 'Most frequent horse', 'Leggyakoribb lovas': 'Most frequent rider',
+        'Átlagsebesség*': 'Average speed*', 'Átlagos pulzusidő*': 'Average recovery*', 'Kiesések': 'Eliminations', 'Utolsó 5 verseny': 'Last 5 races', 'Legutóbbi verseny': 'Latest race', 'Időszak:': 'Period:', '(a legutóbbi elöl)': '(latest first)',
+        'Legjobb idő távonként': 'Best time per distance', '– a legrövidebb hivatalos menetidő': '– shortest official ride time',
+        'Minden sor ugyanabból számol: a hazai versenyek eredményei 2023-tól (az End-Ride-ban lebonyolított versenyek és a szövetség hivatalos listája), a fent kiválasztott időszakban. Korábbi évekről nincs adat; a nemzetközi (FEI) eredmények a profil FEI fülén láthatók. Legjobb idő: a legrövidebb hivatalos menetidő az adott távon; a 20 km felkészítő távnál csak a teljesítések száma látszik.': 'Every row uses the same data: domestic results from 2023 (races run in End-Ride plus the federation\'s official list), within the period selected above. There is no data for earlier years; international (FEI) results are on the FEI tab of the profile. Best time: the shortest official ride time at that distance; for the 20 km introductory distance only the number of completions is shown.', 'Leggyakoribb ló': 'Most frequent horse', 'Leggyakoribb lovas': 'Most frequent rider',
         'Első / utolsó verseny': 'First / last race', 'Egymás ellen': 'Head to head', 'Még nem indultak ugyanazon a versenyen, ugyanazon a távon.': 'They have not yet ridden the same distance at the same race.',
         'Kezdd el gépelni a nevet...': 'Start typing a name...', 'Keresés név, igazolási szám vagy egyesület alapján...': 'Search by name, licence no. or club...',
         'Keresés ló neve vagy start száma alapján...': 'Search by horse name or start no....', 'hely': 'place', 'kiesett': 'eliminated',
@@ -13758,7 +13901,7 @@
         'A sorrend mindig a bajnoki pont alapján dől el, a km-nézet csak a megjelenített számot cseréli. ⚠️ = a tag ebben az időszakban még nem indult hazai OB-fordulón legalább 40 km-en, ezért egyelőre nem jogosult a csapatpontra (visszamenőleg pótolható).': 'The order is always decided by championship points; the km view only changes the number shown. ⚠️ = this member has not yet ridden at least 40 km at a Hungarian championship round in this period, so is not yet eligible for team points (can be made up later).',
         'Kattints egy névre a versenytörténet megtekintéséhez - hol indult, milyen távon, milyen lóval és mi lett az eredménye.': 'Click a name to see the race history – where, on which distance, with which horse, and the result.',
         'Kattints egy lóra a versenytörténet megtekintéséhez - hol indult, milyen távon, milyen lovassal és mi lett az eredménye.': 'Click a horse to see its race history – where, on which distance, with which rider, and the result.',
-        'Két lovas vagy két ló egymás mellett: versenyek, teljesítési arány, km, helyezések, leggyorsabb idő, pulzusidő – és hogyan szerepeltek, amikor ugyanazon a versenyen, ugyanazon a távon indultak.': 'Two riders or two horses side by side: races, completion rate, km, placings, fastest time, recovery time – and how they did when they rode the same distance at the same race.',
+        'Két lovas vagy két ló egymás mellett: versenyek, teljesítési arány, km, helyezések, távonként a legjobb idő – és hogyan szerepeltek, amikor ugyanazon a versenyen, ugyanazon a távon indultak.': 'Two riders or two horses side by side: races, completion rate, km, placings, best time per distance – and how they did when they rode the same distance at the same race.',
         'Válassz ki két lovast, és egymás mellett látod az eredményeiket, a legjobb idejüket és azt, hogyan szerepeltek egymás ellen.': 'Pick two riders to see their results, best times and head-to-head record side by side.',
         'Válassz ki két lovat, és egymás mellett látod az eredményeiket, a legjobb idejüket és azt, hogyan szerepeltek egymás ellen.': 'Pick two horses to see their results, best times and head-to-head record side by side.',
         'Célidőből vagy tempóból körönkénti terv: mikor indul, mikor érkezik, mikor van a vizsgálat és a kimenet – a kiírás köreivel és pihenőivel. Kinyomtatható a segítőknek.': 'A loop-by-loop plan from a target time or a pace: departure, arrival, vet and out times – with the loops and holds of the race. Printable for the crew.',
@@ -13825,6 +13968,11 @@
         [/^(\d{4})\. bajnoki év$/, (m, a) => `${a} season`],
         [/^(\d{4})\. SZEZON$/, (m, a) => `${a} SEASON`],
         [/^várható (\d+:\d\d)$/, (m, a) => `expected ${a}`],
+        [/^vége (\d+:\d\d)$/, (m, a) => `until ${a}`],
+        [/^Minden év \((\d{4}[–\d]*)\)$/, (m, a) => `All years (${a})`],
+        [/^(.+) km\/h · (\d+)× teljesítve$/, (m, a, b) => `${a} km/h · completed ${b}×`],
+        [/^(\d+)× teljesítve$/, (m, a) => `completed ${a}×`],
+        [/^(\d+ (?:kizárva|visszalépett|feladta|egyéb))(?: · \d+ (?:kizárva|visszalépett|feladta|egyéb))*$/, m => m.replace(/kizárva/g, 'eliminated').replace(/visszalépett/g, 'withdrawn').replace(/feladta/g, 'retired').replace(/egyéb/g, 'other')],
         [/^Licenc (\d{4})$/, (m, a) => `Licence ${a}`],
         [/^([\d  ]+) km-es klub$/, (m, a) => `${a} km club`],
         [/^pulzusidő (.+)$/, (m, a) => `recovery ${a}`],
