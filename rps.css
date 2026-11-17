@@ -2817,38 +2817,17 @@ body.stab-nezet #hiba-lebego, body.fullscreen-active #hiba-lebego, body:has(#nye
 .unnep-jel.halloween { width: 66%; height: 66%; right: -26%; bottom: -20%; filter: drop-shadow(0 0 4px rgba(255, 150, 30, .55)) drop-shadow(0 1px 1px rgba(0, 0, 0, .5)); }
 .unnep-jel.karacsony { width: 64%; height: 64%; left: -20%; top: -22%; transform: rotate(-24deg); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .35)); }
 
-/* a kezdőlap nagy képe: pókháló balra fent, két világító tök jobbra fent (Halloween) / hópelyhek (Karácsony) */
-.unnep-halloween .uj-hero::before, .unnep-karacsony .uj-hero::before {
-    content: ''; position: absolute; left: 0; top: 0; z-index: 3; width: clamp(110px, 17vw, 170px); aspect-ratio: 1; pointer-events: none;
-    background: no-repeat left top / contain;
-}
-.unnep-halloween .uj-hero::before { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 130'><path d='M0 0L127.7 8.9M0 0L116.9 52.1M0 0L90.5 90.5M0 0L52.1 116.9M0 0L8.9 127.7M25.9 1.8Q20.2 5.0 23.8 10.6M23.8 10.6Q17.1 11.8 18.4 18.4M18.4 18.4Q11.8 17.1 10.6 23.8M10.6 23.8Q5.0 20.2 1.8 25.9M51.9 3.6Q40.4 10.1 47.5 21.2M47.5 21.2Q34.3 23.6 36.8 36.8M36.8 36.8Q23.6 34.3 21.2 47.5M21.2 47.5Q10.1 40.4 3.6 51.9M77.8 5.4Q60.5 15.1 71.3 31.7M71.3 31.7Q51.4 35.3 55.2 55.2M55.2 55.2Q35.3 51.4 31.7 71.3M31.7 71.3Q15.1 60.5 5.4 77.8M103.7 7.3Q80.7 20.1 95.0 42.3M95.0 42.3Q68.6 47.1 73.5 73.5M73.5 73.5Q47.1 68.6 42.3 95.0M42.3 95.0Q20.1 80.7 7.3 103.7' fill='none' stroke='white' stroke-opacity='.6' stroke-width='.9'/></svg>"); }
-.unnep-karacsony .uj-hero::before { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 130'><path d='M9.0 20.0L27.0 20.0M13.5 12.2L22.5 27.8M22.5 12.2L13.5 27.8M46.0 14.0L58.0 14.0M49.0 8.8L55.0 19.2M55.0 8.8L49.0 19.2M25.0 48.0L39.0 48.0M28.5 41.9L35.5 54.1M35.5 41.9L28.5 54.1M73.0 30.0L83.0 30.0M75.5 25.7L80.5 34.3M80.5 25.7L75.5 34.3M8.0 70.0L20.0 70.0M11.0 64.8L17.0 75.2M17.0 64.8L11.0 75.2M54.0 62.0L62.0 62.0M56.0 58.5L60.0 65.5M60.0 58.5L56.0 65.5M96.0 12.0L104.0 12.0M98.0 8.5L102.0 15.5M102.0 8.5L98.0 15.5' fill='none' stroke='white' stroke-opacity='.8' stroke-width='1.6' stroke-linecap='round'/></svg>"); }
-.unnep-halloween .uj-hero::after {
-    content: ''; position: absolute; right: 14px; top: 34px; z-index: 3; width: clamp(96px, 14vw, 150px); aspect-ratio: 140 / 72; pointer-events: none;
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 72'><g transform='translate(0 2) scale(1.08)'><defs><radialGradient id='h1-tok' cx='38%' cy='32%' r='75%'><stop offset='0' stop-color='%23ffc067'/><stop offset='.55' stop-color='%23f27d16'/><stop offset='1' stop-color='%23a8440a'/></radialGradient><radialGradient id='h1-feny' cx='50%' cy='45%' r='60%'><stop offset='0' stop-color='%23fffbd1'/><stop offset='.5' stop-color='%23ffd84a'/><stop offset='1' stop-color='%23ff9a1f'/></radialGradient></defs><path d='M30.5 16c-.8-4.4.4-8.6 4.3-11.6l3.3 2.3c-3 2.2-4.1 5.4-3.3 9.3z' fill='%234c7d2b'/><path d='M36.5 9.5c3.5-3.2 8.6-3.7 12.2-1.2-4 .4-7.2 1.9-9.3 4.6z' fill='%236aa43a'/><ellipse cx='19' cy='38' rx='14.5' ry='19' fill='url(%23h1-tok)'/><ellipse cx='45' cy='38' rx='14.5' ry='19' fill='url(%23h1-tok)'/><ellipse cx='32' cy='38.5' rx='15.5' ry='21' fill='url(%23h1-tok)' stroke='%23a9480a' stroke-width='.8'/><path d='M19 19.5c-6 6-6 31 0 37M45 19.5c6 6 6 31 0 37' fill='none' stroke='%23b9530c' stroke-width='1' opacity='.7'/><g fill='url(%23h1-feny)'><path d='M18 31l7.5-5.5 2 8.5z'/><path d='M46 31l-7.5-5.5-2 8.5z'/><path d='M32 36l-3 5h6z'/><path d='M16.5 43.5c4.5 6.5 10 9.5 15.5 9.5s11-3 15.5-9.5l-4.6 1.4-2.5 3.4-3-2.6-2.9 3-2.5-3-2.5 3-2.9-3-3 2.6-2.5-3.4z'/></g></g><g transform='translate(78 26) scale(.72)'><defs><radialGradient id='h2-tok' cx='38%' cy='32%' r='75%'><stop offset='0' stop-color='%23ffc067'/><stop offset='.55' stop-color='%23f27d16'/><stop offset='1' stop-color='%23a8440a'/></radialGradient><radialGradient id='h2-feny' cx='50%' cy='45%' r='60%'><stop offset='0' stop-color='%23fffbd1'/><stop offset='.5' stop-color='%23ffd84a'/><stop offset='1' stop-color='%23ff9a1f'/></radialGradient></defs><path d='M30.5 16c-.8-4.4.4-8.6 4.3-11.6l3.3 2.3c-3 2.2-4.1 5.4-3.3 9.3z' fill='%234c7d2b'/><path d='M36.5 9.5c3.5-3.2 8.6-3.7 12.2-1.2-4 .4-7.2 1.9-9.3 4.6z' fill='%236aa43a'/><ellipse cx='19' cy='38' rx='14.5' ry='19' fill='url(%23h2-tok)'/><ellipse cx='45' cy='38' rx='14.5' ry='19' fill='url(%23h2-tok)'/><ellipse cx='32' cy='38.5' rx='15.5' ry='21' fill='url(%23h2-tok)' stroke='%23a9480a' stroke-width='.8'/><path d='M19 19.5c-6 6-6 31 0 37M45 19.5c6 6 6 31 0 37' fill='none' stroke='%23b9530c' stroke-width='1' opacity='.7'/><g fill='url(%23h2-feny)'><path d='M18 31l7.5-5.5 2 8.5z'/><path d='M46 31l-7.5-5.5-2 8.5z'/><path d='M32 36l-3 5h6z'/><path d='M16.5 43.5c4.5 6.5 10 9.5 15.5 9.5s11-3 15.5-9.5l-4.6 1.4-2.5 3.4-3-2.6-2.9 3-2.5-3-2.5 3-2.9-3-3 2.6-2.5-3.4z'/></g></g></svg>") no-repeat center / contain;
-    filter: drop-shadow(0 0 10px rgba(255, 140, 20, .65)); animation: utPislakol 3.2s ease-in-out infinite;
-}
-@keyframes utPislakol { 0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 140, 20, .65)); } 45% { filter: drop-shadow(0 0 18px rgba(255, 170, 40, .85)); } 60% { filter: drop-shadow(0 0 8px rgba(255, 130, 20, .5)); } }
+/* Halloween: a tökök (a kezdőlap képének jobb alsó sarkában) lassan pislákolnak */
+@keyframes utPislakol { 0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 140, 20, .45)) drop-shadow(0 2px 3px rgba(0, 0, 0, .45)); }
+    45% { filter: drop-shadow(0 0 14px rgba(255, 165, 40, .65)) drop-shadow(0 2px 3px rgba(0, 0, 0, .45)); } 60% { filter: drop-shadow(0 0 7px rgba(255, 130, 20, .4)) drop-shadow(0 2px 3px rgba(0, 0, 0, .45)); } }
 
-/* fejléc: halvány tökszínű fény alul, pókháló a két sarokból, a jobb oldalin ereszkedő pók */
+/* fejléc: halvány tökszínű fény alul, bal oldalt ereszkedő pók (a kép pókhálója fölött) */
 .unnep-halloween #uj-fejlec { box-shadow: 0 1px 0 rgba(242, 125, 22, .35), 0 8px 26px -14px rgba(242, 125, 22, .6); }
-.ut-halo { position: absolute; top: 100%; width: clamp(70px, 9vw, 120px); aspect-ratio: 1; pointer-events: none; z-index: 1;
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 130'><path d='M0 0L127.7 8.9M0 0L116.9 52.1M0 0L90.5 90.5M0 0L52.1 116.9M0 0L8.9 127.7M25.9 1.8Q20.2 5.0 23.8 10.6M23.8 10.6Q17.1 11.8 18.4 18.4M18.4 18.4Q11.8 17.1 10.6 23.8M10.6 23.8Q5.0 20.2 1.8 25.9M51.9 3.6Q40.4 10.1 47.5 21.2M47.5 21.2Q34.3 23.6 36.8 36.8M36.8 36.8Q23.6 34.3 21.2 47.5M21.2 47.5Q10.1 40.4 3.6 51.9M77.8 5.4Q60.5 15.1 71.3 31.7M71.3 31.7Q51.4 35.3 55.2 55.2M55.2 55.2Q35.3 51.4 31.7 71.3M31.7 71.3Q15.1 60.5 5.4 77.8M103.7 7.3Q80.7 20.1 95.0 42.3M95.0 42.3Q68.6 47.1 73.5 73.5M73.5 73.5Q47.1 68.6 42.3 95.0M42.3 95.0Q20.1 80.7 7.3 103.7' fill='none' stroke='%239aa2ad' stroke-opacity='.7' stroke-width='1.1'/></svg>") no-repeat left top / contain; }
-.ut-halo.bal { left: 0; }
-.ut-halo.jobb { right: 0; transform: scaleX(-1); }
-.ut-pok { position: absolute; top: 100%; right: clamp(34px, 4.6vw, 62px); width: 20px; pointer-events: none; z-index: 2;
+.ut-pok { position: absolute; top: 100%; left: clamp(58px, 7.4vw, 100px); width: 20px; pointer-events: none; z-index: 2;
     display: flex; flex-direction: column; align-items: center; animation: utEreszkedik 7s ease-in-out infinite; }
 .ut-szal { width: 1px; height: 100%; background: rgba(160, 168, 178, .8); flex: 1 1 auto; }
 .ut-pok svg { width: 20px; height: 20px; flex: 0 0 auto; filter: drop-shadow(0 0 2px rgba(255, 255, 255, .35)); }
 @keyframes utEreszkedik { 0%, 100% { height: 26px; } 50% { height: 78px; } }
-
-/* kis pókháló a verseny- és hírkártyák jobb felső sarkában */
-.unnep-halloween .race-card::after, .unnep-halloween .hir-kartya::after {
-    content: ''; position: absolute; top: 0; right: 0; width: 44px; height: 44px; z-index: 2; pointer-events: none;
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 130'><path d='M0 0L127.7 8.9M0 0L116.9 52.1M0 0L90.5 90.5M0 0L52.1 116.9M0 0L8.9 127.7M25.9 1.8Q20.2 5.0 23.8 10.6M23.8 10.6Q17.1 11.8 18.4 18.4M18.4 18.4Q11.8 17.1 10.6 23.8M10.6 23.8Q5.0 20.2 1.8 25.9M51.9 3.6Q40.4 10.1 47.5 21.2M47.5 21.2Q34.3 23.6 36.8 36.8M36.8 36.8Q23.6 34.3 21.2 47.5M21.2 47.5Q10.1 40.4 3.6 51.9M77.8 5.4Q60.5 15.1 71.3 31.7M71.3 31.7Q51.4 35.3 55.2 55.2M55.2 55.2Q35.3 51.4 31.7 71.3M31.7 71.3Q15.1 60.5 5.4 77.8M103.7 7.3Q80.7 20.1 95.0 42.3M95.0 42.3Q68.6 47.1 73.5 73.5M73.5 73.5Q47.1 68.6 42.3 95.0M42.3 95.0Q20.1 80.7 7.3 103.7' fill='none' stroke='%239aa2ad' stroke-opacity='.7' stroke-width='1.1'/></svg>") no-repeat left top / contain; transform: scaleX(-1); opacity: .8;
-}
-.unnep-halloween .hir-kartya { position: relative; }
 
 /* denevérek: csapatban átrepülnek (kb. félpercenként), csapkodó szárnnyal */
 #unnep-reteg { position: fixed; inset: 0; z-index: 935; pointer-events: none; overflow: hidden; }
@@ -2886,14 +2865,179 @@ body.stab-nezet #hiba-lebego, body.fullscreen-active #hiba-lebego, body:has(#nye
 @media (max-width: 900px) {
     .ut-szellem { width: 46px; bottom: calc(70px + var(--biztonsag-lent)); }
     .ut-raj { top: calc(var(--biztonsag-fent) + 64px); }
-    .unnep-halloween .uj-hero::after { top: 30px; right: 10px; }
 }
 /* a stáb munkaoldalain, TV módban és a nyelvajánló alatt nincs mozgó dísz; nyomtatáskor semmi */
 body.stab-nezet #unnep-reteg, body.fullscreen-active #unnep-reteg, body:has(#nyelv-ajanlo) .ut-szellem { display: none; }
 body.stab-nezet .ut-pok { display: none; }
 @media (prefers-reduced-motion: reduce) {
     .ut-raj, .ut-kitores { display: none; }
-    .ut-szellem, .ut-pok, .ut-hullam, .ut-szarny, .unnep-halloween .uj-hero::after { animation: none; }
+    .ut-szellem, .ut-pok, .ut-hullam, .ut-szarny { animation: none; }
     .ut-pok .ut-szal { height: 40px; }
 }
 @media print { .unnep-jel, .uj-hero::before, .uj-hero::after, #unnep-reteg, .ut-fejlec-disz { display: none !important; } }
+
+/* v145: ÉVSZAKOK ÉS ÜNNEPEK – közös váz. A rajzok az rps.js-ből jönnek CSS-változóként (--unnep-…).
+   html.unnep-disz = bármelyik téma él (a Halloween is); a Halloween saját része (pók, denevérek, szellem) fent van. */
+.unnep-jel.jobb-lent { width: 62%; height: 62%; right: -24%; bottom: -20%; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .45)); }
+.unnep-jel.jobb-fent { width: 58%; height: 58%; right: -24%; top: -22%; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .4)); }
+.unnep-jel.kalap { width: 66%; height: 66%; left: -20%; top: -32%; transform: rotate(-20deg); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .35)); }
+
+/* a kezdőlap nagy képe: dísz a bal felső sarokban; a jobb oldalon vagy fent (tükrözve), vagy lent (Halloween: tökök) */
+html.unnep-disz .uj-hero::before, html.unnep-disz .uj-hero::after { content: ''; position: absolute; z-index: 3; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .4)); }
+html.unnep-disz .uj-hero::before { left: 0; top: 0; width: clamp(104px, 14vw, 176px); aspect-ratio: 160 / 130; background: var(--unnep-hero-bal, none) no-repeat left top / contain; }
+html.unnep-kep-jobb .uj-hero::after { right: 0; top: 0; width: clamp(84px, 11.4vw, 143px); aspect-ratio: 1; background: var(--unnep-hero-jobb, none) no-repeat left top / contain; transform: scaleX(-1); }
+html.unnep-kep-lent .uj-hero::after { right: 22px; bottom: 38px; width: clamp(96px, 12vw, 150px); aspect-ratio: 140 / 92; background: var(--unnep-hero-lent, none) no-repeat center bottom / contain;
+    filter: drop-shadow(0 0 8px rgba(255, 140, 20, .45)) drop-shadow(0 2px 3px rgba(0, 0, 0, .45)); animation: utPislakol 3.4s ease-in-out infinite; }
+@media (max-width: 900px) { html.unnep-kep-lent .uj-hero::after { right: 8px; bottom: 6px; } }
+/* a „Fotó: …” felirat a jobb felső sarokból a pontok fölé kerül, ha ott dísz van */
+html.unnep-kep-jobb .uj-hero-forras { top: auto; bottom: 46px; right: 24px; }
+@media (max-width: 700px) { html.unnep-kep-jobb .uj-hero-forras { bottom: 5px; right: 12px; font-size: 0.6rem; } }
+/* tűzijáték: a két sarok felváltva villan */
+html.unnep-szilveszter .uj-hero::before, html.unnep-aug20 .uj-hero::after { transform-origin: 30% 30%; }
+html.unnep-szilveszter .uj-hero::before { animation: utTuzijatek 2.8s ease-in-out infinite; }
+html.unnep-szilveszter .uj-hero::after, html.unnep-aug20 .uj-hero::after { animation: utTuzijatekJ 3.4s ease-in-out 1.1s infinite; }
+@keyframes utTuzijatek { 0%, 100% { opacity: .25; transform: scale(.82); } 45%, 60% { opacity: 1; transform: scale(1); } }
+@keyframes utTuzijatekJ { 0%, 100% { opacity: .25; transform: scaleX(-1) scale(.82); } 45%, 60% { opacity: 1; transform: scaleX(-1) scale(1); } }
+
+/* a verseny- és hírkártyák jobb felső sarka */
+html.unnep-disz .race-card::after, html.unnep-disz .hir-kartya::after {
+    content: ''; position: absolute; top: 0; right: 0; width: 44px; height: 44px; z-index: 2; pointer-events: none;
+    background: var(--unnep-kartya, none) no-repeat right top / contain; filter: drop-shadow(0 1px 1.5px rgba(30, 50, 80, .35));
+}
+html.unnep-disz .hir-kartya { position: relative; }
+
+/* fejléc: halvány, a témához illő fény alul */
+html.unnep-osz #uj-fejlec { box-shadow: 0 1px 0 rgba(224, 106, 26, .35), 0 8px 26px -14px rgba(224, 106, 26, .55); }
+html.unnep-tel #uj-fejlec { box-shadow: 0 1px 0 rgba(150, 200, 255, .35), 0 8px 26px -14px rgba(120, 180, 255, .5); }
+html.unnep-tavasz #uj-fejlec { box-shadow: 0 1px 0 rgba(240, 140, 180, .35), 0 8px 26px -14px rgba(240, 140, 180, .5); }
+html.unnep-nyar #uj-fejlec { box-shadow: 0 1px 0 rgba(255, 190, 40, .4), 0 8px 26px -14px rgba(255, 190, 40, .55); }
+/* hó jégcsapokkal a fejléc alatt (tél) */
+.ut-hosav { position: absolute; left: 0; right: 0; top: 100%; height: 20px; margin-top: -1px; pointer-events: none; z-index: 1;
+    background: var(--unnep-hosav, none) repeat-x left top / auto 100%; filter: drop-shadow(0 1px 1.5px rgba(40, 70, 110, .4)); }
+/* égősor (karácsony): két füzér felváltva világít */
+.ut-egosor { position: absolute; left: 0; right: 0; top: 100%; height: 22px; margin-top: -2px; pointer-events: none; z-index: 1; }
+.ut-egosor i, .ut-egosor b { position: absolute; inset: 0; background: repeat-x left top / auto 100%; }
+.ut-egosor i { background-image: var(--unnep-egok-a, none); animation: utEgo 1.5s ease-in-out infinite alternate; }
+.ut-egosor b { background-image: var(--unnep-egok-b, none); animation: utEgo 1.5s ease-in-out infinite alternate-reverse; }
+@keyframes utEgo { from { filter: brightness(.6) saturate(.8); } to { filter: brightness(1.25) saturate(1.2) drop-shadow(0 0 5px rgba(255, 220, 120, .85)); } }
+/* nemzeti szalag (március 15., augusztus 20., október 23.) */
+.ut-trikolor { position: absolute; left: 0; right: 0; top: 100%; height: 5px; pointer-events: none; z-index: 1;
+    background: linear-gradient(#ce2939 0 33.4%, #fff 33.4% 66.7%, #477050 66.7% 100%); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+
+/* hulló apróságok: falevél, hó, szirom (lefelé), pitypangmag (felfelé). A helyet, méretet, tempót az rps.js adja. */
+.ut-hullo { position: absolute; inset: 0; }
+.ut-hull { position: absolute; top: -48px; left: var(--x); width: var(--m); opacity: var(--o); animation: utEsik var(--d) linear var(--k) infinite; will-change: transform; }
+.ut-hull svg, .ut-szor svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ut-ring { display: block; animation: utRing var(--r) ease-in-out infinite alternate; }
+@keyframes utEsik { from { transform: translateY(-4vh); } to { transform: translateY(112vh); } }
+@keyframes utRing { from { transform: translateX(calc(var(--s) * -1)) rotate(calc(var(--f) * -1)); } to { transform: translateX(var(--s)) rotate(var(--f)); } }
+/* a fehér hó / mag világos témán is látsszon */
+.ut-hullo.tel .ut-hull svg, .ut-hullo.szilveszter .ut-hull svg, .ut-hullo.nyar .ut-hull svg { filter: drop-shadow(0 0 1.2px rgba(30, 70, 120, .85)); }
+.ut-hullo.fel .ut-hull { top: auto; bottom: -48px; animation-name: utSzall; }
+@keyframes utSzall { from { transform: translate(-6vw, 4vh); } to { transform: translate(22vw, -112vh); } }
+@media (max-width: 700px) { .ut-hullo .ut-hull:nth-child(2n) { display: none; } }
+
+/* vonuló darvak (ősz): V alakban, lassan, magasan */
+.ut-vonulas { position: absolute; left: 0; top: calc(var(--biztonsag-fent) + 64px); width: 0; height: 0; opacity: 0; animation: utVonul 66s linear 5s infinite; }
+.ut-daru { position: absolute; width: 22px; transform-origin: 50% 60%; animation: utDaruSzarny .9s ease-in-out infinite alternate; }
+.ut-daru svg { display: block; width: 100%; height: auto; fill: var(--text-dim); opacity: .8; overflow: visible; }
+@keyframes utVonul { 0% { transform: translate(-30px, 24px); opacity: 0; } 1% { opacity: 1; } 34% { transform: translate(calc(100vw + 220px), -26px); opacity: 1; } 35%, 100% { transform: translate(calc(100vw + 220px), -26px); opacity: 0; } }
+@keyframes utDaruSzarny { from { transform: scaleY(1); } to { transform: scaleY(.4); } }
+/* fecskék (nyár): gyorsan, ívben átsuhannak */
+.ut-fecskek { position: absolute; left: 0; right: 0; top: calc(var(--biztonsag-fent) + 76px); height: 170px; }
+.ut-fecske { position: absolute; left: 0; top: 0; width: 38px; opacity: 0; color: color-mix(in srgb, var(--text) 45%, #1c2233); animation: utFecske 38s cubic-bezier(.4, .1, .6, .9) infinite; will-change: transform; }
+.ut-fecske svg { display: block; width: 100%; height: auto; transform: rotate(90deg); overflow: visible; }
+.ut-fecske.f0 { top: 24px; animation-delay: 4s; }
+.ut-fecske.f1 { width: 28px; top: 78px; animation-delay: 4.5s; }
+.ut-fecske.f2 { width: 32px; top: 0; animation-delay: 5.1s; }
+@keyframes utFecske { 0% { transform: translate(-10vw, 40px) rotate(8deg); opacity: 0; } 1% { opacity: 1; } 7% { transform: translate(46vw, -14px) rotate(-10deg); } 13% { transform: translate(112vw, 52px) rotate(12deg); opacity: 1; } 14%, 100% { transform: translate(112vw, 52px); opacity: 0; } }
+/* pillangók (tavasz): lassan, libegve */
+.ut-lepkek { position: absolute; inset: 0; }
+.ut-lepke { position: absolute; left: 0; top: 0; width: 26px; opacity: 0; animation: utLepke 46s linear 3s infinite; will-change: transform; }
+.ut-lepke.l1 { width: 20px; animation-duration: 54s; animation-delay: 12s; }
+.ut-lepke svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .3)); }
+.ut-libeg { display: block; animation: utLibeg 2.3s ease-in-out infinite alternate; }
+.ut-lsz { transform-box: fill-box; animation: utLepkeSzarny .22s ease-in-out infinite alternate; }
+.ut-lsz.bal { transform-origin: 100% 50%; }
+.ut-lsz.jobb { transform-origin: 0 50%; }
+@keyframes utLepkeSzarny { from { transform: scaleX(1); } to { transform: scaleX(.3); } }
+@keyframes utLibeg { from { transform: translateY(-14px) rotate(-8deg); } to { transform: translateY(16px) rotate(10deg); } }
+@keyframes utLepke { 0% { transform: translate(-6vw, 62vh); opacity: 0; } 2% { opacity: 1; } 12% { transform: translate(22vw, 40vh); } 22% { transform: translate(46vw, 52vh); } 32% { transform: translate(70vw, 26vh); } 42% { transform: translate(106vw, 34vh); opacity: 1; } 43%, 100% { transform: translate(106vw, 34vh); opacity: 0; } }
+
+/* a figura (sün, hóember, katica, nyuszi, napraforgó): a bal alsó sarokban; rákattintva köszön, aztán elmegy */
+.ut-figura { position: absolute; left: 8px; bottom: calc(12px + var(--biztonsag-lent)); width: 60px; padding: 0; border: none; background: none; pointer-events: auto; cursor: pointer;
+    transform-origin: 50% 100%; filter: drop-shadow(0 5px 10px rgba(0, 0, 0, .35));
+    animation: utFiguraBe .9s cubic-bezier(.3, 1.4, .5, 1) both, utFiguraAll 3.4s ease-in-out .9s infinite alternate; }
+.ut-figura svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, .6)); }
+.ut-figura.sun { width: 76px; }
+.ut-figura.katica { width: 50px; }
+.ut-figura.nyuszi { width: 56px; }
+.ut-figura.napraforgo { width: 52px; bottom: var(--biztonsag-lent); }
+.ut-figura .ut-buborek { left: calc(100% + 2px); top: -8px; }
+.ut-figura.bu .ut-buborek { opacity: 1; transform: scale(1); }
+.ut-figura.bu { animation: utFiguraOrul .5s ease-in-out 2; }
+.ut-figura.el { transition: transform 1.3s ease-in, opacity 1.3s ease-in; transform: translateY(130%); opacity: 0; animation: none; }
+.ut-figura.sun.el { transform: translateX(-150%); }
+.ut-figura.katica.el { transform: translate(60vw, -70vh) rotate(-20deg) scale(.6); }
+@keyframes utFiguraBe { from { transform: translateY(125%); } to { transform: translateY(0); } }
+@keyframes utFiguraAll { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg) translateY(-2px); } }
+@keyframes utFiguraOrul { 0%, 100% { transform: rotate(0) scale(1); } 25% { transform: rotate(-7deg) scale(1.08); } 75% { transform: rotate(7deg) scale(1.08); } }
+.ut-kitores .ut-szor { position: fixed; width: 20px; margin: -10px 0 0 -10px; animation: utKitores 2.4s ease-out forwards; }
+@media (max-width: 900px) {
+    .ut-figura { transform-origin: 0 100%; scale: .86; bottom: calc(70px + var(--biztonsag-lent)); }
+    .ut-figura.napraforgo { bottom: calc(62px + var(--biztonsag-lent)); }
+}
+
+/* előnézet-sáv: csak annak, aki az előnézetet kérte (ezen az eszközön) */
+#unnep-elonezet-sav { position: fixed; left: 50%; bottom: calc(14px + var(--biztonsag-lent)); transform: translateX(-50%); z-index: 2500; display: flex; align-items: center; gap: 8px;
+    max-width: calc(100% - 20px); padding: 7px 8px; border-radius: 999px; background: #14171c; color: #fff; border: 1px solid rgba(255, 255, 255, .2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font-size: 0.84rem; }
+#unnep-elonezet-sav .ues-nev { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; text-align: center; padding: 0 2px; }
+#unnep-elonezet-sav .ues-nev small { color: rgba(255, 255, 255, .62); font-size: 0.68rem; white-space: nowrap; }
+#unnep-elonezet-sav .ues-nev b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#unnep-elonezet-sav button { font: inherit; cursor: pointer; border: none; color: #fff; flex: 0 0 auto; }
+#unnep-elonezet-sav .ues-lep { width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, .13); font-size: 1.15rem; line-height: 1; }
+#unnep-elonezet-sav .ues-lep:hover { background: rgba(255, 255, 255, .25); }
+#unnep-elonezet-sav .ues-vissza { padding: 7px 14px; border-radius: 999px; background: #fff; color: #14171c; font-weight: 800; white-space: nowrap; }
+@media (max-width: 900px) { #unnep-elonezet-sav { bottom: calc(72px + var(--biztonsag-lent)); } }
+/* telefonon két sor: felül a téma neve a léptetőkkel, alatta a visszalépő gomb; a figura a sáv fölé kerül */
+@media (max-width: 600px) {
+    #unnep-elonezet-sav { flex-wrap: wrap; justify-content: center; width: calc(100% - 20px); border-radius: 18px; padding: 8px; gap: 6px 8px; }
+    #unnep-elonezet-sav .ues-nev { flex: 1 1 0; }
+    #unnep-elonezet-sav .ues-vissza { flex: 1 1 100%; }
+    body:has(#unnep-elonezet-sav) .ut-figura, body:has(#unnep-elonezet-sav) .ut-szellem { bottom: calc(168px + var(--biztonsag-lent)); }
+}
+
+/* Beállítások > Design téma: a témák listája */
+.unnep-fej { margin: 14px 0 6px; font-size: 0.86rem; color: var(--text); }
+.unnep-fej small { color: var(--text-dim); font-weight: 500; }
+.unnep-sor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 8px 10px; margin-bottom: 6px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--card-2); }
+.unnep-sor.most { border-color: var(--primary); }
+.unnep-sor.tiltva .unnep-pipa span, .unnep-sor.tiltva .unnep-leiras { opacity: .55; }
+.unnep-pipa { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; color: var(--text); font-size: 0.9rem; }
+.unnep-pipa input { flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; accent-color: var(--primary); }
+.unnep-pipa small { color: var(--text-dim); font-weight: 500; }
+.unnep-pipa em { margin-left: 6px; font-style: normal; font-size: 0.68rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.unnep-leiras { grid-column: 1; color: var(--text-dim); font-size: 0.78rem; line-height: 1.4; }
+.unnep-gombok { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.unnep-gombok .edit-btn { margin: 0; }
+@media (max-width: 600px) {
+    .unnep-sor { grid-template-columns: 1fr; }
+    .unnep-gombok { grid-column: 1; grid-row: auto; justify-content: flex-start; margin-top: 4px; }
+}
+
+/* TV / kivetítő módban semmilyen dísz nincs (a kártyák sarkán és a fejlécen sem) */
+body.fullscreen-active .ut-fejlec-disz, body.fullscreen-active .race-card::after, body.fullscreen-active .hir-kartya::after, body.fullscreen-active .unnep-jel { display: none !important; }
+/* a stáb munkaoldalain a fejléc dísze nem mozog; a nyelvajánló alatt nincs figura; „kevesebb animáció”: semmi nem mozog */
+body.stab-nezet .ut-egosor i, body.stab-nezet .ut-egosor b { animation: none; }
+body:has(#nyelv-ajanlo) .ut-figura { display: none; }
+@media (prefers-reduced-motion: reduce) {
+    .ut-hullo, .ut-vonulas, .ut-fecskek, .ut-lepkek { display: none; }
+    .ut-figura, .ut-egosor i, .ut-egosor b, html.unnep-disz .uj-hero::before, html.unnep-disz .uj-hero::after { animation: none; }
+    html.unnep-kep-jobb .uj-hero::after { transform: scaleX(-1); }
+}
+@media print {
+    #unnep-elonezet-sav { display: none !important; }
+    html.unnep-disz .race-card::after, html.unnep-disz .hir-kartya::after { display: none !important; }
+}

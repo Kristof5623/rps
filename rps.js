@@ -13794,7 +13794,8 @@
         'Élő eredmények': 'Live results', 'Kiindulások': 'Departures', 'Hogyan?': 'How?', 'pályán / vizsgálaton': 'on course / at the vet', 'célban': 'finished', 'kiesett': 'eliminated',
         'nevező': 'entries', 'Következő kiindulások': 'Next departures', 'Várható beérkezések': 'Expected arrivals', 'Élő állás': 'Live standings', 'Minden kategória →': 'All distances →',
         'Becslés az eddigi átlagsebességből (az 1. körben a mezőnyéből) – tájékoztató.': 'Estimated from the average speed so far (on loop 1 from the field) – for information only.',
-        'Teljes állás': 'Full standings', 'Teljes állás →': 'Full standings →', 'Összes hír →': 'All news →', 'Tovább →': 'More →', 'Versenynaptár': 'Race calendar', 'Összes verseny →': 'All races →', 'Közelgő események': 'Upcoming events', 'Mind →': 'All →', 'Időpont': 'Date & time', 'Típus': 'Type',
+        'Teljes állás': 'Full standings', 'Teljes állás →': 'Full standings →', 'Összes hír →': 'All news →', 'Tovább →': 'More →', 'Versenynaptár': 'Race calendar', 'Összes verseny →': 'All races →', 'Közelgő események': 'Upcoming events', 'Mind →': 'All →', 'Szép őszt!': 'Happy autumn!', 'Brrr! Jó telet!': 'Brrr! Happy winter!', 'Boldog karácsonyt!': 'Merry Christmas!',
+        'Boldog új évet!': 'Happy New Year!', 'Szép tavaszt!': 'Happy spring!', 'Boldog húsvétot!': 'Happy Easter!', 'Jó nyarat!': 'Have a great summer!', 'Bú! Boldog Halloweent!': 'Boo! Happy Halloween!', 'Időpont': 'Date & time', 'Típus': 'Type',
         'Még nincs kiírt jövőbeli verseny.': 'No upcoming race announced yet.',
         'Legutóbbi eredmények': 'Latest results', 'Archívum →': 'Archive →', 'Ló-ranglista →': 'Horse ranking →', 'Összes →': 'All →', 'Követett versenyzőid': 'Riders you follow',
         'Követések →': 'Following →', 'End-Ride app a gépedre': 'End-Ride app for your computer', 'End-Ride app a telefonodra': 'End-Ride app for your phone', 'Most nem': 'Not now',
@@ -14184,36 +14185,369 @@
         else db.ref('settings/adatkezelo').once('value').then(s => kiir(s.val())).catch(() => kiir(null));
     }
 
-    // --- v137: ÜNNEPI DÍSZÍTÉS (minden témában, mindenkinél, dátum szerint magától) ---------------------
-    // A 2026-10-13-i ötlet: „minden design-ban megjelenő, speciális alkalmakkor megjelenő plusz díszítőelem,
-    // pl. mikulássapka az ikonra”. A díszítés a színtémától független (saját színei vannak), ezért minden
-    // témában ugyanúgy látszik: a logón egy jel (világító tök / mikulássapka), a kezdőlap nagy képén dísz
-    // (pókháló és tökök / hópelyhek), a böngészőfülön a kis ikon is, Halloweenkor pedig a díszítő réteg
-    // (unnepReteg: pókhálók, pók, denevérek, szellem). Kikapcsolni a Beállítások > Design
-    // téma oldalon lehet (settings/unnepiDisz: 'auto' | 'ki'); ott ezen az eszközön előnézet is van.
+    // --- v145: ÉVSZAKOK ÉS ÜNNEPEK DÍSZÍTÉSE (minden színtémában, mindenkinél) ---------------------------
+    // Két réteg: az ÉVSZAK az alap (tavasz, nyár, ősz, tél), az ÜNNEP ráépül (az „alap” évszak díszei + a
+    // sajátjai), vagy teljesen önálló (Halloween, október 23.). Egy napon egy téma él: az első a listában,
+    // amelyik a mai napra esik és nincs kikapcsolva - ezért az ünnepek állnak elöl. Az évszak csak a legjellemzőbb
+    // időszakában jön (nem egész évben): az év nagyobb részében nincs téma, az eredeti oldal látszik.
+    //   settings/unnepiDisz  : 'auto' | 'ki'      - az egész díszítés (mindenkinek)
+    //   settings/unnepiTemak : { kulcs: false }   - egy-egy téma kikapcsolva
+    //   settings/unnepiKezi  : kulcs | null       - kézzel bekapcsolt téma (dátumtól függetlenül, mindenkinek)
+    // Előnézet: csak ezen az eszközön (sessionStorage 'rps-unnep-elonezet'), alul sáv a visszalépéshez.
+    // A díszítés a színtémától független (saját színek). Sosem takar kattintható elemet (csak a figura
+    // kattintható); mozgó dísz nincs a stáb munkaoldalain, TV módban és „kevesebb animáció” beállításnál;
+    // nyomtatáskor semmi. A rajzok itt vannak (SVG), a kezdőlap képére és a kártyákra CSS-változóként kerülnek.
     const UNNEPEK = [
-        { kulcs: 'halloween', nev: 'Halloween', tol: '10-24', ig: '11-01', leiras: 'világító tök a logón és a kezdőlap képén, pókhálók a fejlécen és a kártyákon, ereszkedő pók, átrepülő denevérek, kukucskáló szellem (rákattintva „Bú!”)' },
-        { kulcs: 'karacsony', nev: 'Karácsony', tol: '12-01', ig: '12-26', leiras: 'mikulássapka a logón, hópelyhek a kezdőlap képén' }
+        { kulcs: 'halloween', nev: 'Halloween', tipus: 'unnep', tol: '10-24', ig: '11-01', leiras: 'faragott, világító tök a logón, tökök a kezdőlap képének jobb alsó sarkában, pókháló a bal felsőben, ereszkedő pók, átrepülő denevérek, kukucskáló szellem' },
+        { kulcs: 'okt23', nev: 'Október 23.', tipus: 'unnep', tol: '10-23', ig: '10-23', leiras: 'visszafogottan: nemzeti szalag a fejléc alatt és a kezdőlap képén, lyukas zászló – mozgó dísz nélkül' },
+        { kulcs: 'karacsony', nev: 'Advent és karácsony', tipus: 'unnep', tol: '12-01', ig: '12-29', alap: 'tel', leiras: 'mikulássapka a logón, égősor a fejléc alatt, díszített fenyőág a kezdőlap képén, hóesés, hóember („Boldog karácsonyt!”)' },
+        { kulcs: 'szilveszter', nev: 'Szilveszter és újév', tipus: 'unnep', tol: '12-30', ig: '01-01', alap: 'tel', leiras: 'csákó a logón, tűzijáték a kezdőlap képén, hóesés, hóember („Boldog új évet!”)' },
+        { kulcs: 'marc15', nev: 'Március 15.', tipus: 'unnep', tol: '03-14', ig: '03-15', alap: 'tavasz', leiras: 'kokárda a logón és a kezdőlap képén, nemzeti szalag a fejléc alatt' },
+        { kulcs: 'husvet', nev: 'Húsvét', tipus: 'unnep', szamolt: 'husvet', alap: 'tavasz', leiras: 'hímes tojás a logón, virágzó ág, szirmok, nyuszi („Boldog húsvétot!”) – nagypéntektől húsvéthétfőig' },
+        { kulcs: 'aug20', nev: 'Augusztus 20.', tipus: 'unnep', tol: '08-19', ig: '08-20', alap: 'nyar', leiras: 'nemzeti zászló a logón, tűzijáték a kezdőlap képén, nemzeti szalag a fejléc alatt' },
+        { kulcs: 'tavasz', nev: 'Tavasz', tipus: 'evszak', tol: '03-20', ig: '05-15', leiras: 'cseresznyevirág a logón, virágzó cseresznyeág a kezdőlap képének sarkában, szálló szirmok, pillangók, katica („Szép tavaszt!”)' },
+        { kulcs: 'nyar', nev: 'Nyár', tipus: 'evszak', tol: '06-21', ig: '08-18', leiras: 'nap a logón, cseresznyés ág a kezdőlap képének sarkában, szálló pitypangmagok, fecskék, napraforgó („Jó nyarat!”)' },
+        { kulcs: 'osz', nev: 'Ősz', tipus: 'evszak', tol: '10-01', ig: '11-10', leiras: 'juharlevél a logón, színes őszi ág galagonyával a kezdőlap képének sarkában, hulló falevelek, vonuló darvak, sün („Szép őszt!”)' },
+        { kulcs: 'tel', nev: 'Tél', tipus: 'evszak', tol: '01-02', ig: '01-31', leiras: 'hópehely a logón, havas-jégcsapos fejléc, hó és jégkristályok a kezdőlap képének sarkában, hóesés, hóember („Brrr! Jó telet!”)' }
     ];
+    const UT_NS = 'xmlns="http://www.w3.org/2000/svg"';
+    const UT_PIROS = '#ce2939', UT_ZOLD = '#477050';
+    const utUrl = svg => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+    let utSzamlalo = 0;
+    // az SVG-kben az „UID” helyére egyedi azonosító kerül (több példány is lehet az oldalon: fejléc, menü, lábléc)
+    const utEgyedi = svg => { const id = 'ut' + (++utSzamlalo); return String(svg).replace(/UID/g, id); };
+
+    // --- közös rajzelemek: levél, virág, cseresznye, tök ---
+    // Lapos, kétszínű rajzstílus körvonal nélkül: a jobb fél sötétebb (a levél hajlik), az erek világosabbak.
+    // Levél: a töve az origóban, a csúcsa felfelé, a levélnyél lefelé (0..4,5). A jobb fél körvonala a csúcstól a tőig:
+    // [x, y] egyenes, [c1x, c1y, c2x, c2y, x, y] görbe; a bal fél ennek tükörképe. erek: [x1, y1, x2, y2] (tükrözve is).
+    const UT_LEVEL = {
+        juhar: { csucs: 22, ut: [[1.8, -18.4], [3.8, -19.4], [3, -15.2], [2.4, -11.8], [6, -13.2], [6.8, -15.4], [8.4, -13.8], [11.4, -15.2], [9.6, -11.4], [11.2, -10], [8.2, -8.6], [4, -6.4], [7.6, -5], [8.8, -2.6], [5, -2.6], [1.4, -1.6], [0, 0]], erek: [[0, -6.5, 9.4, -13.6], [0, -3.5, 7.2, -3]] },
+        kerek: { csucs: 22, ut: [[3, -19, 9, -15, 9, -9], [9, -4, 4, -0.5, 0, 0]], erek: [[0, -5, 6, -8.6], [0, -9.5, 6.6, -13.4], [0, -14, 4.2, -17.4]] },
+        sima: { csucs: 24, ut: [[3, -18, 6, -11, 5, -6], [4.5, -2.5, 2, -0.5, 0, 0]], erek: [[0, -6, 3.4, -9.6], [0, -11, 3.2, -14.8], [0, -15.5, 2.2, -18.6]] },
+        magyal: { csucs: 22, ut: [[2, -20, 3, -18, 6, -17], [8.5, -13, 5, -11, 6.5, -8], [3, -7, 4, -3, 0, 0]], erek: [[0, -8, 5.6, -9], [0, -14, 5.4, -16]] }
+    };
+    const utK = n => +n.toFixed(2);
+    // szín keverése feketével / fehérrel (#rrggbb, a: 0..1)
+    const utKever = (hex, cel, a) => '#' + [1, 3, 5].map(i => { const c = parseInt(hex.slice(i, i + 2), 16); return Math.round(c + (cel - c) * a).toString(16).padStart(2, '0'); }).join('');
+    const utSotet = (hex, a) => utKever(hex, 0, a), utVilagos = (hex, a) => utKever(hex, 255, a);
+    function utLevelUt(alak) {
+        const l = UT_LEVEL[alak], csucs = [0, -l.csucs];
+        let jobb = `M0 ${-l.csucs}`, bal = '';
+        l.ut.forEach(s => { jobb += (s.length === 2 ? 'L' : 'C') + s.join(' '); });
+        for (let i = l.ut.length - 1; i >= 0; i--) {
+            const s = l.ut[i], e = i ? l.ut[i - 1].slice(-2) : csucs;
+            bal += s.length === 2 ? `L${utK(-e[0])} ${e[1]}` : `C${utK(-s[2])} ${s[3]} ${utK(-s[0])} ${s[1]} ${utK(-e[0])} ${e[1]}`;
+        }
+        return { egesz: jobb + bal + 'Z', jobb: jobb + 'Z' };
+    }
+    function utLevelRajz(alak, szin, er) {
+        const l = UT_LEVEL[alak], u = utLevelUt(alak);
+        const erek = er === false ? '' : `<path d="M0 -.6V${3 - l.csucs}${l.erek.map(e => `M${e[0]} ${e[1]}L${e[2]} ${e[3]}M${utK(-e[0])} ${e[1]}L${utK(-e[2])} ${e[3]}`).join('')}" fill="none" stroke="${utVilagos(szin, .42)}" stroke-width=".55" stroke-linecap="round" opacity=".75"/>`;
+        return `<path d="M0 -1V4.5" stroke="${utSotet(szin, .45)}" stroke-width="1.1" stroke-linecap="round"/><path d="${u.egesz}" fill="${szin}"/><path d="${u.jobb}" fill="${utSotet(szin, .17)}"/>${erek}`;
+    }
+    // levél egy ágon: a levélnyél vége az (x, y) pontban; f: forgatás fokban (0 = felfelé áll, 180 = lefelé lóg)
+    const utLevelAgon = (x, y, f, m, alak, szin) => `<g transform="translate(${x} ${y}) rotate(${f}) scale(${m}) translate(0 -4.5)">${utLevelRajz(alak, szin)}</g>`;
+    // cseresznyevirág (a közepe az x, y pontban), bimbó, cseresznyepár (a száruk az x, y pontból lóg)
+    const UT_SZIROM = 'M0 0C-3.8-1.2-5.2-5.4-3.4-7.7-2.3-8.8-.9-8.6 0-7.8.9-8.6 2.3-8.8 3.4-7.7 5.2-5.4 3.8-1.2 0 0z';
+    const utViragzas = (x, y, m, f) => `<g transform="translate(${x} ${y}) rotate(${f || 0}) scale(${m})">`
+        + [0, 72, 144, 216, 288].map(a => `<path d="${UT_SZIROM}" fill="#fff2f6" transform="rotate(${a})"/><path d="${UT_SZIROM}" fill="#f7c2d3" transform="rotate(${a}) scale(.52)"/>`).join('')
+        + [20, 72, 124, 176, 228, 280, 332].map(a => `<g transform="rotate(${a})"><path d="M0-1.6V-4.4" stroke="#e58aa7" stroke-width=".45"/><circle cy="-4.7" r=".62" fill="#dca13a"/></g>`).join('')
+        + '<circle r="1.5" fill="#e77d9e"/></g>';
+    const utBimbo = (x, y, f, m) => `<g transform="translate(${x} ${y}) rotate(${f}) scale(${m || 1})"><path d="M0 0V-3.4" stroke="#6b8f3a" stroke-width=".9" stroke-linecap="round"/><path d="M0-3C-2.6-4-3-7.6 0-10.4 3-7.6 2.6-4 0-3z" fill="#f4a3bd"/><path d="M0-3C-1.8-3.4-2.4-5-1.8-6.2L0-4.8 1.8-6.2C2.4-5 1.8-3.4 0-3z" fill="#6f9a3e"/></g>`;
+    const utCseresznye = (x, y, f) => `<g transform="translate(${x} ${y}) rotate(${f || 0})"><path d="M0 0C-.6 5-3.4 10-6.4 14M0 0C1.2 5.4 3.2 10.6 4.4 15.6" fill="none" stroke="#6b7f2e" stroke-width=".9" stroke-linecap="round"/>`
+        + [[-6.8, 18.2, '#c62a35'], [4.8, 19.6, '#b3202d']].map(([cx, cy, sz]) => `<circle cx="${cx}" cy="${cy}" r="4.4" fill="${sz}"/><path d="M${utK(cx + 4.4)} ${cy}A4.4 4.4 0 0 1 ${cx} ${utK(cy + 4.4)}A5.6 5.6 0 0 0 ${utK(cx + 4.4)} ${cy}z" fill="#000" opacity=".2"/><ellipse cx="${utK(cx - 1.6)}" cy="${utK(cy - 1.7)}" rx="1.3" ry=".85" fill="#fff" opacity=".6" transform="rotate(-35 ${utK(cx - 1.6)} ${utK(cy - 1.7)})"/>`).join('') + '</g>';
+    // tök (64x64-es rajz, az alja y = 59-nél): bordázott test, árnyékos jobb oldal, csavart szár indával;
+    // faragva belülről világít (sötét perem a vágás mentén, a fény a közepén a legerősebb)
+    const UT_TOK = {
+        test: 'M32 23.5C35.5 21 40.5 20 44.5 21.6C47.5 20.2 53 21.2 56.5 26.5C60.5 32.5 60 45 55 51.5C52 55.5 47.5 57.5 43 57C40 58.6 35.5 59 32 58.4C28.5 59 24 58.6 21 57C16.5 57.5 12 55.5 9 51.5C4 45 3.5 32.5 7.5 26.5C11 21.2 16.5 20.2 19.5 21.6C23.5 20 28.5 21 32 23.5Z',
+        arnyek: 'M38.5 22.4C44.5 30 44.5 49 40 57.6C46 57.6 52 55.5 55 51.5C60 45 60.5 32.5 56.5 26.5C53 21.2 47.5 20.2 44.5 21.6C42.5 21 40.5 21.6 38.5 22.4Z',
+        bordak: 'M25.5 22.4C19.5 30 19.5 49 24 57.6M38.5 22.4C44.5 30 44.5 49 40 57.6M15.5 22C9.5 30 9 46 13.5 54.6M48.5 22C54.5 30 55 46 50.5 54.6',
+        arc: 'M18.5 38.5L25 30.5 28 38Q23 36.6 18.5 38.5ZM45.5 38.5L39 30.5 36 38Q41 36.6 45.5 38.5ZM30 44.2L32 40.6 34 44.2ZM16.5 45C21 52.6 26.5 54.8 32 54.8S43 52.6 47.5 45C43.5 47.6 40 48.5 37.6 48.6L36.6 50.6 34.8 48.8C33.9 48.85 32.9 48.9 32 48.9S30.1 48.85 29.2 48.8L27.4 50.6 26.4 48.6C24 48.5 20.5 47.6 16.5 45Z',
+        feny: '<radialGradient id="UID-f" cx="50%" cy="45%" r="62%"><stop offset="0" stop-color="#fff4c2"/><stop offset=".55" stop-color="#ffc840"/><stop offset="1" stop-color="#f28a12"/></radialGradient>'
+    };
+    const UT_TOK_NARANCS = { test: '#e8761c', sotet: '#a8460c', borda: '#a94c0c', feny: '#ffb766', szar: '#5e6b2b' };
+    const UT_TOK_KREM = { test: '#ece0c4', sotet: '#b39b72', borda: '#b49c74', feny: '#fffaf0', szar: '#6e6234' };
+    function utTok(sz, faragott) {
+        return `<path d="${UT_TOK.test}" fill="${sz.test}"/><path d="${UT_TOK.arnyek}" fill="${sz.sotet}" opacity=".5"/>`
+            + `<path d="${UT_TOK.bordak}" fill="none" stroke="${sz.borda}" stroke-width="1.1" stroke-linecap="round" opacity=".7"/>`
+            + `<path d="M28 27C26.5 33 26.5 41 27.8 47M12.6 31C11.6 35.5 11.8 40 13 44" fill="none" stroke="${sz.feny}" stroke-width="2" stroke-linecap="round" opacity=".55"/>`
+            + `<path d="M30.6 23.2C30.8 18.5 30 15 31.8 11.2 33 10.6 34.4 10.8 35.4 11.6 34 15 34.2 19 34.6 23 33.3 23.8 31.8 23.8 30.6 23.2Z" fill="${sz.szar}"/><ellipse cx="33.6" cy="11.3" rx="1.9" ry=".9" fill="${utVilagos(sz.szar, .3)}"/>`
+            + `<path d="M34.6 15.5C38 13 41.8 13.6 41.6 16.6 41.4 18.6 38.8 18.6 39 16.8" fill="none" stroke="${sz.szar}" stroke-width="1" stroke-linecap="round"/>`
+            + (faragott ? `<path d="${UT_TOK.arc}" fill="#6a2806" stroke="#6a2806" stroke-width="1.3" stroke-linejoin="round"/><path d="${UT_TOK.arc}" fill="url(#UID-f)"/>` : '');
+    }
+
+    // --- a logó melletti jelek ---
+    const UT_TOJAS = `<defs><clipPath id="UID-e"><path d="M12 2.5c4.2 0 7.3 6.6 7.3 11.4 0 4.6-3.1 7.6-7.3 7.6s-7.3-3-7.3-7.6C4.7 9.1 7.8 2.5 12 2.5z"/></clipPath></defs><g clip-path="url(#UID-e)"><rect width="24" height="24" fill="#f6c453"/><path d="M0 8.5l3 2 3-2 3 2 3-2 3 2 3-2 3 2 3-2v3.4l-3 2-3-2-3 2-3-2-3 2-3-2-3 2-3-2z" fill="#e2557b"/><rect y="15.2" width="24" height="2.4" fill="#4aa3df"/><g fill="#fff"><circle cx="8" cy="5.8" r="1"/><circle cx="12" cy="4.6" r="1"/><circle cx="16" cy="5.8" r="1"/><circle cx="9" cy="19.6" r=".9"/><circle cx="15" cy="19.6" r=".9"/></g></g><path d="M12 2.5c4.2 0 7.3 6.6 7.3 11.4 0 4.6-3.1 7.6-7.3 7.6s-7.3-3-7.3-7.6C4.7 9.1 7.8 2.5 12 2.5z" fill="none" stroke="#a8791c" stroke-width=".7"/>`;
+    const utZaszlo = lyukas => `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true">${lyukas ? '<defs><mask id="UID-m"><rect width="24" height="24" fill="#fff"/><circle cx="13.2" cy="9.8" r="2.9" fill="#000"/></mask></defs>' : ''}<path d="M5 2v20.5" stroke="#8a6a3b" stroke-width="1.6" stroke-linecap="round"/><circle cx="5" cy="2" r="1.3" fill="#d9a520"/><g${lyukas ? ' mask="url(#UID-m)"' : ''}><path d="M5.8 3.5c4-1.6 6.6 1.4 10.6.2 1.8-.5 3.2-1.2 4.6-1.2v4.3c-1.4 0-2.8.7-4.6 1.2-4 1.2-6.6-1.8-10.6-.2z" fill="${UT_PIROS}"/><path d="M5.8 7.8c4-1.6 6.6 1.4 10.6.2 1.8-.5 3.2-1.2 4.6-1.2v4.3c-1.4 0-2.8.7-4.6 1.2-4 1.2-6.6-1.8-10.6-.2z" fill="#fff"/><path d="M5.8 12.1c4-1.6 6.6 1.4 10.6.2 1.8-.5 3.2-1.2 4.6-1.2v4.3c-1.4 0-2.8.7-4.6 1.2-4 1.2-6.6-1.8-10.6-.2z" fill="${UT_ZOLD}"/></g></svg>`;
+    const utKokarda = () => { const szar = f => `<g transform="rotate(${f} 12 10)"><rect x="9.3" y="10" width="1.8" height="13" fill="${UT_PIROS}"/><rect x="11.1" y="10" width="1.8" height="13" fill="#fff"/><rect x="12.9" y="10" width="1.8" height="13" fill="${UT_ZOLD}"/></g>`;
+        return `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true">${szar(17)}${szar(-17)}<circle cx="12" cy="10" r="8.4" fill="${UT_PIROS}" stroke="#8e1a26" stroke-width=".5"/><circle cx="12" cy="10" r="5.7" fill="#fff"/><circle cx="12" cy="10" r="3.1" fill="${UT_ZOLD}"/><g stroke="#000" stroke-opacity=".13" stroke-width=".5"><path d="M12 1.6v16.8M3.6 10h16.8M6.1 4.1l11.8 11.8M17.9 4.1L6.1 15.9"/></g></svg>`; };
     const UNNEP_JEL = {
-        halloween: '<svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="ut-tok" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffc067"/><stop offset=".55" stop-color="#f27d16"/><stop offset="1" stop-color="#a8440a"/></radialGradient><radialGradient id="ut-feny" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fffbd1"/><stop offset=".5" stop-color="#ffd84a"/><stop offset="1" stop-color="#ff9a1f"/></radialGradient></defs><path d="M30.5 16c-.8-4.4.4-8.6 4.3-11.6l3.3 2.3c-3 2.2-4.1 5.4-3.3 9.3z" fill="#4c7d2b"/><path d="M36.5 9.5c3.5-3.2 8.6-3.7 12.2-1.2-4 .4-7.2 1.9-9.3 4.6z" fill="#6aa43a"/><ellipse cx="19" cy="38" rx="14.5" ry="19" fill="url(#ut-tok)"/><ellipse cx="45" cy="38" rx="14.5" ry="19" fill="url(#ut-tok)"/><ellipse cx="32" cy="38.5" rx="15.5" ry="21" fill="url(#ut-tok)" stroke="#a9480a" stroke-width=".8"/><path d="M19 19.5c-6 6-6 31 0 37M45 19.5c6 6 6 31 0 37" fill="none" stroke="#b9530c" stroke-width="1" opacity=".7"/><g fill="url(#ut-feny)"><path d="M18 31l7.5-5.5 2 8.5z"/><path d="M46 31l-7.5-5.5-2 8.5z"/><path d="M32 36l-3 5h6z"/><path d="M16.5 43.5c4.5 6.5 10 9.5 15.5 9.5s11-3 15.5-9.5l-4.6 1.4-2.5 3.4-3-2.6-2.9 3-2.5-3-2.5 3-2.9-3-3 2.6-2.5-3.4z"/></g></svg>',
+        halloween: `<svg ${UT_NS} viewBox="0 0 64 64" aria-hidden="true"><defs>${UT_TOK.feny}</defs>${utTok(UT_TOK_NARANCS, true)}</svg>`,
         karacsony: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.5C5 10 9.5 5 15.5 5c2.6 0 4.3 1.8 4.8 4l-3.1.8c-.5-1.2-1.4-1.8-2.5-1.6C11.5 9 9.6 13 9.3 17.5z" fill="#d6312f" stroke="#7a1414" stroke-width=".6"/>'
             + '<rect x="2" y="16.2" width="14" height="4.4" rx="2.2" fill="#fff" stroke="#c9d3dc" stroke-width=".5"/>'
-            + '<circle cx="20" cy="10.3" r="2.6" fill="#fff" stroke="#c9d3dc" stroke-width=".5"/></svg>'
+            + '<circle cx="20" cy="10.3" r="2.6" fill="#fff" stroke="#c9d3dc" stroke-width=".5"/></svg>',
+        szilveszter: `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="UID-c"><path d="M12 3.2L4.6 20.5h14.8z"/></clipPath></defs><path d="M12 3.2L4.6 20.5h14.8z" fill="#7c4dff"/><g clip-path="url(#UID-c)"><path d="M2 12l20-7v3L2 15zM2 19l20-7v3L2 22z" fill="#ffd23f"/></g><ellipse cx="12" cy="20.6" rx="7.8" ry="1.9" fill="#ff4f8b"/><circle cx="12" cy="3" r="2.1" fill="#ffd23f"/><g fill="#fff"><circle cx="19.6" cy="5" r=".9"/><circle cx="4.2" cy="8.2" r=".7"/><path d="M20.5 11.5l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z"/></g></svg>`,
+        osz: `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true"><g transform="translate(12 20.4) rotate(-12) scale(.84)">${utLevelRajz('juhar', '#d9622b')}</g></svg>`,
+        tel: `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke-linecap="round"><g stroke="#2f6fa8" stroke-width="3.4" opacity=".6"><path d="M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5"/></g><g stroke="#eef8ff" stroke-width="1.7"><path d="M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5"/><path d="M12 6l-2.2-2.2M12 6l2.2-2.2M12 18l-2.2 2.2M12 18l2.2 2.2M6.8 9l-3 .8M6.8 9L6 6M17.2 15l3-.8M17.2 15l.8 3M6.8 15l-3-.8M6.8 15L6 18M17.2 9l3 .8M17.2 9l.8-3"/></g></g><circle cx="12" cy="12" r="1.7" fill="#fff"/></svg>`,
+        tavasz: `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true">${utViragzas(12, 12, 1.3, 0)}</svg>`,
+        nyar: `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true"><g stroke="#f5a400" stroke-width="2" stroke-linecap="round"><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></g><circle cx="12" cy="12" r="5.8" fill="#ffc83a"/><path d="M12 6.2a5.8 5.8 0 0 1 0 11.6z" fill="#f5a400" opacity=".4"/></svg>`,
+        husvet: `<svg ${UT_NS} viewBox="0 0 24 24" aria-hidden="true">${UT_TOJAS}</svg>`,
+        marc15: utKokarda(),
+        aug20: utZaszlo(false),
+        okt23: utZaszlo(true)
     };
-    // a böngészőfül ikonján (100x100-as logóra): hol és mekkora a jel
-    const UNNEP_FAVICON_HELY = { halloween: 'translate(40 38) scale(.95)', karacsony: 'translate(-8 -14) rotate(-22 12 12) scale(2.6)' };
-    let unnepBeallitas = 'auto', unnepFigyelve = false, unnepFaviconEredeti = null, unnepFaviconKulcs = null;
+    // hol ül a jel a logón (CSS-osztály), és hol a böngészőfül ikonján (100x100-as logóra)
+    const UNNEP_JEL_HELY = { halloween: 'halloween', karacsony: 'karacsony', szilveszter: 'kalap', tel: 'jobb-fent', tavasz: 'jobb-fent', nyar: 'jobb-fent' };
+    const UNNEP_FAVICON_HELY = { halloween: 'translate(40 38) scale(.95)', karacsony: 'translate(-8 -14) rotate(-22 12 12) scale(2.6)', szilveszter: 'translate(-8 -16) rotate(-18 12 12) scale(2.5)',
+        tel: 'translate(50 2) scale(2)', tavasz: 'translate(50 2) scale(2)', nyar: 'translate(50 2) scale(2)' };
+    const UNNEP_FAVICON_ALAP = 'translate(50 50) scale(2)';
+    let unnepBeallitas = 'auto', unnepTiltott = {}, unnepKezi = '', unnepFigyelve = false, unnepFaviconEredeti = null, unnepFaviconKulcs = null;
 
+    // --- mikor melyik ---
+    function husvetVasarnap(ev) {
+        const a = ev % 19, b = Math.floor(ev / 100), c = ev % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3),
+            h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+        return new Date(ev, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1);
+    }
+    const utHoNap = d => String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    function unnepIdoszak(u, ev) {
+        if (u.szamolt === 'husvet') {
+            const v = husvetVasarnap(ev), p = new Date(v), h = new Date(v);
+            p.setDate(v.getDate() - 2); h.setDate(v.getDate() + 1);
+            return [utHoNap(p), utHoNap(h)];
+        }
+        return [u.tol, u.ig];
+    }
+    function unnepNapraEsik(u, datum) {
+        const nap = utHoNap(datum), [tol, ig] = unnepIdoszak(u, datum.getFullYear());
+        return tol <= ig ? (nap >= tol && nap <= ig) : (nap >= tol || nap <= ig);
+    }
+    function unnepIdoszakSzoveg(u, ev) {
+        const HO = ['jan.', 'febr.', 'márc.', 'ápr.', 'máj.', 'jún.', 'júl.', 'aug.', 'szept.', 'okt.', 'nov.', 'dec.'];
+        const sz = s => `${HO[parseInt(s.slice(0, 2), 10) - 1]} ${parseInt(s.slice(3), 10)}.`;
+        const [tol, ig] = unnepIdoszak(u, ev);
+        return tol === ig ? sz(tol) : `${sz(tol)} – ${ig === '02-29' ? 'febr. vége' : sz(ig)}`;
+    }
     function unnepElonezet() { try { return sessionStorage.getItem('rps-unnep-elonezet') || ''; } catch (e) { return ''; } }
+    // amit MINDENKI lát (előnézet nélkül): kikapcsolva semmi; kézi téma; különben a dátum szerinti első engedélyezett
+    function unnepMindenkinel(datum) {
+        if (unnepBeallitas === 'ki') return null;
+        if (unnepKezi) { const k = UNNEPEK.find(u => u.kulcs === unnepKezi); if (k) return k; }
+        const ma = datum || new Date();
+        return UNNEPEK.find(u => !unnepTiltott[u.kulcs] && unnepNapraEsik(u, ma)) || null;
+    }
     function aktualisUnnep() {
         const elo = unnepElonezet();
         if (elo) return elo === 'nincs' ? null : (UNNEPEK.find(u => u.kulcs === elo) || null);
-        if (unnepBeallitas === 'ki') return null;
-        const n = new Date();
-        const nap = String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
-        return UNNEPEK.find(u => nap >= u.tol && nap <= u.ig) || null;
+        return unnepMindenkinel();
     }
+
+    // --- rajzok: ág, pókháló, tökök, hó, tűzijáték ---
+    // Az évszakoknál egy ág a kezdőlap képének bal felső sarkából (160x130), légiesen, kevés elemmel:
+    // ősz - színes levelek galagonyabogyóval; tavasz - cseresznyevirág bimbókkal; nyár - zöld levél cseresznyével
+    // elvékonyodó ág kitöltött alakként: köbös görbék láncán a vastagság v0-ról v1-re fogy
+    function utAgForma(gorbek, v0, v1) {
+        const bal = [], jobb = [], n = 14;
+        gorbek.forEach((g, gi) => {
+            for (let k = gi ? 1 : 0; k <= n; k++) {
+                const t = k / n, u = 1 - t;
+                const p = i => u * u * u * g[0][i] + 3 * u * u * t * g[1][i] + 3 * u * t * t * g[2][i] + t * t * t * g[3][i];
+                const dp = i => 3 * u * u * (g[1][i] - g[0][i]) + 6 * u * t * (g[2][i] - g[1][i]) + 3 * t * t * (g[3][i] - g[2][i]);
+                const h = Math.hypot(dp(0), dp(1)) || 1, nx = -dp(1) / h, ny = dp(0) / h, v = (v0 + (v1 - v0) * ((gi + t) / gorbek.length)) / 2;
+                bal.push(`${utK(p(0) + nx * v)} ${utK(p(1) + ny * v)}`);
+                jobb.push(`${utK(p(0) - nx * v)} ${utK(p(1) - ny * v)}`);
+            }
+        });
+        return `<path d="M${bal.join('L')}L${jobb.reverse().join('L')}Z"/>`;
+    }
+    function utAgSvg(fajta) {
+        const ag = '<g fill="#5b4030">' + utAgForma([[[-6, 14], [24, 8], [54, 14], [82, 30]], [[82, 30], [100, 40], [112, 54], [120, 70]], [[120, 70], [123, 76], [125, 82], [126, 88]]], 3.8, 1)
+            + utAgForma([[[36, 10], [44, 3], [52, 1], [60, 2]]], 2, .8) + utAgForma([[[66, 21], [70, 30], [70, 40], [66, 48]]], 1.9, .9) + utAgForma([[[98, 44], [106, 42], [116, 40], [126, 42]]], 1.6, .7) + '</g>';
+        const L = utLevelAgon;
+        let hatul, elol;
+        if (fajta === 'osz') {
+            hatul = L(44, 5, 150, .95, 'kerek', '#e09a2d') + L(60, 2, 112, .9, 'sima', '#cfa840') + L(126, 42, 100, .85, 'sima', '#e09a2d');
+            elol = L(16, 11, 195, 1.2, 'juhar', '#c4502a') + L(84, 31, 140, 1, 'kerek', '#d9682b') + L(66, 48, 172, 1.35, 'juhar', '#a33326') + L(126, 88, 165, 1.05, 'juhar', '#d9682b')
+                + '<path d="M104 48L99.5 57M104 48L104.5 60M104 48L109 56" fill="none" stroke="#5b4030" stroke-width=".8" stroke-linecap="round"/>'
+                + [[99.5, 59.5, '#b3261e'], [104.5, 62.6, '#c4321f'], [109, 58.6, '#a01f1a']].map(([x, y, s]) => `<circle cx="${x}" cy="${y}" r="3.1" fill="${s}"/><circle cx="${x - 1}" cy="${y - 1}" r=".9" fill="#fff" opacity=".45"/>`).join('');
+        } else if (fajta === 'tavasz') {
+            hatul = L(30, 10, 160, .7, 'sima', '#8cbf55') + L(69, 34, 120, .75, 'sima', '#7cb04a') + L(110, 56, 130, .75, 'sima', '#8cbf55');
+            elol = utViragzas(18, 10, 1.15, 10) + utViragzas(42, 6, 1, 40) + utBimbo(60, 2, 72) + utViragzas(66, 48, 1.25, 0) + utViragzas(86, 33, 1.05, 20)
+                + utBimbo(98, 44, 200) + utViragzas(126, 42, .95, 0) + utBimbo(120, 70, 120) + utViragzas(126, 88, 1.1, 30);
+        } else {
+            hatul = L(44, 5, 150, 1, 'sima', '#4f8a34') + L(60, 2, 112, .9, 'sima', '#6aa744') + L(126, 42, 100, .9, 'sima', '#5e9a3a');
+            elol = L(16, 11, 190, 1.15, 'sima', '#5e9a3a') + L(84, 31, 140, 1.05, 'sima', '#4f8a34') + L(126, 88, 165, 1, 'sima', '#6aa744') + utCseresznye(66, 46, 0) + utCseresznye(104, 48, -10);
+        }
+        return `<svg ${UT_NS} viewBox="0 0 160 130">${hatul}${ag}${elol}</svg>`;
+    }
+    // pókháló a sarokból (140x140): sugarak és a sarok felé belógó körök, néhol szakadt szállal
+    function utHaloSvg(szin, vastag, atlatszo) {
+        const szogek = [4, 18, 32, 46, 60, 74, 87].map(a => a * Math.PI / 180), hossz = [138, 132, 140, 152, 140, 132, 138];
+        const pont = (a, r) => `${utK(Math.cos(a) * r)} ${utK(Math.sin(a) * r)}`;
+        let sugarak = '', korok = '';
+        szogek.forEach((a, i) => { sugarak += `M0 0L${pont(a, hossz[i])}`; });
+        [16, 29, 43, 58, 74, 91, 109].forEach((r, k) => {
+            const rr = n => r * (1 + ((((n * 7 + k * 3) % 5) - 2) * 0.02));
+            for (let i = 0; i < szogek.length - 1; i++) {
+                if ((k === 5 && i === 4) || (k === 6 && (i === 1 || i === 5))) continue;
+                const a1 = szogek[i], a2 = szogek[i + 1];
+                korok += `M${pont(a1, rr(i))}Q${pont((a1 + a2) / 2, (rr(i) + rr(i + 1)) / 2 * 0.89)} ${pont(a2, rr(i + 1))}`;
+            }
+        });
+        return `<svg ${UT_NS} viewBox="0 0 140 140"><g fill="none" stroke="${szin}" stroke-opacity="${atlatszo}" stroke-linecap="round"><path d="${sugarak}" stroke-width="${utK(vastag * 1.15)}"/><path d="${korok}" stroke-width="${vastag}"/></g></svg>`;
+    }
+    // tökök a kezdőlap képének jobb alsó sarkában (140x92): elöl a faragott, mögötte egy krémszínű, mellette egy kicsi
+    function utTokokSvg() {
+        return `<svg ${UT_NS} viewBox="0 0 140 92"><defs>${UT_TOK.feny}<radialGradient id="UID-g"><stop offset="0" stop-color="#ffae3d" stop-opacity=".5"/><stop offset="1" stop-color="#ffae3d" stop-opacity="0"/></radialGradient></defs>`
+            + '<ellipse cx="52" cy="86" rx="50" ry="8" fill="url(#UID-g)"/>'
+            + `<g transform="translate(74 36) scale(.8)">${utTok(UT_TOK_KREM, false)}</g>`
+            + `<g transform="translate(8 17) scale(1.2)">${utTok(UT_TOK_NARANCS, true)}</g>`
+            + `<g transform="translate(106 62) scale(.45)">${utTok(UT_TOK_NARANCS, false)}</g></svg>`;
+    }
+    // díszített fenyőág (karácsony): a tűlevelek a görbék mentén számolódnak
+    function utFenyoSvg() {
+        const gorbek = [[[-2, 3], [28, 8], [56, 22], [78, 48]], [[78, 48], [92, 64], [100, 80], [104, 100]], [[38, 14], [52, 8], [66, 8], [80, 12]], [[62, 34], [60, 50], [52, 64], [40, 74]], [[88, 62], [100, 60], [110, 64], [118, 72]]];
+        const zold = ['#2f7d4a', '#256b3e', '#3c9458'];
+        let tuk = '', agak = '';
+        gorbek.forEach((g, gi) => {
+            agak += `<path d="M${g[0].join(' ')}C${g[1].join(' ')} ${g[2].join(' ')} ${g[3].join(' ')}"/>`;
+            const lepes = gi < 2 ? 11 : 8;
+            for (let k = 0; k <= lepes; k++) {
+                const t = k / lepes, u = 1 - t;
+                const p = n => u * u * u * g[0][n] + 3 * u * u * t * g[1][n] + 3 * u * t * t * g[2][n] + t * t * t * g[3][n];
+                const dp = n => 3 * u * u * (g[1][n] - g[0][n]) + 6 * u * t * (g[2][n] - g[1][n]) + 3 * t * t * (g[3][n] - g[2][n]);
+                const irany = Math.atan2(dp(1), dp(0)), hossz = gi < 2 ? 13 : 10;
+                [-1, 1].forEach(o => {
+                    const a = irany + o * 0.9;
+                    tuk += `<path d="M${p(0).toFixed(1)} ${p(1).toFixed(1)}l${(Math.cos(a) * hossz).toFixed(1)} ${(Math.sin(a) * hossz).toFixed(1)}" stroke="${zold[(k + gi + (o > 0 ? 1 : 0)) % 3]}"/>`;
+                });
+            }
+        });
+        const gomb = (x, y, r, szin) => `<path d="M${x} ${y}v6" stroke="#d9a520" stroke-width="1" fill="none"/><rect x="${x - 1.7}" y="${y + 5}" width="3.4" height="2.4" rx=".6" fill="#d9a520"/><circle cx="${x}" cy="${y + 7 + r}" r="${r}" fill="${szin}" stroke="rgba(0,0,0,.3)" stroke-width=".7"/><circle cx="${x - r * .35}" cy="${y + 7 + r * .62}" r="${r * .28}" fill="#fff" opacity=".65"/>`;
+        return `<svg ${UT_NS} viewBox="0 0 130 130"><g fill="none" stroke-linecap="round" stroke-width="2.3">${tuk}</g><g fill="none" stroke="#5a3d28" stroke-linecap="round" stroke-width="2.4">${agak}</g>${gomb(40, 74, 8, '#d6312f')}${gomb(104, 100, 7, '#e8b923')}${gomb(80, 12, 6, '#d6312f')}${gomb(118, 72, 5.5, '#3f8fd6')}${gomb(60, 26, 5, '#e8b923')}</svg>`;
+    }
+    const UT_PIHE_UT = 'M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5M12 6l-2.2-2.2M12 6l2.2-2.2M12 18l-2.2 2.2M12 18l2.2 2.2M6.8 9l-3 .8M6.8 9L6 6M17.2 15l3-.8M17.2 15l.8 3M6.8 15l-3-.8M6.8 15L6 18M17.2 9l3 .8M17.2 9l.8-3';
+    // jégvirág a sarokban (tél): hókupac a sarokban + három kristály
+    function utKristalySvg() {
+        const k = (x, y, s, o) => `<g transform="translate(${x} ${y}) scale(${s}) translate(-12 -12)" opacity="${o}"><path d="${UT_PIHE_UT}"/></g>`;
+        return `<svg ${UT_NS} viewBox="0 0 130 130"><path d="M0 0H92C84 6 80 13 68 12C58 11 54 19 44 21C36 23 34 33 24 36C15 39 14 52 0 62z" fill="#fff" opacity=".92"/><path d="M30 34l2.6 13 2.4-13.6zM52 19l2 9 2.2-9.6zM12 52l2.4 12 2.2-12.6z" fill="#eaf4fd" opacity=".95"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round">${k(98, 40, 1.5, .9)}${k(60, 62, 1, .75)}${k(34, 96, .8, .65)}${k(112, 84, .65, .55)}</g></svg>`;
+    }
+    // tűzijáték (szilveszter, augusztus 20.)
+    function utTuzijatekSvg() {
+        const kitores = (cx, cy, r, szin, db) => `<g stroke="${szin}" stroke-linecap="round" fill="${szin}">${Array.from({ length: db }, (_, i) => {
+            const a = (i / db) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), b = i % 2 ? .78 : 1;
+            return `<path d="M${(cx + c * r * .3).toFixed(1)} ${(cy + s * r * .3).toFixed(1)}L${(cx + c * r * b).toFixed(1)} ${(cy + s * r * b).toFixed(1)}" stroke-width="1.6" fill="none"/><circle cx="${(cx + c * r * (b + .12)).toFixed(1)}" cy="${(cy + s * r * (b + .12)).toFixed(1)}" r="1.5" stroke="none"/>`;
+        }).join('')}</g>`;
+        return `<svg ${UT_NS} viewBox="0 0 130 130">${kitores(44, 44, 34, '#ffd23f', 14)}${kitores(98, 34, 21, '#ff6fa5', 12)}${kitores(84, 92, 25, '#5ad1ff', 12)}${kitores(28, 104, 15, '#b6ff6a', 10)}</svg>`;
+    }
+    // nemzeti szalag a sarokban (átlós sáv) és a nagyobb jelek a kezdőlap képére
+    const utSzalagSvg = () => `<svg ${UT_NS} viewBox="0 0 130 130"><path d="M0 50L50 0H68L0 68z" fill="${UT_PIROS}"/><path d="M0 68L68 0H86L0 86z" fill="#fff"/><path d="M0 86L86 0H104L0 104z" fill="${UT_ZOLD}"/><path d="M0 50L50 0M0 104L104 0" stroke="rgba(0,0,0,.25)" stroke-width="1" fill="none"/></svg>`;
+    const utNagyJel = jel => `<svg ${UT_NS} viewBox="0 0 130 130"><g transform="translate(26 22) scale(3.3)">${utEgyedi(jel).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g></svg>`;
+    // a verseny- és hírkártyák jobb felső sarkába (44x44)
+    const UT_KARTYA = {
+        osz: `<svg ${UT_NS} viewBox="0 0 44 44">${utLevelAgon(42, 2, 165, .68, 'kerek', '#e09a2d')}${utLevelAgon(42, 2, 222, 1, 'juhar', '#c4502a')}</svg>`,
+        tel: `<svg ${UT_NS} viewBox="0 0 44 44"><path d="M44 0H10C13 6 19 7 24 6C27 11 34 12 38 9C39 15 44 17 44 17z" fill="#fff"/><path d="M20 6.4l1.4 6 1.4-6.2zM33 10.6l1.2 5 1.2-5.4z" fill="#eaf4fd"/></svg>`,
+        tavasz: `<svg ${UT_NS} viewBox="0 0 44 44">${utLevelAgon(42, 2, 200, .7, 'sima', '#8cbf55')}${utBimbo(42, 2, 245, .9)}${utViragzas(31, 13, 1.05, 15)}</svg>`,
+        nyar: `<svg ${UT_NS} viewBox="0 0 44 44">${utLevelAgon(43, 1, 215, .85, 'sima', '#5e9a3a')}${utCseresznye(33, 1, 8)}</svg>`,
+        karacsony: `<svg ${UT_NS} viewBox="0 0 44 44"><g transform="translate(34 12) rotate(235)">${utLevelRajz('magyal', '#2f7d4a')}</g><g transform="translate(34 12) rotate(165)">${utLevelRajz('magyal', '#256b3e')}</g><g fill="#d6312f" stroke="#8f1c1b" stroke-width=".6"><circle cx="36" cy="9" r="3.2"/><circle cx="31" cy="11" r="3"/><circle cx="35" cy="14.6" r="2.8"/></g></svg>`
+    };
+    // a fejléc alá: hó jégcsapokkal (ismétlődő csempe), égősor két váltakozva világító füzérrel
+    const UT_HOSAV = `<svg ${UT_NS} viewBox="0 0 240 22"><path d="M22 7.5l2.6 11 2.6-10.6zM70 9l2 8 2.2-7.6zM112 8l3 13 3-12.6zM150 7.5l1.8 6.5 2-6.4zM196 8l2.6 10.6 2.6-10.4zM226 6.5l1.6 6 1.8-6z" fill="#e3f0fb"/><path d="M0 0H240V5C228 9 218 4 206 6.5C196 8.5 190 11 178 8C168 5.5 160 9.5 148 7.5C136 5.5 130 10.5 118 8.5C108 7 100 4.5 90 7C80 9.5 72 11 60 8C50 5.5 42 9 30 7.5C20 6.3 10 10 0 5z" fill="#fff"/></svg>`;
+    const utEgoSvg = masodik => { const ego = (x, y, szin) => `<rect x="${x - 1.7}" y="${y}" width="3.4" height="3" rx=".7" fill="#3a3f47"/><ellipse cx="${x}" cy="${y + 7}" rx="3.4" ry="4.8" fill="${szin}"/><ellipse cx="${x - 1}" cy="${y + 5.6}" rx="1" ry="1.6" fill="#fff" opacity=".55"/>`;
+        return `<svg ${UT_NS} viewBox="0 0 160 24">${masodik ? '' : '<path d="M0 3Q40 17 80 3T160 3" fill="none" stroke="#3a3f47" stroke-width="1.3"/>'}${masodik ? ego(40, 9.6, '#3f8fd6') + ego(94, 5.2, '#e8b923') + ego(146, 5.2, '#d6312f') : ego(14, 5.2, '#d6312f') + ego(66, 5.2, '#3fae5a') + ego(120, 9.6, '#e8b923')}</svg>`; };
+
+    // mit kap egy téma: az alap évszak díszei, amit az ünnep felülír
+    const UT_DISZ = {
+        osz: { heroBal: () => utAgSvg('osz'), kartya: UT_KARTYA.osz, hullo: 'osz', raj: 'daru', figura: 'sun' },
+        tel: { heroBal: utKristalySvg, kartya: UT_KARTYA.tel, fejlec: ['hosav'], hullo: 'tel', figura: 'hoember' },
+        tavasz: { heroBal: () => utAgSvg('tavasz'), kartya: UT_KARTYA.tavasz, hullo: 'tavasz', raj: 'lepke', figura: 'katica' },
+        nyar: { heroBal: () => utAgSvg('nyar'), kartya: UT_KARTYA.nyar, hullo: 'nyar', raj: 'fecske', figura: 'napraforgo' },
+        halloween: { heroBal: () => utHaloSvg('#ffffff', 1, .55), heroLent: utTokokSvg, kartya: () => utHaloSvg('#9aa2ad', 2.6, .75) },
+        karacsony: { heroBal: utFenyoSvg, heroJobb: utFenyoSvg, kartya: UT_KARTYA.karacsony, fejlec: ['egosor'] },
+        szilveszter: { heroBal: utTuzijatekSvg, heroJobb: utTuzijatekSvg, kartya: '', hullo: 'szilveszter' },
+        husvet: { figura: 'nyuszi' },
+        marc15: { heroBal: utSzalagSvg, heroJobb: () => utNagyJel(UNNEP_JEL.marc15), fejlec: ['trikolor'], figura: '' },
+        aug20: { heroBal: utSzalagSvg, heroJobb: utTuzijatekSvg, fejlec: ['trikolor'], figura: '' },
+        okt23: { heroBal: utSzalagSvg, heroJobb: () => utNagyJel(UNNEP_JEL.okt23), fejlec: ['trikolor'] }
+    };
+    function unnepDisz(u) { return Object.assign({}, UT_DISZ[u.alap] || {}, UT_DISZ[u.kulcs] || {}); }
+    const UT_UDV = { osz: 'Szép őszt!', tel: 'Brrr! Jó telet!', karacsony: 'Boldog karácsonyt!', szilveszter: 'Boldog új évet!', tavasz: 'Szép tavaszt!', husvet: 'Boldog húsvétot!', nyar: 'Jó nyarat!' };
+
+    // --- hulló / szálló apróságok ---
+    const utLevelSvg = (alak, szin) => `<svg viewBox="-12 -23 24 28" aria-hidden="true">${utLevelRajz(alak, szin)}</svg>`;
+    const UT_PIHE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${UT_PIHE_UT}" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>`;
+    const UT_HOPOTTY = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" fill="#fff"/></svg>';
+    const utSziromSvg = szin => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C17 7 17.5 13 12 21C7.5 14 7.5 8 12 3z" fill="${szin}" stroke="rgba(190,90,130,.4)" stroke-width=".6"/></svg>`;
+    const UT_PITYPANG = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="1" stroke-linecap="round"><path d="M12 21V10M12 10L7 4M12 10l5-6M12 10V3M12 10L5 7.5M12 10l7-2.5M12 10L9 3.4M12 10l3-6.6"/></g><ellipse cx="12" cy="21.4" rx="1" ry="1.7" fill="#b08a55"/></svg>';
+    const utKonfettiSvg = (szin, f) => `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="10" height="14" rx="2" fill="${szin}" transform="rotate(${f} 12 12)"/></svg>`;
+    // db: hány darab; meret (px), ido (mp, míg leér), leng (px, oldalra), forog (fok) - mind [tól, ig]
+    const UT_HULLO = {
+        osz: { db: 7, elemek: [utLevelSvg('juhar', '#c4502a'), utLevelSvg('kerek', '#e09a2d'), utLevelSvg('juhar', '#a33326'), utLevelSvg('sima', '#cfa840'), utLevelSvg('juhar', '#d9682b')], meret: [13, 21], ido: [14, 23], leng: [18, 42], forog: [25, 75] },
+        tel: { db: 18, elemek: [UT_PIHE, UT_HOPOTTY, UT_HOPOTTY], meret: [7, 17], ido: [11, 24], leng: [8, 26], forog: [20, 120] },
+        szilveszter: { db: 18, elemek: [UT_PIHE, UT_HOPOTTY, utKonfettiSvg('#ffd23f', 20), UT_HOPOTTY, utKonfettiSvg('#ff6fa5', -30), utKonfettiSvg('#5ad1ff', 50)], meret: [7, 15], ido: [10, 20], leng: [10, 30], forog: [40, 200] },
+        tavasz: { db: 10, elemek: [utSziromSvg('#ffd0e0'), utSziromSvg('#ffffff'), utSziromSvg('#ffb7cf')], meret: [9, 15], ido: [12, 21], leng: [20, 50], forog: [40, 160] },
+        nyar: { db: 6, elemek: [UT_PITYPANG], meret: [15, 23], ido: [20, 32], leng: [12, 28], forog: [6, 16], fel: true }
+    };
+    function utVeletlen(mag) { let s = (mag * 9301 + 49297) % 233280; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+    function utHulloHtml(fajta) {
+        const b = UT_HULLO[fajta];
+        if (!b) return '';
+        const r = utVeletlen(fajta.length * 13 + b.db), koz = t => t[0] + r() * (t[1] - t[0]);
+        return `<div class="ut-hullo ${fajta}${b.fel ? ' fel' : ''}">${Array.from({ length: b.db }, (_, i) => {
+            const ido = koz(b.ido);
+            return `<span class="ut-hull" style="--x:${(2 + (i + r() * .8) * (96 / b.db)).toFixed(1)}%; --d:${ido.toFixed(1)}s; --k:${(-r() * ido).toFixed(1)}s; --m:${Math.round(koz(b.meret))}px; --s:${Math.round(koz(b.leng))}px; --f:${Math.round(koz(b.forog))}deg; --r:${(2.6 + r() * 3).toFixed(1)}s; --o:${(.6 + r() * .38).toFixed(2)}"><span class="ut-ring">${b.elemek[i % b.elemek.length]}</span></span>`;
+        }).join('')}</div>`;
+    }
+    // --- átrepülő csapatok: denevérek (Halloween), vonuló darvak (ősz), fecskék (nyár), pillangók (tavasz) ---
+    const UT_DENEVER = '<svg viewBox="0 0 64 30" aria-hidden="true"><g class="ut-szarny"><path d="M30 13C25 5 15 2 2 6c5 1.6 7.4 4.6 7.4 8.6-3-1.8-6.4-1.6-9 .4 4.2.8 6.6 3.6 6.8 7 5.2-4.2 13.6-5.4 23.2-2.8z"/><path d="M34 13c5-8 15-11 28-7-5 1.6-7.4 4.6-7.4 8.6 3-1.8 6.4-1.6 9 .4-4.2.8-6.6 3.6-6.8 7-5.2-4.2-13.6-5.4-23.2-2.8z"/></g><ellipse cx="32" cy="16" rx="4.6" ry="7"/><path d="M28.6 10.4l.9-4.4 2.5 3.2 2.5-3.2.9 4.4z"/><circle cx="30.4" cy="13" r="1" fill="#ffd23f"/><circle cx="33.6" cy="13" r="1" fill="#ffd23f"/></svg>';
+    const UT_DARU = '<svg viewBox="0 0 24 10" aria-hidden="true"><path d="M0 5Q6-1 12 5Q18-1 24 5Q18 2.6 12 7.6Q6 2.6 0 5z"/></svg>';
+    const UT_FECSKE = '<svg viewBox="0 0 64 34" aria-hidden="true"><path d="M32 13C26 5 15 2 1 4c8 2.6 13 6 16 11 4.6-1.6 9.6-1.2 15 1.6 5.4-2.8 10.4-3.2 15-1.6 3-5 8-8.4 16-11-14-2-25 1-31 9z" fill="currentColor"/><path d="M29.6 16.6L24 33l8-9.4 8 9.4-5.6-16.4z" fill="currentColor"/><ellipse cx="32" cy="17" rx="4.4" ry="6.4" fill="currentColor"/><ellipse cx="32" cy="19.6" rx="2.4" ry="3.6" fill="#f3efe6"/><circle cx="32" cy="11.6" r="2" fill="#a8452a"/></svg>';
+    const utLepkeSvg = (sz1, sz2) => `<svg viewBox="0 0 40 32" aria-hidden="true"><g class="ut-lsz bal"><path d="M19 15C13 2 2 2 2 10c0 6 9 7 17 5z" fill="${sz1}" stroke="#3a2a14" stroke-width="1"/><path d="M19 16c-7 1-12 5-9 10 4 4 8-3 9-10z" fill="${sz2}" stroke="#3a2a14" stroke-width="1"/></g><g class="ut-lsz jobb"><path d="M21 15C27 2 38 2 38 10c0 6-9 7-17 5z" fill="${sz1}" stroke="#3a2a14" stroke-width="1"/><path d="M21 16c7 1 12 5 9 10-4 4-8-3-9-10z" fill="${sz2}" stroke="#3a2a14" stroke-width="1"/></g><ellipse cx="20" cy="16" rx="1.6" ry="7.4" fill="#2a1d10"/><path d="M19.4 9c-.6-3-2-4.6-3.6-5M20.6 9c.6-3 2-4.6 3.6-5" fill="none" stroke="#2a1d10" stroke-width=".8" stroke-linecap="round"/></svg>`;
+    function utRajHtml(fajta) {
+        if (fajta === 'denever') return `<div class="ut-raj">${[0, 1, 2, 3, 4].map(i => `<span class="ut-denever d${i}"><span class="ut-hullam">${UT_DENEVER}</span></span>`).join('')}</div>`;
+        if (fajta === 'daru') return `<div class="ut-vonulas">${[-3, -2, -1, 0, 1, 2, 3].map(k => `<span class="ut-daru" style="left:${-Math.abs(k) * 26}px; top:${k * 13 + 40}px; animation-delay:${Math.abs(k) * 0.12}s">${UT_DARU}</span>`).join('')}</div>`;
+        if (fajta === 'fecske') return `<div class="ut-fecskek">${[0, 1, 2].map(i => `<span class="ut-fecske f${i}"><span class="ut-hullam">${UT_FECSKE}</span></span>`).join('')}</div>`;
+        if (fajta === 'lepke') return `<div class="ut-lepkek"><span class="ut-lepke l0"><span class="ut-libeg">${utLepkeSvg('#ffb238', '#ff8a1f')}</span></span><span class="ut-lepke l1"><span class="ut-libeg">${utLepkeSvg('#fff06a', '#ffd23f')}</span></span></div>`;
+        return '';
+    }
+    // --- figurák: a bal alsó sarokból kukucskálnak; rákattintva köszönnek, aztán elmennek ---
+    const UT_SZELLEM = '<svg viewBox="0 0 60 72" aria-hidden="true"><defs><linearGradient id="ut-szellem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dcd9f2"/></linearGradient></defs><path d="M6.5 34c-4 1-6 4-5.4 7 3-1 5-2.4 5.4-4zM53.5 34c4 1 6 4 5.4 7-3-1-5-2.4-5.4-4z" fill="url(#ut-szellem)" stroke="#bdb8dd" stroke-width="1"/><path d="M30 3C15.5 3 6 14.5 6 29v34c0 3.2 3.4 4.4 5.6 2.2l4.4-4.4 5.2 5.2c1.8 1.8 4.4 1.8 6.2 0l2.6-3.6 2.6 3.6c1.8 1.8 4.4 1.8 6.2 0l5.2-5.2 4.4 4.4c2.2 2.2 5.6 1 5.6-2.2V29C54 14.5 44.5 3 30 3z" fill="url(#ut-szellem)" stroke="#bdb8dd" stroke-width="1.2"/><ellipse cx="21.5" cy="27" rx="3.6" ry="5" fill="#231a30"/><ellipse cx="38.5" cy="27" rx="3.6" ry="5" fill="#231a30"/><circle cx="22.6" cy="25.2" r="1.2" fill="#fff"/><circle cx="39.6" cy="25.2" r="1.2" fill="#fff"/><ellipse cx="30" cy="39" rx="4" ry="5" fill="#231a30"/><ellipse cx="15" cy="35" rx="3.6" ry="2.2" fill="#ff9fbd" opacity=".55"/><ellipse cx="45" cy="35" rx="3.6" ry="2.2" fill="#ff9fbd" opacity=".55"/></svg>';
+    const UT_POK = '<svg viewBox="0 0 30 30" aria-hidden="true"><g stroke="#140f1c" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M11 14l-6-4-2-5M11 16H4l-3 3M11 18l-6 4-1 5M12 20l-3 6M19 14l6-4 2-5M19 16h7l3 3M19 18l6 4 1 5M18 20l3 6"/></g><ellipse cx="15" cy="18" rx="5" ry="6" fill="#140f1c"/><circle cx="15" cy="11" r="3.4" fill="#140f1c"/><circle cx="13.7" cy="10.6" r=".8" fill="#ff8a24"/><circle cx="16.3" cy="10.6" r=".8" fill="#ff8a24"/></svg>';
+    const UT_FIGURA = {
+        sun: '<svg viewBox="0 0 72 50" aria-hidden="true"><ellipse cx="38" cy="46.6" rx="26" ry="2.6" fill="#000" opacity=".18"/><path d="M21 44C14 36 15 22 27 14l1.5-6 4 4.2L36 5l3.2 6L44 5.5l1.6 6.2L51 7l.4 6.4 6-2.6-1.2 6.4 6.2-.6-3.2 5.6 5.4 1.6-4.4 4.2 3.8 3.6-5.2 2.4c0 4-1.6 7.6-4.2 10z" fill="#6b4a32" stroke="#4a3122" stroke-width="1" stroke-linejoin="round"/><g stroke="#3d281b" stroke-width="1.2" stroke-linecap="round" opacity=".6"><path d="M30 20l-2-4M37 17l-1-4.5M44 17l.6-4.6M50 20l2.4-4M54 26l4-2.4M56 32l4.4-.6M34 26l-1.4-4M41 24l-.2-4.4M47 26l1.6-4M51 31l3.6-2M38 31l-1-4M45 32l.8-4"/></g><path d="M26 44C14 45 5 41 2.6 35.6 7 29 14 25 22 25.4c5 3.4 7.6 11.6 4 18.6z" fill="#f3d9b1" stroke="#c9a273" stroke-width="1"/><circle cx="3.4" cy="35.2" r="2.2" fill="#2a1d16"/><circle cx="13.5" cy="31.5" r="1.9" fill="#2a1d16"/><circle cx="14.1" cy="30.9" r=".6" fill="#fff"/><ellipse cx="17.4" cy="36.6" rx="2.6" ry="1.6" fill="#f2a0a0" opacity=".6"/><path d="M7 38.8c2 1.4 4.4 1.6 6.4.6" fill="none" stroke="#8a5a3a" stroke-width="1" stroke-linecap="round"/><path d="M21 25.6c-.6-3 1.4-5 4.2-4.6 1 2.6-.4 5-3 5.6z" fill="#e8c597" stroke="#c9a273" stroke-width=".8"/><ellipse cx="24" cy="45.4" rx="4" ry="2" fill="#d9b183"/><ellipse cx="46" cy="45.4" rx="4.4" ry="2" fill="#d9b183"/><g transform="translate(37 -2)"><circle cx="6" cy="9" r="5.6" fill="#d83a2e" stroke="#9c231b" stroke-width=".8"/><path d="M6 4.2c.2-1.6 1-2.6 2.2-3.2" fill="none" stroke="#5a3d28" stroke-width="1.1" stroke-linecap="round"/><path d="M7.4 2.6c1.6-1.4 3.6-1.2 4.6.2-1.4 1.2-3.2 1.2-4.6-.2z" fill="#5c9a36"/><circle cx="4.2" cy="7.2" r="1.2" fill="#fff" opacity=".5"/></g></svg>',
+        hoember: '<svg viewBox="0 0 60 80" aria-hidden="true"><defs><radialGradient id="UID-h" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#fff"/><stop offset=".7" stop-color="#eef4fb"/><stop offset="1" stop-color="#c9d8ea"/></radialGradient></defs><ellipse cx="30" cy="76.6" rx="21" ry="2.8" fill="#000" opacity=".16"/><path d="M19 38L5 28M9.6 31.2l-4.4.6M10.6 32l-.6-4.6M41 38l14-10M50.4 31.2l4.4.6M49.4 32l.6-4.6" stroke="#6b4a32" stroke-width="1.7" stroke-linecap="round" fill="none"/><circle cx="30" cy="58" r="18" fill="url(#UID-h)" stroke="#b5c6da" stroke-width="1.1"/><circle cx="30" cy="36" r="13" fill="url(#UID-h)" stroke="#b5c6da" stroke-width="1.1"/><circle cx="30" cy="18.5" r="10" fill="url(#UID-h)" stroke="#b5c6da" stroke-width="1.1"/><path d="M20.2 24.4c6 3.6 13.6 3.6 19.6 0l1.2 3.8c-6.8 4-15.2 4-22 0z" fill="#d6312f" stroke="#8f1c1b" stroke-width=".7"/><path d="M35 27.8l2.8 9.8 3.6-1.2-2.6-9.6z" fill="#d6312f" stroke="#8f1c1b" stroke-width=".7"/><rect x="22.5" y="1.4" width="15" height="9.6" rx="1.4" fill="#2b2f3a"/><rect x="19" y="9.6" width="22" height="2.8" rx="1.4" fill="#2b2f3a"/><rect x="22.5" y="6.8" width="15" height="2.6" fill="#d6312f"/><circle cx="26.2" cy="16.4" r="1.4" fill="#22262e"/><circle cx="33.8" cy="16.4" r="1.4" fill="#22262e"/><path d="M30 18.6l9.4 2-9.4 1.6z" fill="#f58a1f" stroke="#c96a10" stroke-width=".5"/><g fill="#22262e"><circle cx="25.2" cy="21.6" r=".75"/><circle cx="26.8" cy="23" r=".75"/><circle cx="28.9" cy="23.7" r=".75"/><circle cx="31.1" cy="23.7" r=".75"/><circle cx="33.2" cy="23" r=".75"/><circle cx="30" cy="34" r="1.3"/><circle cx="30" cy="39.6" r="1.3"/><circle cx="30" cy="52" r="1.4"/><circle cx="30" cy="59" r="1.4"/></g></svg>',
+        katica: '<svg viewBox="0 0 58 44" aria-hidden="true"><ellipse cx="27" cy="41.6" rx="19" ry="2.2" fill="#000" opacity=".16"/><g stroke="#1d1a22" stroke-width="1.7" stroke-linecap="round" fill="none"><path d="M12 34l-5 5M20 38l-2 4.4M32 38l2 4.4M40 34l5 5"/><path d="M46 15c1-4 3-6 6-6.6M48.4 17c2.6-2.6 5-3.4 7.4-3"/></g><path d="M41 14.6c5 1.2 8.6 6.6 8.6 12.4 0 2.6-.5 5-1.1 7H41z" fill="#1d1a22"/><path d="M6 34C6 19 14 9 24 9s18 10 18 25z" fill="#e23a2e" stroke="#9c1f17" stroke-width="1.1"/><path d="M24 9v25" stroke="#9c1f17" stroke-width="1.1"/><g fill="#1d1a22"><circle cx="15" cy="20" r="3"/><circle cx="17" cy="29" r="2.4"/><circle cx="10" cy="28.4" r="1.8"/><circle cx="31.4" cy="17.6" r="2.6"/><circle cx="33" cy="27.4" r="3"/></g><circle cx="45.4" cy="22.4" r="2.1" fill="#fff"/><circle cx="46" cy="22.8" r="1" fill="#1d1a22"/><path d="M10 16.6c3-3.4 7-5.4 11-5.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".45"/></svg>',
+        nyuszi: `<svg viewBox="0 0 56 72" aria-hidden="true"><ellipse cx="28" cy="69" rx="19" ry="2.6" fill="#000" opacity=".16"/><path d="M19 26C13 14 13 4 17.6 2.6 22 1.4 25 11 25.6 24z" fill="#f4f1ee" stroke="#cfc6bd" stroke-width="1"/><path d="M19.6 22C16.6 14 16.8 7.6 18.6 6.6c1.8-.6 3.6 6 4 14z" fill="#f7b5c4"/><path d="M37 26c6-12 6-22 1.4-23.4C34 1.4 31 11 30.4 24z" fill="#f4f1ee" stroke="#cfc6bd" stroke-width="1"/><path d="M36.4 22c3-8 2.8-14.4 1-15.4-1.8-.6-3.6 6-4 14z" fill="#f7b5c4"/><ellipse cx="28" cy="54" rx="15" ry="14" fill="#f4f1ee" stroke="#cfc6bd" stroke-width="1"/><ellipse cx="20" cy="67" rx="6" ry="2.8" fill="#f4f1ee" stroke="#cfc6bd" stroke-width=".9"/><ellipse cx="36" cy="67" rx="6" ry="2.8" fill="#f4f1ee" stroke="#cfc6bd" stroke-width=".9"/><ellipse cx="28" cy="33" rx="13" ry="11.4" fill="#f4f1ee" stroke="#cfc6bd" stroke-width="1"/><circle cx="22.6" cy="31" r="1.8" fill="#2a2330"/><circle cx="33.4" cy="31" r="1.8" fill="#2a2330"/><circle cx="23.2" cy="30.4" r=".6" fill="#fff"/><circle cx="34" cy="30.4" r=".6" fill="#fff"/><path d="M26.6 35.4h2.8L28 37.2z" fill="#f08aa6"/><path d="M28 37.2v1.6M28 38.8c-1.4 1.6-3.2 1.6-4.2.4M28 38.8c1.4 1.6 3.2 1.6 4.2.4" fill="none" stroke="#8d7f86" stroke-width=".9" stroke-linecap="round"/><ellipse cx="19.6" cy="36" rx="2.6" ry="1.6" fill="#f7b5c4" opacity=".7"/><ellipse cx="36.4" cy="36" rx="2.6" ry="1.6" fill="#f7b5c4" opacity=".7"/><g transform="translate(19.4 45.5) scale(.72)">${UT_TOJAS}</g><ellipse cx="18.4" cy="57" rx="3.6" ry="2.6" fill="#f4f1ee" stroke="#cfc6bd" stroke-width=".9"/><ellipse cx="37.6" cy="57" rx="3.6" ry="2.6" fill="#f4f1ee" stroke="#cfc6bd" stroke-width=".9"/></svg>`,
+        napraforgo: `<svg viewBox="0 0 56 86" aria-hidden="true"><path d="M28 40c-1.4 14-1.4 30 0 46" stroke="#4f8a2e" stroke-width="3.6" stroke-linecap="round" fill="none"/><path d="M27.4 64c-8-6-16-5-20 0 6 5 14 5 20 0z" fill="#5c9a36" stroke="#3f7323" stroke-width=".8"/><path d="M28 73c8-6 16-5 20 0-6 5-14 5-20 0z" fill="#5c9a36" stroke="#3f7323" stroke-width=".8"/><g transform="translate(28 27)">${Array.from({ length: 16 }, (_, i) => `<ellipse cx="0" cy="-17" rx="4.3" ry="9" fill="${i % 2 ? '#ffb81f' : '#ffcf3c'}" stroke="#e39a12" stroke-width=".6" transform="rotate(${i * 22.5})"/>`).join('')}<circle r="11.6" fill="#6b4423" stroke="#4a2d14" stroke-width="1"/><circle r="8.2" fill="#7d5230"/><circle cx="-3.6" cy="-1.8" r="1.4" fill="#2a1a0c"/><circle cx="3.6" cy="-1.8" r="1.4" fill="#2a1a0c"/><path d="M-4.2 2.4c2.4 2.8 6 2.8 8.4 0" fill="none" stroke="#2a1a0c" stroke-width="1.2" stroke-linecap="round"/><ellipse cx="-6.4" cy="1.6" rx="1.8" ry="1.1" fill="#f2a0a0" opacity=".55"/><ellipse cx="6.4" cy="1.6" rx="1.8" ry="1.1" fill="#f2a0a0" opacity=".55"/></g></svg>`
+    };
+    function utFiguraHtml(u, nev) {
+        const svg = nev && UT_FIGURA[nev];
+        if (!svg) return '';
+        let el = false;
+        try { el = sessionStorage.getItem('rps-figura-el-' + u.kulcs) === '1'; } catch (e) {}
+        if (el) return '';
+        const szoveg = UT_UDV[u.kulcs] || UT_UDV[u.alap] || '';
+        return `<button type="button" class="ut-figura ${nev}" title="${esc(szoveg)}" onclick="unnepFigura(this, '${u.kulcs}')">${utEgyedi(svg)}<span class="ut-buborek">${esc(szoveg)}</span></button>`;
+    }
+    function unnepFigura(gomb, kulcs) {
+        if (gomb.classList.contains('bu')) return;
+        gomb.classList.add('bu');
+        const u = UNNEPEK.find(x => x.kulcs === kulcs), b = u ? UT_HULLO[unnepDisz(u).hullo] : null;
+        if (b) {
+            const r = gomb.getBoundingClientRect(), kitores = document.createElement('div');
+            kitores.className = 'ut-kitores';
+            kitores.innerHTML = [[200, -240], [300, -130], [130, -310], [350, -280], [240, -50], [60, -210], [120, -120], [280, -210]].map(([dx, dy], i) =>
+                `<span class="ut-szor" style="left:${Math.round(r.left + r.width / 2)}px; top:${Math.round(r.top + r.height / 3)}px; --dx:${dx}px; --dy:${dy}px; animation-delay:${i * 70}ms">${b.elemek[i % b.elemek.length]}</span>`).join('');
+            document.getElementById('unnep-reteg')?.appendChild(kitores);
+            setTimeout(() => kitores.remove(), 4000);
+        }
+        // ezután elmegy, és ebben a munkamenetben már nem jön vissza
+        setTimeout(() => { gomb.classList.add('el'); try { sessionStorage.setItem('rps-figura-el-' + kulcs, '1'); } catch (e) {} }, 2800);
+        setTimeout(() => gomb.remove(), 4600);
+    }
+
+    // --- a téma alkalmazása ---
     // A logók (fejléc, menü, lábléc, fiók) mellé a jel: a logót egy keretbe tesszük, abban ül a jel
     function unnepLogok(gyoker, u) {
         (gyoker.querySelectorAll ? gyoker.querySelectorAll('svg.brand-logo') : []).forEach(svg => {
@@ -14228,7 +14562,7 @@
             let jel = keret.querySelector('.unnep-jel');
             if (!u) { if (jel) jel.remove(); return; }
             if (!jel) { jel = document.createElement('span'); keret.appendChild(jel); }
-            if (jel.dataset.unnep !== u.kulcs) { jel.className = 'unnep-jel ' + u.kulcs; jel.dataset.unnep = u.kulcs; jel.innerHTML = UNNEP_JEL[u.kulcs]; }
+            if (jel.dataset.unnep !== u.kulcs) { jel.className = 'unnep-jel ' + (UNNEP_JEL_HELY[u.kulcs] || 'jobb-lent'); jel.dataset.unnep = u.kulcs; jel.innerHTML = utEgyedi(UNNEP_JEL[u.kulcs] || UNNEP_JEL[u.alap] || ''); }
         });
     }
     function unnepFavicon(u) {
@@ -14241,36 +14575,62 @@
         if (!u) { unnepFaviconEredeti.forEach(x => { x.l.setAttribute('href', x.href); if (x.type) x.l.setAttribute('type', x.type); }); return; }
         fetch('kepek/logo.svg').then(r => (r.ok ? r.text() : Promise.reject())).then(svg => {
             if (unnepFaviconKulcs !== kulcs) return;
-            const jel = UNNEP_JEL[kulcs].replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
-            const uj = svg.replace('</svg>', `<g transform="${UNNEP_FAVICON_HELY[kulcs]}">${jel}</g></svg>`);
+            const jel = String(UNNEP_JEL[kulcs] || UNNEP_JEL[u.alap] || '').replace(/UID/g, 'fav').replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+            const uj = svg.replace('</svg>', `<g transform="${UNNEP_FAVICON_HELY[kulcs] || UNNEP_FAVICON_ALAP}">${jel}</g></svg>`);
             const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(uj);
             unnepFaviconEredeti.forEach(x => { x.l.setAttribute('href', url); x.l.setAttribute('type', 'image/svg+xml'); });
         }).catch(() => {});
     }
-    // Halloween: díszítő réteg - pókhálók a fejléc két sarkából, ereszkedő pók, átrepülő denevérek, kukucskáló
-    // szellem (rákattintva „Bú!”, és szétrebbennek a denevérek). Kattintani csak a szellemre lehet, minden más
-    // átengedi az egeret / ujjat. A stáb munkaoldalain, TV módban és „kevesebb animáció” beállításnál nincs mozgás.
-    const UT_DENEVER = '<svg viewBox="0 0 64 30" aria-hidden="true"><g class="ut-szarny"><path d="M30 13C25 5 15 2 2 6c5 1.6 7.4 4.6 7.4 8.6-3-1.8-6.4-1.6-9 .4 4.2.8 6.6 3.6 6.8 7 5.2-4.2 13.6-5.4 23.2-2.8z"/><path d="M34 13c5-8 15-11 28-7-5 1.6-7.4 4.6-7.4 8.6 3-1.8 6.4-1.6 9 .4-4.2.8-6.6 3.6-6.8 7-5.2-4.2-13.6-5.4-23.2-2.8z"/></g><ellipse cx="32" cy="16" rx="4.6" ry="7"/><path d="M28.6 10.4l.9-4.4 2.5 3.2 2.5-3.2.9 4.4z"/><circle cx="30.4" cy="13" r="1" fill="#ffd23f"/><circle cx="33.6" cy="13" r="1" fill="#ffd23f"/></svg>';
-    const UT_SZELLEM = '<svg viewBox="0 0 60 72" aria-hidden="true"><defs><linearGradient id="ut-szellem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dcd9f2"/></linearGradient></defs><path d="M6.5 34c-4 1-6 4-5.4 7 3-1 5-2.4 5.4-4zM53.5 34c4 1 6 4 5.4 7-3-1-5-2.4-5.4-4z" fill="url(#ut-szellem)" stroke="#bdb8dd" stroke-width="1"/><path d="M30 3C15.5 3 6 14.5 6 29v34c0 3.2 3.4 4.4 5.6 2.2l4.4-4.4 5.2 5.2c1.8 1.8 4.4 1.8 6.2 0l2.6-3.6 2.6 3.6c1.8 1.8 4.4 1.8 6.2 0l5.2-5.2 4.4 4.4c2.2 2.2 5.6 1 5.6-2.2V29C54 14.5 44.5 3 30 3z" fill="url(#ut-szellem)" stroke="#bdb8dd" stroke-width="1.2"/><ellipse cx="21.5" cy="27" rx="3.6" ry="5" fill="#231a30"/><ellipse cx="38.5" cy="27" rx="3.6" ry="5" fill="#231a30"/><circle cx="22.6" cy="25.2" r="1.2" fill="#fff"/><circle cx="39.6" cy="25.2" r="1.2" fill="#fff"/><ellipse cx="30" cy="39" rx="4" ry="5" fill="#231a30"/><ellipse cx="15" cy="35" rx="3.6" ry="2.2" fill="#ff9fbd" opacity=".55"/><ellipse cx="45" cy="35" rx="3.6" ry="2.2" fill="#ff9fbd" opacity=".55"/></svg>';
-    const UT_POK = '<svg viewBox="0 0 30 30" aria-hidden="true"><g stroke="#140f1c" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M11 14l-6-4-2-5M11 16H4l-3 3M11 18l-6 4-1 5M12 20l-3 6M19 14l6-4 2-5M19 16h7l3 3M19 18l6 4 1 5M18 20l3 6"/></g><ellipse cx="15" cy="18" rx="5" ry="6" fill="#140f1c"/><circle cx="15" cy="11" r="3.4" fill="#140f1c"/><circle cx="13.7" cy="10.6" r=".8" fill="#ff8a24"/><circle cx="16.3" cy="10.6" r=".8" fill="#ff8a24"/></svg>';
+    // a kezdőlap képének díszei, a kártyák sarka, a fejléc hava / égősora: CSS-változóként (rps.css használja)
+    const UT_VALTOZOK = ['--unnep-hero-bal', '--unnep-hero-jobb', '--unnep-hero-lent', '--unnep-kartya', '--unnep-hosav', '--unnep-egok-a', '--unnep-egok-b'];
+    let unnepValtozoKulcs = null;
+    function unnepValtozok(u) {
+        const kulcs = u ? u.kulcs : '';
+        if (kulcs === unnepValtozoKulcs) return;
+        unnepValtozoKulcs = kulcs;
+        const gy = document.documentElement, st = gy.style, d = u ? unnepDisz(u) : {}, fej = d.fejlec || [];
+        UT_VALTOZOK.forEach(v => st.removeProperty(v));
+        // a kép jobb oldalán egy dísz fér el: a felső sarokban (tükrözve), vagy ha ott nincs, a jobb alsóban
+        gy.classList.toggle('unnep-kep-jobb', !!d.heroJobb);
+        gy.classList.toggle('unnep-kep-lent', !d.heroJobb && !!d.heroLent);
+        if (!u) return;
+        const be = (nev, svg) => { const s = typeof svg === 'function' ? svg() : svg; if (s) st.setProperty(nev, utUrl(s)); };
+        be('--unnep-hero-bal', d.heroBal); be('--unnep-kartya', d.kartya);
+        if (d.heroJobb) be('--unnep-hero-jobb', d.heroJobb); else be('--unnep-hero-lent', d.heroLent);
+        if (fej.includes('hosav')) be('--unnep-hosav', UT_HOSAV);
+        if (fej.includes('egosor')) { be('--unnep-egok-a', utEgoSvg(false)); be('--unnep-egok-b', utEgoSvg(true)); }
+    }
+    // a fejléc alja: ereszkedő pók (Halloween), hó jégcsapokkal, égősor, nemzeti szalag
+    function unnepFejlec(u) {
+        const fej = document.getElementById('uj-fejlec'), kulcs = u ? u.kulcs : '';
+        document.querySelectorAll('.ut-fejlec-disz').forEach(e => { if (e.dataset.kulcs !== kulcs) e.remove(); });
+        if (!fej || !u || fej.querySelector('.ut-fejlec-disz')) return;
+        const span = (osztaly, belso) => `<span class="ut-fejlec-disz ${osztaly}" data-kulcs="${kulcs}" aria-hidden="true">${belso || ''}</span>`;
+        const html = kulcs === 'halloween' ? span('ut-pok', `<span class="ut-szal"></span>${UT_POK}`)
+            : (unnepDisz(u).fejlec || []).map(t => ({ hosav: span('ut-hosav'), egosor: span('ut-egosor', '<i></i><b></b>'), trikolor: span('ut-trikolor') }[t] || '')).join('');
+        if (html) fej.insertAdjacentHTML('beforeend', html);
+    }
+    // a díszítő réteg: hulló apróságok, átrepülő csapat, figura. Kattintani csak a figurára lehet.
     function unnepReteg(u) {
-        const van = u && u.kulcs === 'halloween';
-        const fej = document.getElementById('uj-fejlec');
-        document.querySelectorAll('.ut-fejlec-disz').forEach(e => { if (!van) e.remove(); });
         let reteg = document.getElementById('unnep-reteg');
-        if (!van) { if (reteg) reteg.remove(); return; }
-        if (fej && !fej.querySelector('.ut-fejlec-disz')) {
-            fej.insertAdjacentHTML('beforeend', `<span class="ut-fejlec-disz ut-halo bal" aria-hidden="true"></span><span class="ut-fejlec-disz ut-halo jobb" aria-hidden="true"></span>
-                <span class="ut-fejlec-disz ut-pok" aria-hidden="true"><span class="ut-szal"></span>${UT_POK}</span>`);
+        const kulcs = u ? u.kulcs : '';
+        if (reteg && reteg.dataset.kulcs !== kulcs) { reteg.remove(); reteg = null; }
+        if (!u || reteg) return;
+        let html;
+        if (kulcs === 'halloween') {
+            let szellemEl = false;
+            try { szellemEl = sessionStorage.getItem('rps-szellem-el') === '1'; } catch (e) {}
+            html = utRajHtml('denever') + (szellemEl ? '' : `<button type="button" class="ut-szellem" title="Bú!" onclick="unnepSzellem(this)">${UT_SZELLEM}<span class="ut-buborek">Bú! Boldog Halloweent!</span></button>`);
+        } else {
+            const d = unnepDisz(u);
+            html = utHulloHtml(d.hullo) + utRajHtml(d.raj) + utFiguraHtml(u, d.figura);
         }
-        if (reteg) return;
+        if (!html) return;
         reteg = document.createElement('div');
         reteg.id = 'unnep-reteg';
+        reteg.dataset.kulcs = kulcs;
         reteg.setAttribute('aria-hidden', 'true');
-        let szellemEl = false;
-        try { szellemEl = sessionStorage.getItem('rps-szellem-el') === '1'; } catch (e) {}
-        reteg.innerHTML = `<div class="ut-raj">${[0, 1, 2, 3, 4].map(i => `<span class="ut-denever d${i}"><span class="ut-hullam">${UT_DENEVER}</span></span>`).join('')}</div>
-            ${szellemEl ? '' : `<button type="button" class="ut-szellem" title="Bú!" onclick="unnepSzellem(this)">${UT_SZELLEM}<span class="ut-buborek">Bú! Boldog Halloweent!</span></button>`}`;
+        reteg.innerHTML = html;
         document.body.appendChild(reteg);
     }
     function unnepSzellem(gomb) {
@@ -14287,11 +14647,15 @@
         setTimeout(() => gomb.remove(), 4200);
     }
     function unnepAlkalmaz() {
-        const u = aktualisUnnep();
-        UNNEPEK.forEach(x => document.documentElement.classList.toggle('unnep-' + x.kulcs, !!u && u.kulcs === x.kulcs));
+        const u = aktualisUnnep(), gy = document.documentElement;
+        UNNEPEK.forEach(x => gy.classList.toggle('unnep-' + x.kulcs, !!u && (u.kulcs === x.kulcs || u.alap === x.kulcs)));
+        gy.classList.toggle('unnep-disz', !!u);
+        unnepValtozok(u);
         unnepLogok(document, u);
+        unnepFejlec(u);
         unnepReteg(u);
         unnepFavicon(u);
+        unnepElonezetSav();
         unnepValasztoRajzol();
     }
     function unnepInditas() {
@@ -14305,30 +14669,94 @@
         if (!unnepFigyelve) {
             unnepFigyelve = true;
             db.ref('settings/unnepiDisz').on('value', s => { unnepBeallitas = s.val() === 'ki' ? 'ki' : 'auto'; unnepAlkalmaz(); }, () => {});
+            db.ref('settings/unnepiTemak').on('value', s => { const v = s.val() || {}; unnepTiltott = {}; Object.keys(v).forEach(k => { if (v[k] === false) unnepTiltott[k] = true; }); unnepAlkalmaz(); }, () => {});
+            db.ref('settings/unnepiKezi').on('value', s => { const v = s.val(); unnepKezi = typeof v === 'string' && UNNEPEK.some(x => x.kulcs === v) ? v : ''; unnepAlkalmaz(); }, () => {});
         }
-        // éjfélkor (pl. november 2-án) magától eltűnik / megjelenik
+        // éjfélkor (pl. november 2-án) magától vált
         setInterval(unnepAlkalmaz, 30 * 60 * 1000);
     }
-    // Beállítások > Design téma: be / ki (mindenkinek), és előnézet ezen az eszközön
+
+    // --- előnézet: csak ezen az eszközön; alul sáv, amivel lépkedni és visszalépni lehet ---
+    function unnepElonezetSav() {
+        let sav = document.getElementById('unnep-elonezet-sav');
+        const elo = unnepElonezet();
+        if (!elo) { if (sav) sav.remove(); return; }
+        const u = UNNEPEK.find(x => x.kulcs === elo);
+        if (!sav) { sav = document.createElement('div'); sav.id = 'unnep-elonezet-sav'; sav.className = 'nyelv-nem'; document.body.appendChild(sav); }
+        sav.innerHTML = `<button type="button" class="ues-lep" onclick="unnepElonezetLep(-1)" aria-label="Előző téma">‹</button>
+            <span class="ues-nev"><small>Előnézet – csak te látod</small><b>${u ? esc(u.nev) : 'Díszítés nélkül'}</b></span>
+            <button type="button" class="ues-lep" onclick="unnepElonezetLep(1)" aria-label="Következő téma">›</button>
+            <button type="button" class="ues-vissza" onclick="unnepElonezetValt('')">Vissza az eredetihez</button>`;
+    }
+    function unnepElonezetLep(irany) {
+        const sor = UNNEPEK.map(x => x.kulcs).concat('nincs'), i = sor.indexOf(unnepElonezet());
+        unnepElonezetValt(sor[(i + irany + sor.length) % sor.length]);
+    }
+    function unnepElonezetValt(ertek) {
+        try {
+            if (ertek) sessionStorage.setItem('rps-unnep-elonezet', ertek); else sessionStorage.removeItem('rps-unnep-elonezet');
+            // előnézetben a figura mindig ott legyen (akkor is, ha egyszer már elküldted)
+            if (ertek) { sessionStorage.removeItem('rps-figura-el-' + ertek); sessionStorage.removeItem('rps-szellem-el'); }
+        } catch (e) {}
+        const reteg = document.getElementById('unnep-reteg');
+        if (reteg) reteg.remove();
+        unnepAlkalmaz();
+    }
+
+    // a beállításokból indítva a kezdőlapra visz: ott látszik minden (a stáb munkaoldalain nincs mozgó dísz)
+    function unnepElonezetIndit(kulcs) {
+        unnepElonezetValt(kulcs);
+        if (typeof ujNavValaszt === 'function') ujNavValaszt('kezdolap');
+        window.scrollTo(0, 0);
+    }
+
+    // --- Beállítások > Design téma: az egész be / ki, témánként be / ki, kézi bekapcsolás, előnézet ---
     function unnepValasztoRajzol() {
         const hely = document.getElementById('unnep-valaszto');
         if (!hely) return;
-        const u = aktualisUnnep(), elo = unnepElonezet();
+        const mindenkinel = unnepMindenkinel(), elo = unnepElonezet(), ev = new Date().getFullYear();
         const gomb = (ertek, cimke) => `<button type="button" class="tab-btn ${unnepBeallitas === ertek ? 'active' : ''}" onclick="unnepBeallit('${ertek}')">${cimke}</button>`;
-        const egomb = (ertek, cimke) => `<button type="button" class="tab-btn ${elo === ertek ? 'active' : ''}" onclick="unnepElonezetValt('${ertek}')">${cimke}</button>`;
-        hely.innerHTML = `<div class="hir-szurok">${gomb('auto', 'Bekapcsolva (dátum szerint)')}${gomb('ki', 'Kikapcsolva')}</div>
-            <p class="field-hint" style="margin:4px 0 6px;">${UNNEPEK.map(x => `<b>${esc(x.nev)}</b> (${x.tol.replace('-', '.')}.–${x.ig.replace('-', '.')}.): ${esc(x.leiras)}`).join('<br>')}<br>
-                Most: <b>${u ? esc(u.nev) : 'nincs ünnepi díszítés'}</b>${elo ? ' (előnézet ezen az eszközön)' : ''}.</p>
-            <div class="hir-szurok">${egomb('', 'Valódi állapot')}${UNNEPEK.map(x => egomb(x.kulcs, 'Előnézet: ' + esc(x.nev))).join('')}${egomb('nincs', 'Előnézet: nincs')}</div>`;
+        const sor = x => `<div class="unnep-sor ${mindenkinel && mindenkinel.kulcs === x.kulcs ? 'most' : ''} ${unnepTiltott[x.kulcs] ? 'tiltva' : ''}">
+                <label class="unnep-pipa"><input type="checkbox" ${unnepTiltott[x.kulcs] ? '' : 'checked'} onchange="unnepTemaKapcsol('${x.kulcs}', this.checked)"><span><b>${esc(x.nev)}</b> <small>${esc(unnepIdoszakSzoveg(x, ev))}</small>${mindenkinel && mindenkinel.kulcs === x.kulcs ? '<em>most ez megy</em>' : ''}</span></label>
+                <small class="unnep-leiras">${esc(x.leiras)}</small>
+                <span class="unnep-gombok"><button type="button" class="edit-btn ${elo === x.kulcs ? 'is-info' : ''}" onclick="unnepElonezetIndit('${x.kulcs}')">Előnézet</button>
+                    <button type="button" class="edit-btn ${unnepKezi === x.kulcs ? 'is-success' : ''}" onclick="unnepKeziValt('${x.kulcs}')">${unnepKezi === x.kulcs ? 'Kézzel megy ✓' : 'Bekapcsolás most'}</button></span>
+            </div>`;
+        const kezi = unnepKezi && UNNEPEK.find(x => x.kulcs === unnepKezi);
+        hely.innerHTML = `<div class="hir-szurok">${gomb('auto', 'Bekapcsolva')}${gomb('ki', 'Kikapcsolva')}</div>
+            <p class="field-hint" style="margin:4px 0 8px;">Mindenkinél most: <b>${mindenkinel ? esc(mindenkinel.nev) : 'nincs díszítés'}</b>${unnepBeallitas === 'ki' ? ' (az egész ki van kapcsolva)' : kezi ? ' – kézzel bekapcsolva, a dátumtól függetlenül' : mindenkinel ? ' – a dátum szerint' : ''}.
+                ${kezi && unnepBeallitas !== 'ki' ? `<button type="button" class="edit-btn" onclick="unnepKeziValt('')">Vissza az automatikára</button>` : ''}
+                ${elo ? `<br>Ezen az eszközön előnézet megy – <button type="button" class="edit-btn" onclick="unnepElonezetValt('')">Vissza az eredetihez</button>` : ''}</p>
+            <h5 class="unnep-fej">Ünnepek <small>– az évszak díszeire épülnek, és elsőbbségük van</small></h5>
+            ${UNNEPEK.filter(x => x.tipus === 'unnep').map(sor).join('')}
+            <h5 class="unnep-fej">Évszakok</h5>
+            ${UNNEPEK.filter(x => x.tipus === 'evszak').map(sor).join('')}
+            <p class="field-hint" style="margin:8px 0 0;">Az évszakok csak a legjellemzőbb időszakukban jönnek, így az év nagyobb részében az eredeti oldal látszik. A pipa: a téma a maga idejében megjelenik-e (mindenkinél). <b>Előnézet</b>: az egész oldalon megnézheted, csak te látod – alul egy sáv visz vissza. <b>Bekapcsolás most</b>: mindenkinél ez megy a dátumtól függetlenül, amíg vissza nem állítod.</p>`;
     }
     function unnepBeallit(ertek) {
         db.ref('settings/unnepiDisz').set(ertek === 'ki' ? 'ki' : 'auto')
-            .then(() => showToast(ertek === 'ki' ? 'Ünnepi díszítés kikapcsolva – mindenkinél.' : 'Ünnepi díszítés bekapcsolva (dátum szerint) – mindenkinél.'))
+            .then(() => showToast(ertek === 'ki' ? 'Díszítés kikapcsolva – mindenkinél.' : 'Díszítés bekapcsolva – mindenkinél.'))
             .catch(e => showToast('Nem sikerült: ' + (e && e.message), true));
     }
-    function unnepElonezetValt(ertek) {
-        try { if (ertek) sessionStorage.setItem('rps-unnep-elonezet', ertek); else sessionStorage.removeItem('rps-unnep-elonezet'); } catch (e) {}
-        unnepAlkalmaz();
+    function unnepTemaKapcsol(kulcs, be) {
+        const u = UNNEPEK.find(x => x.kulcs === kulcs);
+        if (!u) return;
+        (be ? db.ref('settings/unnepiTemak/' + kulcs).remove() : db.ref('settings/unnepiTemak/' + kulcs).set(false))
+            .then(() => showToast(`${u.nev}: ${be ? 'a maga idejében megjelenik' : 'kikapcsolva'} – mindenkinél.`))
+            .catch(e => { showToast('Nem sikerült: ' + (e && e.message), true); unnepValasztoRajzol(); });
+    }
+    function unnepKeziValt(kulcs) {
+        const u = UNNEPEK.find(x => x.kulcs === kulcs);
+        if (!u || unnepKezi === kulcs) {
+            db.ref('settings/unnepiKezi').remove().then(() => showToast('Vissza az automatikára: a dátum szerinti téma megy.'))
+                .catch(e => showToast('Nem sikerült: ' + (e && e.message), true));
+            return;
+        }
+        showConfirm('Téma bekapcsolása mindenkinek', `A(z) „${u.nev}” téma most mindenkinél megjelenik, a dátumtól függetlenül – amíg vissza nem állítod automatikára.`, () => {
+            Promise.all([db.ref('settings/unnepiKezi').set(kulcs), db.ref('settings/unnepiDisz').set('auto')])
+                .then(() => showToast(`${u.nev}: bekapcsolva mindenkinél.`))
+                .catch(e => showToast('Nem sikerült: ' + (e && e.message), true));
+        });
     }
 
     window.onload = function() {
