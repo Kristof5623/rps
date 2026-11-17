@@ -3114,6 +3114,12 @@
     }
     const idoMezoHtml = attr => `<input type="text" class="ido-mezo" inputmode="numeric" maxlength="5" placeholder="óó:pp" autocomplete="off" spellcheck="false" oninput="idoMezoIr(this)" onblur="idoMezoKesz(this)" ${attr}>`;
     function esemenyTobbnapos(e) { return !!(e && e.vegDatum && e.datum && e.vegDatum > e.datum); }
+    // a naptárba mentéshez a kezdés: a megadott, vagy ha nincs, az első napi legkorábbi program (csak olvasáskor
+    // számoljuk, nem tároljuk - így a „Kezdés” mező törölhető marad)
+    function esemenyKezdes(e) {
+        if (ORA_PERC.test(e.ido || '')) return e.ido;
+        return Object.values(esemenyProgram(e)).filter(p => p.ido && (!p.nap || p.nap === e.datum)).map(p => p.ido).sort()[0] || '';
+    }
     // a bejelölt programok külön kezdése (csak a még bejelölt típusoké, csak érvényes érték)
     function esemenyProgram(e) {
         const p = e && e.program && typeof e.program === 'object' ? e.program : {};
@@ -3278,11 +3284,9 @@
         });
         if (rosszIdo) { showToast(`A(z) „${rosszIdo}” kezdését óra:perc alakban add meg, pl. 9:30 vagy 0930.`, true); return; }
         if (rosszNap) { showToast(`A(z) „${rosszNap}” napja az esemény napjai közé essen.`, true); return; }
-        if (Object.keys(program).length) {
-            adat.program = program;
-            // ha a kezdés nincs megadva: az első napi legkorábbi program (a naptárba mentéshez és a régebbi app-változatoknak)
-            if (!adat.ido) adat.ido = Object.values(program).filter(p => p.ido && (!p.nap || p.nap === adat.datum)).map(p => p.ido).sort()[0] || '';
-        }
+        // a kezdést nem pótoljuk a programból (különben a kitörölt kezdés mentés után visszajönne);
+        // a naptárba mentéshez az esemenyKezdes() számolja ki olvasáskor
+        if (Object.keys(program).length) adat.program = program;
         if (adat.link && !biztonsagosUrl(adat.link)) { showToast('A linknek http:// vagy https:// címmel kell kezdődnie.', true); return; }
         const id = v('es-id') || (generateSlug(adat.cim, adat.datum) + '-' + Date.now().toString(36).slice(-4));
         db.ref('esemenyek/' + id).set(adat).then(() => {
@@ -3322,7 +3326,7 @@
             const prog = esemenyProgramLista(e);
             const progSzoveg = prog.some(x => x.ido || x.nap) ? 'Program:\n' + prog.map(x => [x.nap && esemenyTobbnapos(e) ? x.nap : '', x.ido, x.nev].filter(Boolean).join(' ')).join('\n') : '';
             return { cim: e.cim || 'Esemény', datum: e.datum, vegDatum: esemenyTobbnapos(e) ? e.vegDatum : e.datum,
-                ido: ORA_PERC.test(e.ido || '') ? e.ido : '', vegIdo: ORA_PERC.test(e.vegIdo || '') ? e.vegIdo : '', hely: e.helyszin || '',
+                ido: esemenyKezdes(e), vegIdo: ORA_PERC.test(e.vegIdo || '') ? e.vegIdo : '', hely: e.helyszin || '',
                 leiras: [progSzoveg, e.leiras, biztonsagosUrl(e.link) ? e.link : ''].filter(Boolean).join('\n') };
         }
         const r = localRaces.jovo.find(x => x.id === id) || localRaces.mult.find(x => x.id === id) || (liveRaceMeta && liveRaceMeta.id === id ? liveRaceMeta : null);
