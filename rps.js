@@ -3085,6 +3085,34 @@
         return (localEsemenyek || []).filter(e => e && e.datum && esemenyVege(e) >= ma).sort((a, b) => a.datum.localeCompare(b.datum));
     }
     const ORA_PERC = /^\d\d:\d\d$/, NAP_MINTA = /^\d{4}-\d\d-\d\d$/;
+    // Időpont beírása óra-választó nélkül (a böngésző „órája” helyett sima szövegmező): gépeléskor 4 számjegynél
+    // magától bekerül a kettőspont (1030 → 10:30), kilépéskor egységes lesz (930 → 09:30, 9 → 09:00, 9.30 / 9,30 /
+    // 9 30 → 09:30). Üres: '' (nem kötelező); értelmetlen (25:00, 12:75, betű): null - a mező pirosan jelez.
+    function idoNormal(s) {
+        const t = String(s || '').trim().replace(/\s*(óra|h)$/i, '');
+        if (!t) return '';
+        let o, p, m;
+        if ((m = t.match(/^(\d{1,2})\s*[:.,\s]\s*(\d{1,2})$/))) { o = +m[1]; p = +m[2]; }
+        else if (/^\d{1,4}$/.test(t)) { o = +(t.length <= 2 ? t : t.slice(0, -2)); p = t.length <= 2 ? 0 : +t.slice(-2); }
+        else return null;
+        if (o > 23 || p > 59) return null;
+        return String(o).padStart(2, '0') + ':' + String(p).padStart(2, '0');
+    }
+    function idoMezoIr(m) {
+        let v = m.value.replace(/[.,]/g, ':').replace(/[^\d:]/g, '');
+        if (/^\d{4}$/.test(v)) v = v.slice(0, 2) + ':' + v.slice(2);
+        v = v.slice(0, 5);
+        if (v !== m.value) m.value = v;
+        m.classList.remove('hibas');
+    }
+    function idoMezoKesz(m) {
+        if (!m) return;
+        const n = idoNormal(m.value);
+        m.classList.toggle('hibas', n === null);
+        m.title = n === null ? 'Óra:perc, pl. 9:30 vagy 0930' : '';
+        if (n !== null) m.value = n;
+    }
+    const idoMezoHtml = attr => `<input type="text" class="ido-mezo" inputmode="numeric" maxlength="5" placeholder="óó:pp" autocomplete="off" spellcheck="false" oninput="idoMezoIr(this)" onblur="idoMezoKesz(this)" ${attr}>`;
     function esemenyTobbnapos(e) { return !!(e && e.vegDatum && e.datum && e.vegDatum > e.datum); }
     // a bejelölt programok külön kezdése (csak a még bejelölt típusoké, csak érvényes érték)
     function esemenyProgram(e) {
@@ -3178,7 +3206,7 @@
         if (!hely) return;
         hely.querySelectorAll('.es-program-sor').forEach(s => {
             const nap = s.querySelector('input[type="date"]');
-            esemenyProgramMemo[s.dataset.k] = { ido: s.querySelector('input[type="time"]').value, nap: nap ? nap.value : (esemenyProgramMemo[s.dataset.k] || {}).nap || '' };
+            esemenyProgramMemo[s.dataset.k] = { ido: s.querySelector('.ido-mezo').value, nap: nap ? nap.value : (esemenyProgramMemo[s.dataset.k] || {}).nap || '' };
         });
         const tipusok = [...document.querySelectorAll('#es-tipusok input:checked')].map(c => c.value).filter(k => ESEMENY_TIPUSOK[k]);
         if (tipusok.length < 2) { hely.innerHTML = ''; return; }
@@ -3188,8 +3216,8 @@
             <div class="es-program-sorok">${tipusok.map(k => {
                 const p = esemenyProgramMemo[k] || {}, nev = escapeHtml(ESEMENY_TIPUSOK[k]);
                 return `<div class="es-program-sor${tobb ? ' tobbnapos' : ''}" data-k="${k}"><span>${nev}</span>
-                    ${tobb ? `<input type="date" min="${escapeHtml(d1)}" max="${escapeHtml(d2)}" value="${escapeHtml(p.nap || '')}" aria-label="${nev} – melyik napon">` : ''}
-                    <input type="time" value="${escapeHtml(p.ido || '')}" aria-label="${nev} – kezdés"></div>`;
+                    ${tobb ? `<input type="date" min="${escapeHtml(d1)}" max="${escapeHtml(d2)}" value="${p.nap ? escapeHtml(p.nap) : ''}" aria-label="${nev} – melyik napon">` : ''}
+                    ${idoMezoHtml(`value="${p.ido ? escapeHtml(p.ido) : ''}" aria-label="${nev} – kezdés"`)}</div>`;
             }).join('')}</div>`;
     }
 
@@ -3221,20 +3249,25 @@
         const v = mezo => String(document.getElementById(mezo).value || '').trim();
         const tipusok = [...document.querySelectorAll('#es-tipusok input:checked')].map(c => c.value).filter(k => ESEMENY_TIPUSOK[k]);
         const adat = { cim: v('es-cim'), tipus: tipusok[0] || 'egyeb', tipusok: tipusok.length ? tipusok : ['egyeb'], datum: v('es-datum'), vegDatum: v('es-vegDatum'),
-            ido: v('es-ido'), vegIdo: v('es-vegIdo'), helyszin: v('es-helyszin'), leiras: v('es-leiras'), link: v('es-link') };
+            ido: idoNormal(v('es-ido')), vegIdo: idoNormal(v('es-vegIdo')), helyszin: v('es-helyszin'), leiras: v('es-leiras'), link: v('es-link') };
         if (!adat.cim) { showToast('Add meg az esemény nevét!', true); return; }
         if (!tipusok.length) { showToast('Jelöld be, mi lesz az eseményen (több is lehet)!', true); return; }
+        if (adat.ido === null || adat.vegIdo === null) {
+            ['es-ido', 'es-vegIdo'].forEach(id => idoMezoKesz(document.getElementById(id)));
+            showToast('Az időt óra:perc alakban add meg, pl. 9:30 vagy 0930.', true); return;
+        }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(adat.datum)) { showToast('Add meg a dátumot!', true); return; }
         if (adat.vegDatum && adat.vegDatum < adat.datum) { showToast('Az utolsó nap nem lehet a kezdés előtt.', true); return; }
         const tobb = !!(adat.vegDatum && adat.vegDatum > adat.datum);
         if (!tobb && adat.ido && adat.vegIdo && adat.vegIdo <= adat.ido) { showToast('Az esemény vége nem lehet a kezdés előtt.', true); return; }
         // a programok külön kezdése (csak ha több program van bejelölve)
         const program = {};
-        let rosszNap = '';
+        let rosszNap = '', rosszIdo = '';
         if (tipusok.length > 1) document.querySelectorAll('#es-program .es-program-sor').forEach(s => {
             const k = s.dataset.k;
             if (!tipusok.includes(k)) return;
-            const ido = s.querySelector('input[type="time"]').value;
+            const idoMezo = s.querySelector('.ido-mezo'), ido = idoNormal(idoMezo ? idoMezo.value : '');
+            if (ido === null) { rosszIdo = ESEMENY_TIPUSOK[k]; idoMezoKesz(idoMezo); }
             const napMezo = s.querySelector('input[type="date"]');
             const nap = tobb && napMezo ? napMezo.value : '';
             if (nap && (nap < adat.datum || nap > adat.vegDatum)) rosszNap = ESEMENY_TIPUSOK[k];
@@ -3243,6 +3276,7 @@
             if (NAP_MINTA.test(nap)) p.nap = nap;
             if (p.ido || p.nap) program[k] = p;
         });
+        if (rosszIdo) { showToast(`A(z) „${rosszIdo}” kezdését óra:perc alakban add meg, pl. 9:30 vagy 0930.`, true); return; }
         if (rosszNap) { showToast(`A(z) „${rosszNap}” napja az esemény napjai közé essen.`, true); return; }
         if (Object.keys(program).length) {
             adat.program = program;
@@ -13259,15 +13293,14 @@
     function htmlSzoveg(h) {   // DOMParser: a kapott HTML-ből csak a szöveg (semmi nem fut le és nem töltődik be belőle)
         try { return (new DOMParser().parseFromString(String(h || ''), 'text/html').body.textContent || '').replace(/\s+/g, ' ').trim(); } catch (e) { return ''; }
     }
-    const TAV_HIREK_KULCS = 'rps-tavhirek2';
+    const TAV_HIREK_KULCS = 'rps-tavhirek3';
     const tavKepUrl = u => /^https:\/\/tavlovasok\.hu\/wp-content\//.test(String(u || '')) ? String(u) : '';
-    function tavHirekBetolt() {
-        if (tavHirek !== null) return;
-        tavHirek = [];
-        try { const c = JSON.parse(sessionStorage.getItem(TAV_HIREK_KULCS) || 'null'); if (c && Date.now() - c.t < 30 * 60000 && Array.isArray(c.l)) { tavHirek = c.l; return; } } catch (e) {}
+    // A szövetség oldaláról a legutóbbi 6 cikk, a kiemelt képükkel (a WordPress media felületéről, méretenként).
+    // hianyos: egy cikknek van kiemelt képe, de nem jött meg (hálózati akadás) - ilyen listát nem tárolunk el.
+    function tavHirekLetolt() {
         const alap = 'https://tavlovasok.hu/wp-json/wp/v2/';
-        fetch(alap + 'posts?per_page=6&_fields=id,date,link,title,excerpt,featured_media')
-            .then(r => { if (!r.ok) tavHirekHiba = true; return r.ok ? r.json() : []; })
+        return fetch(alap + 'posts?per_page=6&_fields=id,date,link,title,excerpt,featured_media')
+            .then(r => { if (!r.ok) throw new Error('tavlovasok.hu: ' + r.status); return r.json(); })
             .then(j => {
                 const lista = Array.isArray(j) ? j : [];
                 // a cikkek kiemelt képe egy második kéréssel (WordPress media), méretenként
@@ -13282,14 +13315,30 @@
                         const u = s => sz[s] && sz[s].source_url;
                         kepMap[x.id] = { kep: tavKepUrl(u('medium_large') || u('large') || x.source_url), nagy: tavKepUrl(u('large') || u('1536x1536') || x.source_url) };
                     });
-                    tavHirek = lista.map(p => ({ id: p.id, cim: htmlSzoveg(p.title && p.title.rendered), link: String(p.link || ''), datum: String(p.date || '').slice(0, 10),
+                    const hirek = lista.map(p => ({ id: p.id, cim: htmlSzoveg(p.title && p.title.rendered), link: String(p.link || ''), datum: String(p.date || '').slice(0, 10),
                         kivonat: htmlSzoveg(p.excerpt && p.excerpt.rendered).replace(/\s*\[…\]\s*$/, ''),
                         kep: (kepMap[p.featured_media] || {}).kep || '', kepNagy: (kepMap[p.featured_media] || {}).nagy || '' }))
                         .filter(p => p.cim && /^https:\/\/tavlovasok\.hu\//.test(p.link));
-                    try { sessionStorage.setItem(TAV_HIREK_KULCS, JSON.stringify({ t: Date.now(), l: tavHirek })); } catch (e) {}
-                    hirekFrissit();
+                    return { hirek, hianyos: lista.some(p => p.featured_media > 0 && !(kepMap[p.featured_media] || {}).kep) };
                 });
-            }).catch(() => { tavHirekHiba = true; hirekFrissit(); });
+            });
+    }
+    let tavHirekUjra = false;
+    function tavHirekTarol(hirek) { try { sessionStorage.setItem(TAV_HIREK_KULCS, JSON.stringify({ t: Date.now(), l: hirek })); } catch (e) {} }
+    function tavHirekBetolt() {
+        if (tavHirek !== null) return;
+        tavHirek = [];
+        try { const c = JSON.parse(sessionStorage.getItem(TAV_HIREK_KULCS) || 'null'); if (c && Date.now() - c.t < 30 * 60000 && Array.isArray(c.l) && c.l.length) { tavHirek = c.l; return; } } catch (e) {}
+        tavHirekLetolt().then(({ hirek, hianyos }) => {
+            tavHirek = hirek;
+            if (hirek.length && !hianyos) tavHirekTarol(hirek);
+            // ha egy-két kép nem jött meg: fél perc múlva még egyszer (addig a saját fotónk áll a helyén)
+            if (hianyos && !tavHirekUjra) {
+                tavHirekUjra = true;
+                setTimeout(() => tavHirekLetolt().then(u => { if (!u.hirek.length) return; tavHirek = u.hirek; if (!u.hianyos) tavHirekTarol(u.hirek); hirekFrissit(); }).catch(() => {}), 30000);
+            }
+            hirekFrissit();
+        }).catch(() => { tavHirekHiba = true; hirekFrissit(); });
     }
     // a szövegben a linkek kattinthatók, a sortörések megmaradnak
     function hirSzovegHtml(s) {
@@ -13305,10 +13354,23 @@
         const t = hatterKep(h.id || h.cim);
         return t ? t.src : '';
     }
-    function hirKepHtml(src, tartalek, cimke, link) {
+    // A hír képe. Ha egy külső (https) kép nem jön be, nem vált rögtön a saját fotónkra: előbb újrapróbálja,
+    // aztán a másik méretet tölti be, és csak ha az sem megy, kerül a helyére a tartalék.
+    function hirKepHtml(src, tartalek, cimke, link, masik) {
         if (!src && !tartalek) return '';
-        const kep = `<img src="${esc(src || tartalek)}" alt="" loading="lazy" decoding="async"${tartalek && src !== tartalek ? ` onerror="this.onerror=null; this.src='${esc(tartalek)}'"` : ''}>${cimke ? `<span class="hir-cimke">${cimke}</span>` : ''}`;
+        const hiba = !(src && tartalek && src !== tartalek) ? ''
+            : /^https:/.test(src) ? ` data-eredeti="${esc(src)}" data-masik="${esc(masik || '')}" data-tartalek="${esc(tartalek)}" onerror="hirKepHiba(this)"`
+            : ` onerror="this.onerror=null; this.src='${esc(tartalek)}'"`;
+        const kep = `<img src="${esc(src || tartalek)}" alt="" loading="lazy" decoding="async"${hiba}>${cimke ? `<span class="hir-cimke">${cimke}</span>` : ''}`;
         return link ? `<a class="hir-kep" href="${esc(link)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">${kep}</a>` : `<div class="hir-kep">${kep}</div>`;
+    }
+    function hirKepHiba(img) {
+        const n = +(img.dataset.proba || 0), eredeti = img.dataset.eredeti || '', masik = img.dataset.masik || '';
+        img.dataset.proba = n + 1;
+        if (n === 0 && eredeti) { setTimeout(() => { img.src = eredeti + (eredeti.includes('?') ? '&' : '?') + 'ujra=1'; }, 1500); return; }
+        if (n <= 1 && masik && masik !== eredeti) { img.dataset.proba = 2; img.src = masik; return; }
+        img.onerror = null;
+        if (img.dataset.tartalek) img.src = img.dataset.tartalek;
     }
     function hirKartyaHtml(h, rovid, nagy) {
         const szoveg = rovid ? rovidit(h.szoveg, nagy ? 260 : 160) : h.szoveg;
@@ -13328,7 +13390,7 @@
     function tavHirKartyaHtml(p, rovid, nagy) {
         const tartalek = (hatterKep('tav' + (p.id || p.cim)) || {}).src;
         return `<article class="hir-kartya kulso ${nagy ? 'nagy' : ''}">
-            ${hirKepHtml(nagy ? (p.kepNagy || p.kep) : p.kep, tartalek, 'tavlovasok.hu', p.link)}
+            ${hirKepHtml(nagy ? (p.kepNagy || p.kep) : p.kep, tartalek, 'tavlovasok.hu', p.link, nagy ? p.kep : p.kepNagy)}
             <div class="hir-tartalom">
                 <div class="hir-forras">${esc(p.datum)}</div>
                 <h4><a class="hir-cim-link" href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.cim)}</a></h4>
