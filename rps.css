@@ -1544,6 +1544,29 @@ body.fullscreen-active .live-item { width: 100%; border-radius: 16px; }
 .minosites-tetelek summary { cursor: pointer; color: var(--primary); font-size: 0.8rem; white-space: nowrap; }
 .minosites-tetelek div { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; margin-top: 3px; }
 
+/* Év Tenyésztője (178. §): lovak és eredmények pontokkal, a kimaradók és az összevonás */
+.teny-tabla td { vertical-align: top; }
+.teny-irasmod { font-size: 0.72rem; font-weight: 500; color: var(--text-dim); margin-top: 3px; line-height: 1.35; }
+.minosites-tetelek .teny-lo { margin-top: 8px; white-space: normal; }
+.teny-lo { margin-top: 8px; }
+.minosites-tetelek .teny-lo-fej, .teny-lo-fej { font-size: 0.82rem; color: var(--text); white-space: normal; }
+.minosites-tetelek .teny-sor, .teny-sor { display: grid; grid-template-columns: 82px minmax(170px, 1fr) 74px 58px 44px 96px; gap: 2px 8px; align-items: baseline;
+    font-size: 0.75rem; color: var(--text-dim); white-space: normal; margin-top: 2px; padding: 1px 0 1px 10px; border-left: 2px solid var(--border); }
+.teny-sor b { color: var(--text); text-align: right; }
+.teny-sor small { font-size: 0.7rem; }
+.teny-doboz { margin-top: 14px; }
+.teny-javaslat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 0.85rem; }
+.teny-javaslat > span { flex: 1 1 260px; }
+.teny-alcim { margin: 12px 0 4px; font-weight: 700; font-size: 0.85rem; }
+.btn-teny-x { background: none; border: 0; color: var(--text-dim); cursor: pointer; padding: 0 4px; font-size: 0.8rem; }
+.btn-teny-x:hover { color: var(--danger); }
+@media (max-width: 700px) {
+    /* telefonon egy eredmény = egy folyó sor (dátum · verseny · táv · hely · pont) */
+    .minosites-tetelek .teny-sor, .teny-sor { display: flex; flex-wrap: wrap; gap: 0 8px; }
+    .teny-sor b { text-align: left; }
+    .teny-tabla td:last-child { min-width: 240px; }
+}
+
 /* Ló versenymentes időszaka (140. §) és FEI újonc minősülés (134. §) a profilban */
 .profil-piheno { margin: 10px 0; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.45; border-left: 4px solid var(--border); background: var(--card-2); color: var(--text); }
 .profil-piheno.pihen { border-left-color: var(--warning); }

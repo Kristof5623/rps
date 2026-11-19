@@ -9747,63 +9747,253 @@
     }
 
     // ============================================================================
-    // ÉV TENYÉSZTŐJE (178. §) - csak admin. A tenyésztő az általa tenyésztett lovak (horses/{startNum}.breeder)
-    // minden eredményesen teljesített, legalább 40 km-es versenyéért pontot kap, bárhol és bármilyen
-    // kategóriában, az előző bajnokavatótól a tárgyévi bajnokavatóig. A pont ugyanúgy számol, mint a
-    // csapatbajnokság (177. § (3), azonos szabályszöveg): a megtett táv sávjában a helyezéshez tartozó pont.
+    // ÉV TENYÉSZTŐJE (178. §) - a „tenyeszto” joggal. A tenyésztő az általa tenyésztett lovak
+    // (horses/{startNum}.breeder - az MLSZ nyilvántartása szerint) minden sikeresen teljesített, legalább
+    // 40 km-es távlovas versenyéért pontot kap, bárhol és bármilyen kategóriában: a III. melléklet szerint
+    // a táv oszlopában a helyezéshez tartozó pontot (mint a csapatbajnokságban).
+    // Időszak: csak a tárgyév versenyei (a felhasználó kérése, 2026-11-18), a tárgyévi bajnokavatóig.
+    // Források - egy ló egy napjára egyszer, a saját adat a mérvadó: 1) a saját lezárt versenyeink,
+    // 2) a szövetségi eredménylista (horseResults) - ami nálunk nem futott, 3) a nemzetközi (FEI) eredmények.
+    // A tenyésztőt az MLSZ többféleképpen írja („Rencsár Kálmán” / „Rencsár Kálmán, Solt”, „Baumann Lajos
+    // e.v.”): a vessző utáni település / cím és a cégforma nem számít; a többit az admin vonja össze.
+    //   settings/tenyesztok/osszevon/{kulcs}   = célkulcs ('-' = nem megnevezett tenyésztő)
+    //   settings/tenyesztok/kulon/{teljes kulcs} = true  (egy írásmód leválasztva az automatikus csoportból)
+    //   settings/tenyesztok/nemUgyanaz/{a|b}   = true  (elvetett összevonási javaslat)
     // ============================================================================
-    function computeEvTenyesztoje(year) {
-        const win = getChampionshipWindow(year);
-        const tenyesztok = {};
-        const hozzaad = (startNum, lo, eredmeny) => {
-            const h = horsesCache[sanitizeKey(startNum || '')] || {};
-            const nev = String(h.breeder || '').trim();
-            if (!nev) return;
-            const t = tenyesztok[nev] || (tenyesztok[nev] = { nev, pont: 0, km: 0, db: 0, lovak: {} });
-            const l = t.lovak[startNum] || (t.lovak[startNum] = { startNum, nev: h.name || lo || startNum, pont: 0, eredmenyek: [] });
-            t.pont += eredmeny.pont; t.km += eredmeny.km; t.db += 1;
-            l.pont += eredmeny.pont; l.eredmenyek.push(eredmeny);
-        };
-        getAllPastRaceRows().forEach(r => {
-            if (!r.startNum || !isDateInWindow(r.raceDate, win) || r.place == null || !(r.completedKm >= 40)) return;
-            hozzaad(r.startNum, r.horseName, { datum: r.raceDate, verseny: r.raceName, km: r.completedKm, hely: r.place, pont: getPoints(getPointBand(r.completedKm), r.place) });
-        });
-        Object.values(externalResultsCache).forEach(ex => {
-            const km = parseFloat(ex && ex.distanceKm) || 0;
-            const hely = parseInt(ex && ex.place, 10);
-            if (!ex || !ex.horseStartNum || ex.status || !(hely > 0) || km < 40 || !isDateInWindow(ex.date, win)) return;
-            hozzaad(ex.horseStartNum, ex.horseName, { datum: ex.date, verseny: (ex.event || 'Nemzetközi verseny') + (ex.venue ? ' – ' + ex.venue : ''), km, hely, pont: getPoints(getPointBand(km), hely) });
-        });
-        return Object.values(tenyesztok).map(t => Object.assign(t, {
-            km: Math.round(t.km * 100) / 100,
-            lovak: Object.values(t.lovak).sort((a, b) => b.pont - a.pont)
-        })).sort((a, b) => (b.pont - a.pont) || (b.km - a.km) || a.nev.localeCompare(b.nev, 'hu'));
+    let tenyesztoBeallitas = {};      // settings/tenyesztok
+    let tenyesztoHivatalos = null;    // horseResults (szövetségi lista) - a nézet első nyitásakor töltjük
+    let tenyesztoFigyel = false;
+    const TENYESZTO_CEGFORMA = new Set(['kft', 'bt', 'zrt', 'nyrt', 'kkt', 'ev', 'ec', 'sarl', 'earl', 'scea', 'gmbh', 'ltd', 'srl', 'sro']);
+
+    // Ékezet és írásjel nélküli szavak; az egybetűs szavak sora egy szó („S.C.E.A.” -> scea, „e.v.” -> ev)
+    function tenyesztoSzavak(s) {
+        const ki = [];
+        String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+            .split(' ').filter(Boolean).forEach(w => {
+                const utolso = ki[ki.length - 1];
+                if (w.length === 1 && utolso && utolso.egy) utolso.s += w;
+                else ki.push({ s: w, egy: w.length === 1 });
+            });
+        return ki.map(x => x.s);
     }
+    // A csoport kulcsa: a vessző előtti rész (utána település / cím jön), cégforma nélkül
+    function tenyesztoAlapKulcs(nev) { return tenyesztoSzavak(String(nev || '').split(',')[0]).filter(w => !TENYESZTO_CEGFORMA.has(w)).join(' '); }
+    function tenyesztoTeljesKulcs(nev) { return tenyesztoSzavak(nev).join(' '); }
+    // Nem megnevezett tenyésztő: „Ismeretlen”, „Ism.”, „Unknown”, „Bulgár tenyésztés”
+    function tenyesztoIsmeretlen(k) { return !k || k === '-' || /^(ism|ismeretlen|unknown|nincs|nem ismert)( |$)/.test(k) || /(^| )tenyesztes$/.test(k); }
+    // A ló tenyésztőjének végső csoportja az összevonások után; '' = nincs megnevezett tenyésztő
+    function tenyesztoCsoport(nev) {
+        const b = tenyesztoBeallitas || {}, osszevon = b.osszevon || {};
+        const teljes = tenyesztoTeljesKulcs(nev);
+        let k = (b.kulon || {})[teljes] ? teljes : tenyesztoAlapKulcs(nev);
+        for (let i = 0; i < 10 && osszevon[k]; i++) k = osszevon[k];
+        return tenyesztoIsmeretlen(k) ? '' : k;
+    }
+    // A tenyésztők az összes lóból: kulcs -> { nev (a leggyakoribb írásmód), valtozatok, lovak }
+    function tenyesztoNevek() {
+        const m = {};
+        Object.values(horsesCache).forEach(h => {
+            const b = String(h && h.breeder || '').trim().replace(/\s+/g, ' ');
+            const k = b && tenyesztoCsoport(b);
+            if (!k) return;
+            const t = m[k] || (m[k] = { kulcs: k, reszek: {}, valtozatok: {}, lovak: 0 });
+            const resz = b.split(',')[0].trim();
+            t.reszek[resz] = (t.reszek[resz] || 0) + 1;
+            t.valtozatok[b] = (t.valtozatok[b] || 0) + 1;
+            t.lovak++;
+        });
+        Object.values(m).forEach(t => { t.nev = Object.entries(t.reszek).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0]; });
+        return m;
+    }
+    function tenyesztoIdoszak(year) {
+        const win = getChampionshipWindow(year), elso = year + '-01-01';
+        return { start: win.start > elso ? win.start : elso, end: win.end };
+    }
+    // Többnapos verseny: „CEI2* 70+(2)” (FEI) vagy „2x80 km” -> napok száma
+    function tenyesztoNapok(...szovegek) {
+        for (const s of szovegek) {
+            const a = /(\d{2,3})\s*\+\s*\((\d)\)/.exec(s || '');
+            if (a) return parseInt(a[2], 10);
+            const b = /(?:^|[^\d.])([2-9])\s*[x×]\s*\d{2,3}/i.exec(s || '');
+            if (b) return parseInt(b[1], 10);
+        }
+        return 1;
+    }
+    // III. melléklet: kétnapos versenynél a napi táv dönt (2×80–2×100 = 140–160-as oszlop, 2×60–2×79 =
+    // 120–139, 2×40–2×59 = 80–99), egynaposnál a megtett táv
+    function tenyesztoSav(km, napok) {
+        if (napok > 1) { const nap = km / napok; return nap >= 80 ? 'band140_160' : nap >= 60 ? 'band120_139' : nap >= 40 ? 'band80_99' : null; }
+        return getPointBand(km);
+    }
+    // Az időszak minden ló-eredménye a három forrásból; egy ló egy napjára egy sor (a saját adat a mérvadó)
+    function tenyesztoSorok(ido) {
+        const sorok = [], van = new Set();
+        getAllPastRaceRows().forEach(r => {
+            if (!r.startNum || !isDateInWindow(r.raceDate, ido)) return;
+            van.add(r.startNum + '|' + r.raceDate);
+            sorok.push({ startNum: r.startNum, lo: r.horseName, datum: r.raceDate, verseny: r.raceName || '', km: r.completedKm, napok: 1,
+                hely: r.place, kesz: r.place != null && !r.isEliminated, lovas: r.name, forras: 'saját' });
+        });
+        Object.entries(tenyesztoHivatalos || {}).forEach(([sn, v]) => {
+            (Array.isArray(v) ? v : Object.values(v || {})).forEach(e => {
+                if (!e) return;
+                const datum = String(e.date || '').replace(/\//g, '-').replace(/\.$/, '').replace(/\./g, '-');
+                if (!isDateInWindow(datum, ido) || van.has(sn + '|' + datum)) return;
+                van.add(sn + '|' + datum);
+                const hely = /^\d+$/.test(String(e.place == null ? '' : e.place).trim()) ? parseInt(e.place, 10) : null;
+                sorok.push({ startNum: sn, lo: (horsesCache[sanitizeKey(sn)] || {}).name || '', datum, verseny: e.event || '', km: parseFloat(e.distanceKm) || 0,
+                    napok: tenyesztoNapok(e.competition, e.event), hely, kesz: !e.status && hely > 0, lovas: profilPartnerNev(e.riderName || e.partnerName || ''), forras: 'szövetségi lista' });
+            });
+        });
+        const feiLo = {};
+        Object.values(horsesCache).forEach(h => { const f = String(h && h.feiId || '').trim().toUpperCase(); if (f && h.startNum) feiLo[f] = String(h.startNum); });
+        Object.values(externalResultsCache).forEach(ex => {
+            if (!ex || !isDateInWindow(ex.date, ido)) return;
+            const fei = String(ex.horseFeiId || '').trim().toUpperCase();
+            const sn = String(ex.horseStartNum || '').trim() || feiLo[fei] || '';
+            const k = (sn || 'fei:' + (fei || String(ex.horseName || '').toUpperCase())) + '|' + ex.date;
+            if (van.has(k)) return;
+            van.add(k);
+            const hely = parseInt(ex.place, 10);
+            sorok.push({ startNum: sn, lo: ex.horseName || '', datum: ex.date, verseny: (ex.event || 'Nemzetközi verseny') + (ex.venue ? ' – ' + ex.venue : ''),
+                km: parseFloat(ex.distanceKm) || 0, napok: tenyesztoNapok(ex.competition, ex.event), hely: hely > 0 ? hely : null,
+                kesz: !ex.status && hely > 0, lovas: ex.riderName || '', forras: 'FEI' });
+        });
+        return sorok;
+    }
+
+    function evTenyesztoje(year) {
+        const ido = tenyesztoIdoszak(year);
+        const nevek = tenyesztoNevek();
+        const tenyesztok = {}, kimaradt = {};
+        let kulfoldi = 0;
+        tenyesztoSorok(ido).forEach(s => {
+            const sav = s.kesz && s.hely > 0 && s.km >= 40 ? tenyesztoSav(s.km, s.napok) : null;
+            if (!sav) return;
+            const e = Object.assign({}, s, { pont: getPoints(sav, s.hely) });
+            const h = s.startNum ? horsesCache[sanitizeKey(s.startNum)] : null;
+            const k = h ? tenyesztoCsoport(h.breeder) : '';
+            if (!k) {
+                // a nem magyar nyilvántartású (FEI-)lovaknak nincs MLSZ-tenyésztője - ezeket csak megszámoljuk
+                if (!s.startNum) { kulfoldi++; return; }
+                const m = kimaradt[s.startNum] || (kimaradt[s.startNum] = { startNum: s.startNum, nev: (h && h.name) || s.lo,
+                    ok: !h ? 'nincs a lótörzsben' : String(h.breeder || '').trim() ? `nincs megnevezett tenyésztő („${String(h.breeder).trim()}”)` : 'nincs tenyésztő az MLSZ-nyilvántartásban', eredmenyek: [] });
+                m.eredmenyek.push(e);
+                return;
+            }
+            const t = tenyesztok[k] || (tenyesztok[k] = { kulcs: k, nev: nevek[k] ? nevek[k].nev : k, pont: 0, km: 0, db: 0, lovak: {} });
+            const l = t.lovak[s.startNum] || (t.lovak[s.startNum] = { startNum: s.startNum, nev: h.name || s.lo, pont: 0, eredmenyek: [] });
+            t.pont += e.pont; t.km += s.km; t.db++;
+            l.pont += e.pont; l.eredmenyek.push(e);
+        });
+        const datumSzerint = (a, b) => a.datum.localeCompare(b.datum);
+        const lista = Object.values(tenyesztok).map(t => Object.assign(t, {
+            km: Math.round(t.km * 100) / 100,
+            valtozatok: nevek[t.kulcs] ? Object.keys(nevek[t.kulcs].valtozatok).sort((a, b) => a.localeCompare(b, 'hu')) : [],
+            lovak: Object.values(t.lovak).map(l => Object.assign(l, { eredmenyek: l.eredmenyek.sort(datumSzerint) }))
+                .sort((a, b) => b.pont - a.pont || a.nev.localeCompare(b.nev, 'hu'))
+        })).sort((a, b) => (b.pont - a.pont) || (b.km - a.km) || a.nev.localeCompare(b.nev, 'hu'));
+        lista.forEach((t, i) => { const e = lista[i - 1]; t.hely = e && e.pont === t.pont && e.km === t.km ? e.hely : i + 1; });
+        return { ido, lista, nevek, kulfoldi,
+            kimaradt: Object.values(kimaradt).map(m => Object.assign(m, { eredmenyek: m.eredmenyek.sort(datumSzerint) })).sort((a, b) => a.nev.localeCompare(b.nev, 'hu')) };
+    }
+    // a régi név (a bajnoki modulok és a tesztek ezt hívták)
+    function computeEvTenyesztoje(year) { return evTenyesztoje(year).lista; }
+
+    // Összevonási javaslat: 1-2 betű eltérés, vagy az egyik név a másik része („Veles Stud” / „Veles Stud Farm”)
+    function tenyesztoJavaslatok(nevek) {
+        const nem = (tenyesztoBeallitas || {}).nemUgyanaz || {};
+        const kulcsok = Object.keys(nevek).sort();
+        const ki = [];
+        for (let i = 0; i < kulcsok.length; i++) {
+            for (let j = i + 1; j < kulcsok.length; j++) {
+                const a = kulcsok[i], b = kulcsok[j];
+                if (nem[a + '|' + b]) continue;
+                const ta = a.split(' '), tb = b.split(' ');
+                const resz = ta.length !== tb.length && Math.min(ta.length, tb.length) >= 2 && (ta.every(w => tb.includes(w)) || tb.every(w => ta.includes(w)));
+                const max = Math.min(a.length, b.length) >= 12 ? 2 : 1;
+                if (resz || (Math.min(a.length, b.length) >= 6 && szerkTav(a, b, max) <= max)) ki.push([a, b]);
+            }
+        }
+        return ki;
+    }
+    function tenyesztoIr(ut, ertek, uzenet) {
+        db.ref('settings/tenyesztok/' + ut).set(ertek).then(() => showToast(uzenet)).catch(e => showToast('Hiba: ' + e.message, true));
+    }
+    // Összevonás: a kevesebb lóval szereplő írásmód kerül a másikhoz (a név a leggyakoribb írásmód marad)
+    function tenyesztoOsszevon(a, b) {
+        const nevek = tenyesztoNevek();
+        const [honnan, hova] = ((nevek[a] || {}).lovak || 0) >= ((nevek[b] || {}).lovak || 0) ? [b, a] : [a, b];
+        if (tenyesztoCsoport(hova) === honnan) return showToast('Ez körkörös összevonás lenne.', true);
+        tenyesztoIr('osszevon/' + honnan, hova, 'Összevonva – egy tenyésztőként számol.');
+    }
+    function tenyesztoNemUgyanaz(a, b) { tenyesztoIr('nemUgyanaz/' + [a, b].sort().join('|'), true, 'Rendben, külön tenyésztők maradnak.'); }
+    // Egy írásmód leválasztása a csoportjáról (kézi összevonásnál az összevonás törlése, az automatikusnál „külön”)
+    function tenyesztoLevalaszt(valtozat) {
+        const alap = tenyesztoAlapKulcs(valtozat), teljes = tenyesztoTeljesKulcs(valtozat);
+        const osszevon = (tenyesztoBeallitas || {}).osszevon || {};
+        if (osszevon[alap] && !((tenyesztoBeallitas || {}).kulon || {})[teljes]) tenyesztoIr('osszevon/' + alap, null, 'Leválasztva.');
+        else tenyesztoIr('kulon/' + teljes, true, 'Leválasztva – külön tenyésztőként számol.');
+    }
+    function tenyesztoVisszaCsatol(teljes) { tenyesztoIr('kulon/' + teljes, null, 'Visszacsatolva.'); }
 
     let tenyesztoYear = new Date().getFullYear();
     function renderEvTenyesztoje() {
         const cont = document.getElementById('tenyeszto-tartalom');
         if (!cont) return;
+        if (!tenyesztoFigyel) {
+            tenyesztoFigyel = true;
+            const ujra = () => { if (document.getElementById('bajnoksag-teny')?.classList.contains('active')) renderEvTenyesztoje(); };
+            db.ref('settings/tenyesztok').on('value', s => { tenyesztoBeallitas = s.val() || {}; ujra(); }, () => {});
+            db.ref('horseResults').once('value').then(s => { tenyesztoHivatalos = s.val() || {}; ujra(); }).catch(() => { tenyesztoHivatalos = {}; ujra(); });
+        }
         const sel = document.getElementById('tenyeszto-year-select');
         if (sel && sel.options.length === 0) populateYearSelect('tenyeszto-year-select', tenyesztoYear);
         if (sel) tenyesztoYear = parseInt(sel.value, 10) || tenyesztoYear;
-        const win = getChampionshipWindow(tenyesztoYear);
-        const lista = computeEvTenyesztoje(tenyesztoYear);
-        let html = `<p class="field-hint" style="margin-top:0;">Időszak: <b>${escapeHtml(win.start)} – ${escapeHtml(win.end)}</b> (bajnokavatótól bajnokavatóig).
-            A tenyésztett lovak minden eredményesen teljesített, legalább 40 km-es versenye számít, bárhol és bármilyen kategóriában (hazai és FEI).
-            Pont: a megtett táv sávjában a helyezéshez tartozó pont (III. melléklet) - ugyanúgy, mint a csapatbajnokságban. A tenyésztő a szövetségi lótörzsből jön.</p>`;
-        if (!lista.length) { cont.innerHTML = html + '<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még pontszerző eredmény erre az időszakra.</p>'; return; }
-        html += `<div class="table-responsive"><table class="ttrack-table"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Tenyésztő</th><th class="col-header">Pont</th><th class="col-header">Teljesítés</th><th class="col-header">Km</th><th class="col-header" style="text-align:left;">Lovak</th></tr>`;
-        let elozo = null, hely = 0;
-        lista.forEach((t, i) => {
-            if (!elozo || elozo.pont !== t.pont || elozo.km !== t.km) hely = i + 1;
-            elozo = t;
-            const lovak = t.lovak.map(l => `<div>${horseLink(escapeHtml(l.nev), l.startNum)} – <b>${l.pont}</b> p
-                <span style="color:var(--text-dim-2);">(${l.eredmenyek.map(e => `${escapeHtml(e.datum)} ${escapeHtml(e.verseny)}, ${String(e.km).replace('.', ',')} km, ${e.hely}. hely: ${e.pont} p`).join('; ')})</span></div>`).join('');
-            html += `<tr><td>${hely}.</td><td style="text-align:left; font-weight:700; white-space:normal; min-width:160px;">${escapeHtml(t.nev)}</td><td><b style="color:var(--primary);">${t.pont}</b></td><td>${t.db}</td><td>${String(t.km).replace('.', ',')}</td>
-                <td style="text-align:left;"><details class="minosites-tetelek"><summary>${t.lovak.length} ló</summary>${lovak}</details></td></tr>`;
-        });
-        cont.innerHTML = html + '</table></div>';
+        const { ido, lista, nevek, kimaradt, kulfoldi } = evTenyesztoje(tenyesztoYear);
+        const tizedes = n => String(n).replace('.', ',');
+        const forrasDb = {};
+        lista.forEach(t => t.lovak.forEach(l => l.eredmenyek.forEach(e => { forrasDb[e.forras] = (forrasDb[e.forras] || 0) + 1; })));
+        let html = `<p class="field-hint" style="margin-top:0;">Időszak: <b>${esc(ido.start)} – ${esc(ido.end)}</b> (a ${tenyesztoYear}. év versenyei, a bajnokavatóig).
+            A tenyésztett lovak minden sikeresen teljesített, legalább 40 km-es távlovas versenye számít, bárhol és bármilyen kategóriában; pont: a III. melléklet szerint a táv oszlopában a helyezéshez tartozó pont.
+            A tenyésztő az MLSZ nyilvántartásából jön (lótörzs); a település / cím és a cégforma nem számít, a többféle írásmódot lent lehet összevonni.
+            ${tenyesztoHivatalos === null ? '<br><i>A szövetségi eredménylista töltődik…</i>' : ''}</p>`;
+        if (lista.length) {
+            html += `<p class="field-hint">Beszámított eredmények: ${['saját', 'szövetségi lista', 'FEI'].filter(f => forrasDb[f]).map(f => `${f === 'saját' ? 'saját versenyek' : f}: <b>${forrasDb[f]}</b>`).join(' · ')}</p>`;
+            html += `<div class="table-responsive"><table class="ttrack-table teny-tabla"><tr><th class="col-header">#</th><th class="col-header" style="text-align:left;">Tenyésztő</th><th class="col-header">Pont</th><th class="col-header">Teljesítés</th><th class="col-header">Km</th><th class="col-header" style="text-align:left;">Lovak és eredmények</th></tr>`;
+            lista.forEach(t => {
+                const lovak = t.lovak.map(l => `<div class="teny-lo"><div class="teny-lo-fej">${horseLink(esc(l.nev), l.startNum)} <small>${esc(l.startNum)}</small> – <b>${l.pont} p</b></div>
+                    ${l.eredmenyek.map(e => `<div class="teny-sor"><span>${esc(e.datum)}</span><span>${esc(e.verseny)}${e.lovas ? ' · ' + esc(e.lovas) : ''}</span><span>${tizedes(e.km)} km${e.napok > 1 ? ` (${e.napok} nap)` : ''}</span><span>${e.hely}. hely</span><b>${e.pont} p</b><small>${esc(e.forras)}</small></div>`).join('')}</div>`).join('');
+                const irasmod = t.valtozatok.length > 1 ? `<div class="teny-irasmod" title="Az MLSZ nyilvántartásában így szerepel">${t.valtozatok.map(v => esc(v)).join(' · ')}</div>` : '';
+                html += `<tr><td>${t.hely}.</td><td style="text-align:left; font-weight:700; white-space:normal; min-width:160px;">${esc(t.nev)}${irasmod}</td><td><b style="color:var(--primary);">${t.pont}</b></td><td>${t.db}</td><td>${tizedes(t.km)}</td>
+                    <td style="text-align:left; white-space:normal;"><details class="minosites-tetelek"><summary>${t.lovak.length} ló</summary>${lovak}</details></td></tr>`;
+            });
+            html += '</table></div>';
+        } else {
+            html += '<p style="text-align:center; color:var(--text-dim); padding:20px 0;">Nincs még pontszerző eredmény erre az időszakra.</p>';
+        }
+        if (kimaradt.length || kulfoldi) {
+            html += `<details class="adatmin-leiras teny-doboz"><summary>Nem számít bele: ${kimaradt.length} magyar ló${kulfoldi ? `, ${kulfoldi} külföldi ló-eredmény` : ''}</summary>
+                <p class="field-hint">Teljesített 40 km-t, de nincs megnevezett tenyésztője az MLSZ nyilvántartásában (vagy nincs a lótörzsben) – ha van tenyésztője, a szövetségnél kell pótolni.${kulfoldi ? ' A külföldi (nem magyar nyilvántartású) lovak FEI-eredményeinek nincs MLSZ-tenyésztője.' : ''}</p>
+                ${kimaradt.map(m => `<div class="teny-lo"><div class="teny-lo-fej">${horseLink(esc(m.nev), m.startNum)} <small>${esc(m.startNum)} · ${esc(m.ok)}</small></div>
+                    ${m.eredmenyek.map(e => `<div class="teny-sor"><span>${esc(e.datum)}</span><span>${esc(e.verseny)}</span><span>${tizedes(e.km)} km</span><span>${e.hely}. hely</span><b>${e.pont} p</b><small>${esc(e.forras)}</small></div>`).join('')}</div>`).join('')}
+            </details>`;
+        }
+        // összevonás: javaslatok + az egy tenyésztőnek vett írásmódok
+        const javaslat = tenyesztoJavaslatok(nevek);
+        const tobb = Object.values(nevek).filter(n => Object.keys(n.valtozatok).length > 1).sort((a, b) => a.nev.localeCompare(b.nev, 'hu'));
+        const kulon = Object.keys((tenyesztoBeallitas || {}).kulon || {});
+        const nevLovak = k => `<b>${esc((nevek[k] || {}).nev || k)}</b> <small>(${(nevek[k] || {}).lovak || 0} ló)</small>`;
+        html += `<details class="adatmin-leiras teny-doboz"${javaslat.length ? ' open' : ''}><summary>Tenyésztők összevonása${javaslat.length ? ` – <b>${javaslat.length} javaslat</b>` : ''}</summary>
+            <p class="field-hint">Ugyanaz a tenyésztő többféle írásmóddal ne oszoljon két helyre. A település, a cím és a cégforma (Kft., e.v.…) magától nem számít; ami ezen túl eltér, itt lehet egy tenyésztővé vonni.</p>
+            ${javaslat.map(([a, b]) => `<div class="teny-javaslat"><span>${nevLovak(a)} ↔ ${nevLovak(b)}</span>
+                <button class="edit-btn is-info" onclick="tenyesztoOsszevon('${a}', '${b}')">Egy tenyésztő</button><button class="edit-btn" onclick="tenyesztoNemUgyanaz('${a}', '${b}')">Nem ugyanaz</button></div>`).join('')}
+            ${tobb.length ? `<div class="teny-alcim">Egy tenyésztőként számol:</div>` + tobb.map(n => `<div class="teny-javaslat"><span><b>${esc(n.nev)}</b> ← ${Object.keys(n.valtozatok).sort((a, b) => a.localeCompare(b, 'hu')).map(v =>
+                tenyesztoTeljesKulcs(v) === n.kulcs ? esc(v)
+                    : `${esc(v)} <button class="btn-teny-x" title="Leválasztás: külön tenyésztőként számol" onclick="tenyesztoLevalaszt(this.dataset.v)" data-v="${esc(v)}">✕</button>`).join(' · ')}</span></div>`).join('') : ''}
+            ${kulon.length ? `<div class="teny-alcim">Leválasztott írásmódok:</div>` + kulon.map(k => `<div class="teny-javaslat"><span>${esc(k)}</span><button class="edit-btn" onclick="tenyesztoVisszaCsatol('${esc(k)}')">Vissza</button></div>`).join('') : ''}
+        </details>`;
+        cont.innerHTML = html;
     }
 
     // ============================================================================
@@ -10804,9 +10994,6 @@
                 .catch(e => showToast('Hiba: ' + e.message, true));
         });
     }
-
-    // --- ÉV TENYÉSZTŐJE - placeholder (l. terv 5.) ---
-    // (a tenyésztő a ló-törzsbe a tavlovasok_import_v4.json-ból kerül be - horses/{startNum}.breeder)
 
     // ============================================================================
     // A FELÜLET (2026-10-06 óta az egyetlen; a stílusa az rps.css végén, "AZ END-RIDE FELÜLETE"), felső
